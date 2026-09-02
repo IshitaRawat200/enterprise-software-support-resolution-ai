@@ -8,3 +8,4 @@ psycopg
 pgvector
 python-dotenv
 bcrypt
+PyJWT
