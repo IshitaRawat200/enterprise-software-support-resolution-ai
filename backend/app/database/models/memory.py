@@ -43,14 +43,17 @@ class MemoryFact(Base):
 
     source: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     confidence: Mapped[Decimal | None] = mapped_column(
         Numeric(5, 4),
+        nullable=True,
     )
 
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

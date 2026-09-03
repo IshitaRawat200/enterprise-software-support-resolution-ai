@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from typing import Callable
-
 from fastapi import Depends, HTTPException, status
 
-from app.database.models.user import User
 from app.guardrails.auth import get_current_user
 
 
-def require_role(required_role: str) -> Callable:
-    async def role_dependency(
-        current_user: User = Depends(get_current_user),
-    ) -> User:
-        if current_user.role != required_role:
+def require_role(*allowed_roles: str):
+
+    async def role_checker(
+        current_user=Depends(get_current_user),
+    ):
+
+        user_role = str(current_user.role)
+
+        if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions.",
@@ -20,9 +21,16 @@ def require_role(required_role: str) -> Callable:
 
         return current_user
 
-    return role_dependency
+    return role_checker
 
 
-require_customer = require_role("customer")
+require_admin = require_role("admin")
 
-require_support_agent = require_role("support_agent")
+require_support_agent = require_role(
+    "support_agent",
+    "admin",
+)
+
+require_customer = require_role(
+    "customer",
+)

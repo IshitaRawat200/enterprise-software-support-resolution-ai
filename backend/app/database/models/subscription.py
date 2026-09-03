@@ -44,14 +44,17 @@ class Subscription(Base):
 
     start_date: Mapped[date | None] = mapped_column(
         Date,
+        nullable=True,
     )
 
     end_date: Mapped[date | None] = mapped_column(
         Date,
+        nullable=True,
     )
 
     seats: Mapped[int | None] = mapped_column(
         Integer,
+        nullable=True,
     )
 
     is_premium: Mapped[bool] = mapped_column(

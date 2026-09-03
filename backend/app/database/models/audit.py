@@ -33,15 +33,21 @@ class AuditEvent(Base):
     user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     session_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
+        nullable=True,
+        index=True,
     )
 
     ticket_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("support_tickets.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     event_type: Mapped[str] = mapped_column(
@@ -51,10 +57,12 @@ class AuditEvent(Base):
 
     actor: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     action: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
     )
 
     details: Mapped[dict[str, Any]] = mapped_column(

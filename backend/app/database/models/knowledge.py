@@ -39,26 +39,32 @@ class KnowledgeArticle(Base):
 
     description: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
     )
 
     product_name: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
     )
 
     product_version: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     source_url: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
     )
 
     version: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     published_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
     )
 
     is_active: Mapped[bool] = mapped_column(
@@ -104,6 +110,8 @@ class Document(Base):
     knowledge_article_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("knowledge_articles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     document_name: Mapped[str] = mapped_column(
@@ -113,26 +121,32 @@ class Document(Base):
 
     document_type: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     source_url: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
     )
 
     product_name: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
     )
 
     product_version: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     version: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     content_hash: Mapped[str | None] = mapped_column(
         String(128),
+        nullable=True,
     )
 
     metadata_: Mapped[dict[str, Any]] = mapped_column(
@@ -190,10 +204,12 @@ class DocumentChunk(Base):
 
     token_count: Mapped[int | None] = mapped_column(
         Integer,
+        nullable=True,
     )
 
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(1536),
+        nullable=True,
     )
 
     metadata_: Mapped[dict[str, Any]] = mapped_column(
@@ -217,7 +233,7 @@ class DocumentChunk(Base):
 
 
 class KnowledgeArticleUsage(Base):
-    __tablename__ = "knowlege_article_usage"
+    __tablename__ = "knowledge_article_usage"
 
     id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
@@ -229,24 +245,31 @@ class KnowledgeArticleUsage(Base):
         PGUUID(as_uuid=True),
         ForeignKey("knowledge_articles.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     ticket_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("support_tickets.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     query: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
     )
 
     usage_type: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

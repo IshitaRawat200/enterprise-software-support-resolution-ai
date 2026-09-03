@@ -49,6 +49,7 @@ class IncidentLog(Base):
 
     service_name: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
     )
 
     severity: Mapped[str] = mapped_column(
@@ -98,10 +99,12 @@ class IncidentLog(Base):
 
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
     )
 
     resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
     )
 
     metadata_: Mapped[dict[str, Any]] = mapped_column(

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from functools import lru_cache
 
 from pydantic import Field
@@ -12,52 +14,162 @@ class Settings(BaseSettings):
     Secrets must never be hard-coded in source code.
     """
 
+    # =========================================================
+    # Application
+    # =========================================================
+
     app_name: str = Field(
         default="Enterprise Software Support & Resolution Intelligence System"
     )
-    environment: str = Field(default="development")
-    debug: bool = Field(default=True)
 
+    environment: str = Field(
+        default="development"
+    )
+
+    debug: bool = Field(
+        default=True
+    )
+
+    # =========================================================
     # Database
+    # =========================================================
+
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/support_ai"
     )
 
+    # =========================================================
     # Authentication
-    jwt_secret_key: str = Field(default="change-this-secret")
-    jwt_algorithm: str = Field(default="HS256")
-    access_token_expire_minutes: int = Field(default=60, ge=1)
+    # =========================================================
 
+    jwt_secret_key: str = Field(
+        default="change-this-secret"
+    )
+
+    jwt_algorithm: str = Field(
+        default="HS256"
+    )
+
+    access_token_expire_minutes: int = Field(
+        default=60,
+        ge=1,
+    )
+
+    # =========================================================
     # CORS
-    frontend_url: str = Field(default="http://localhost:5173")
+    # =========================================================
 
-    # AI provider configuration
-    llm_provider: str = Field(default="ollama")
+    frontend_url: str = Field(
+        default="http://localhost:5173"
+    )
 
-    ollama_base_url: str = Field(default="http://localhost:11434")
-    ollama_model: str = Field(default="llama3.1")
+    # =========================================================
+    # LLM Provider
+    # =========================================================
 
-    groq_api_key: str | None = Field(default=None)
-    groq_model: str | None = Field(default=None)
+    llm_provider: str = Field(
+        default="groq"
+    )
 
-    openai_api_key: str | None = Field(default=None)
-    openai_model: str | None = Field(default=None)
+    # =========================================================
+    # Groq
+    # =========================================================
 
+    groq_api_key: str | None = Field(
+        default=None
+    )
+
+    groq_simple_model: str | None = Field(
+        default=None
+    )
+
+    groq_complex_model: str | None = Field(
+        default=None
+    )
+
+    groq_base_url: str = Field(
+        default="https://api.groq.com/openai/v1"
+    )
+
+    # =========================================================
+    # OpenAI
+    # =========================================================
+
+    openai_api_key: str | None = Field(
+        default=None
+    )
+
+    openai_model: str | None = Field(
+        default=None
+    )
+
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1"
+    )
+
+    # =========================================================
+    # Embeddings
+    # =========================================================
+
+    embedding_model: str = Field(
+        default="BAAI/bge-small-en-v1.5"
+    )
+
+    embedding_dimensions: int = Field(
+        default=1536,
+        ge=1,
+    )
+
+    embedding_batch_size: int = Field(
+        default=100,
+        ge=1,
+        le=500,
+    )
+
+    # =========================================================
     # RAG
-    rag_top_k: int = Field(default=8, ge=1)
+    # =========================================================
+
+    rag_top_k: int = Field(
+        default=8,
+        ge=1,
+    )
+
     rag_confidence_threshold: float = Field(
         default=0.75,
         ge=0.0,
         le=1.0,
     )
 
+    rag_vector_top_k: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+    )
+
+    rag_final_top_k: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+    )
+
+    # =========================================================
     # Escalation
+    # =========================================================
+
     confidence_threshold: float = Field(
         default=0.70,
         ge=0.0,
         le=1.0,
     )
-    critical_auto_escalation: bool = Field(default=True)
+
+    critical_auto_escalation: bool = Field(
+        default=True
+    )
+
+    # =========================================================
+    # Environment configuration
+    # =========================================================
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -71,7 +183,6 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """
     Return a cached settings instance.
-
-    Caching prevents repeatedly parsing environment configuration.
     """
+
     return Settings()

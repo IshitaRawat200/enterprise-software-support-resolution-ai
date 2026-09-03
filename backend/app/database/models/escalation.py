@@ -69,6 +69,7 @@ class Escalation(Base):
 
     confidence: Mapped[Decimal | None] = mapped_column(
         Numeric(5, 4),
+        nullable=True,
     )
 
     handoff_package: Mapped[dict[str, Any]] = mapped_column(
@@ -80,11 +81,14 @@ class Escalation(Base):
 
     investigation_summary: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
     )
 
     support_agent_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -101,6 +105,7 @@ class Escalation(Base):
 
     resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
     )
 
     ticket: Mapped["SupportTicket"] = relationship(

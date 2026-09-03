@@ -15,7 +15,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
-from app.guardrails.rbac import require_customer, require_support_agent
+
 from app.services.auth_service import (
     authenticate_user,
     create_access_token,
@@ -95,24 +95,3 @@ async def get_me(
 ) -> UserResponse:
 
     return UserResponse.model_validate(current_user)
-
-@router.get("/customer-test")
-async def customer_test(
-    current_user: User = Depends(require_customer),
-) -> dict:
-    return {
-        "message": "Customer access granted",
-        "email": current_user.email,
-        "role": current_user.role,
-    }
-
-
-@router.get("/support-test")
-async def support_test(
-    current_user: User = Depends(require_support_agent),
-) -> dict:
-    return {
-        "message": "Support agent access granted",
-        "email": current_user.email,
-        "role": current_user.role,
-    }

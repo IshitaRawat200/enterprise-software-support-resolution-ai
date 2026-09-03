@@ -9,8 +9,6 @@ from app.database.models.customer import Customer
 
 
 class CustomerRepository:
-    """Database operations for customers."""
-
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 

@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.auth import router as auth_router
 from app.config import get_settings
 from app.database.connection import check_database_connection
-
+from app.api.auth import router as auth_router
+from app.api.customers import router as customers_router
+from app.api.tickets import router as tickets_router
+from app.api.agent_test import router as agent_test_router
+from app.api.knowledge_base import router as knowledge_base_router
+from app.api.chat import router as chat_router
 
 settings = get_settings()
 
@@ -24,7 +28,11 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-
+app.include_router(customers_router)
+app.include_router(tickets_router)
+app.include_router(agent_test_router)
+app.include_router(knowledge_base_router)
+app.include_router(chat_router)
 
 @app.get("/health")
 async def health_check() -> dict:
