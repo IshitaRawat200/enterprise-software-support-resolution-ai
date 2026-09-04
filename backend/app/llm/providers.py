@@ -41,6 +41,7 @@ def create_groq_llm(
     return ChatGroq(
         model=model,
         api_key=settings.groq_api_key,
+        base_url="https://api.groq.com",
         temperature=0.0,
     )
 

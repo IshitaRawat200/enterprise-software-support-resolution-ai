@@ -21,6 +21,7 @@ BEGIN
         CREATE TYPE user_role AS ENUM (
             'customer',
             'support_agent'
+            'admin'
         );
     END IF;
 
@@ -533,7 +534,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 -- NIIT SPECIFICATION TABLE
 -- ------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS knowlege_article_usage (
+CREATE TABLE IF NOT EXISTS knowledge_article_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     article_id UUID NOT NULL,
@@ -565,13 +566,13 @@ CREATE TABLE IF NOT EXISTS knowlege_article_usage (
 );
 
 CREATE INDEX IF NOT EXISTS idx_article_usage_article
-    ON knowlege_article_usage(article_id);
+    ON knowledge_article_usage(article_id);
 
 CREATE INDEX IF NOT EXISTS idx_article_usage_user
-    ON knowlege_article_usage(user_id);
+    ON knowledge_article_usage(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_article_usage_ticket
-    ON knowlege_article_usage(ticket_id);
+    ON knowledge_article_usage(ticket_id);
 
 -- ------------------------------------------------------------
 -- INDEXES

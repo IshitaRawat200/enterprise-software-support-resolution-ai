@@ -41,6 +41,13 @@ class SupportState(TypedDict, total=False):
     suggested_route: str | None
     initial_action: str | None
 
+    # severity
+    severity: str | None
+    severity_confidence: float
+    severity_reason: str | None
+
+    escalation_required: bool
+    escalation_reason: str | None
     # ============================================================
     # ROUTING
     # ============================================================
@@ -88,3 +95,28 @@ class SupportState(TypedDict, total=False):
     # ============================================================
 
     errors: list[str]
+
+        # ============================================================
+    # SQL
+    # ============================================================
+
+    customer_id: str | None
+
+    sql_query: str | None
+    sql_rows: list[dict[str, Any]]
+    sql_row_count: int
+    sql_confidence: float
+    sql_explanation: str | None
+    sql_tables_used: list[str]
+    sql_success: bool
+    sql_error: str | None
+
+    # ============================================================
+    # HYBRID
+    # ============================================================
+
+    hybrid_results: list[dict[str, Any]]
+    hybrid_confidence: float
+    hybrid_success: bool
+    hybrid_reason: str | None
+    hybrid_errors: list[str]

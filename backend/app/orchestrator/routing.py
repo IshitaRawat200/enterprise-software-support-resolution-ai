@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
 from langgraph.graph import END
 
-from app.orchestrator.state import (
-    SupportState,
-)
+from app.orchestrator.state import SupportState
 
 
 # ============================================================
@@ -20,11 +16,10 @@ def route_after_plan(
     """
     PLAN → INTENT
 
-    Intent Agent always runs after planning.
+    Intent Agent runs after the planning phase.
     """
 
     if state.get("errors"):
-
         return END
 
     return "intent"
@@ -39,37 +34,47 @@ def route_after_intent(
     state: SupportState,
 ) -> str:
     """
-    Decide which action should be executed.
+    INTENT → ACT
 
-    Current supported route:
+    The Intent Agent determines the suggested execution route.
 
-        rag → ACT
+    Supported routes:
 
-    Other routes are reserved for later implementation.
+        rag       → ACT
+        sql       → ACT
+        hybrid    → ACT
+        incident  → ACT
+
+    The ACT node is responsible for executing the
+    selected resolution path.
     """
 
     if state.get("errors"):
-
         return END
 
-    if state.get(
-        "requires_clarification",
-        False,
-    ):
-
+    # If the Intent Agent explicitly needs clarification,
+    # stop the workflow and ask the customer for clarification.
+    if state.get("requires_clarification", False):
         return END
 
     route = (
-        state.get(
-            "suggested_route"
-        )
-        or state.get(
-            "route"
-        )
+        state.get("suggested_route")
+        or state.get("route")
         or "rag"
     )
 
-    return "act"
+    # All supported resolution paths continue to ACT.
+    if route in {
+        "rag",
+        "sql",
+        "hybrid",
+        "incident",
+    }:
+        return "act"
+
+    # Unknown route should not enter an unsupported
+    # execution path.
+    return END
 
 
 # ============================================================
@@ -83,7 +88,7 @@ def route_after_check(
     """
     CHECK → REFLECT
 
-    Reflection always follows the check phase.
+    Reflection always follows the CHECK phase.
     """
 
     return "reflect"
@@ -105,12 +110,9 @@ def route_after_reflect(
         replan  → PLAN
     """
 
-    decision = state.get(
-        "reflection_decision"
-    )
+    decision = state.get("reflection_decision")
 
     if decision == "replan":
-
         return "plan"
 
     return END
