@@ -19,6 +19,7 @@ class SupportState(TypedDict, total=False):
 
     message: str
     conversation_id: str | None
+    customer_id: str | None
 
     # ============================================================
     # PLAN
@@ -41,13 +42,6 @@ class SupportState(TypedDict, total=False):
     suggested_route: str | None
     initial_action: str | None
 
-    # severity
-    severity: str | None
-    severity_confidence: float
-    severity_reason: str | None
-
-    escalation_required: bool
-    escalation_reason: str | None
     # ============================================================
     # ROUTING
     # ============================================================
@@ -63,6 +57,66 @@ class SupportState(TypedDict, total=False):
     retrieval_confidence: float
     sufficient_evidence: bool
     retrieval_reason: str | None
+
+    # ============================================================
+    # ACCOUNT VALIDATION
+    # ============================================================
+
+    account_exists: bool
+    account_status: str | None
+    company_name: str | None
+    contact_name: str | None
+    region: str | None
+    industry: str | None
+
+    account_validation_confidence: float
+    account_validation_reason: str | None
+
+    # ============================================================
+    # SQL
+    # ============================================================
+
+    sql_query: str | None
+    sql_rows: list[dict[str, Any]]
+    sql_row_count: int
+    sql_confidence: float
+    sql_explanation: str | None
+    sql_tables_used: list[str]
+    sql_success: bool
+    sql_error: str | None
+
+    # ============================================================
+    # HYBRID
+    # ============================================================
+
+    hybrid_results: list[dict[str, Any]]
+    hybrid_confidence: float
+    hybrid_success: bool
+    hybrid_reason: str | None
+    hybrid_errors: list[str]
+
+    # ============================================================
+    # SEVERITY ASSESSMENT AGENT
+    # ============================================================
+
+    severity: str | None
+    severity_confidence: float
+    severity_reason: str | None
+
+    # ============================================================
+    # ESCALATION MANAGER AGENT
+    # ============================================================
+
+    escalation_required: bool
+    escalation_reason: str | None
+
+    escalation_priority: str | None
+    escalation_type: str | None
+    escalation_reference_id: str | None
+    handoff_context: dict[str, Any] | None
+    human_handoff_required: bool
+    handoff_summary: str | None
+    recommended_action: str | None
 
     # ============================================================
     # CHECK
@@ -96,27 +150,10 @@ class SupportState(TypedDict, total=False):
 
     errors: list[str]
 
-        # ============================================================
-    # SQL
+    # ============================================================
+    # FINAL RESPONSE
     # ============================================================
 
-    customer_id: str | None
+    response: str | None
 
-    sql_query: str | None
-    sql_rows: list[dict[str, Any]]
-    sql_row_count: int
-    sql_confidence: float
-    sql_explanation: str | None
-    sql_tables_used: list[str]
-    sql_success: bool
-    sql_error: str | None
-
-    # ============================================================
-    # HYBRID
-    # ============================================================
-
-    hybrid_results: list[dict[str, Any]]
-    hybrid_confidence: float
-    hybrid_success: bool
-    hybrid_reason: str | None
-    hybrid_errors: list[str]
+    

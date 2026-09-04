@@ -59,115 +59,82 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """
-    Support workflow response.
-
-    Current pipeline:
-
-        Intent
-          ↓
-        RAG
-
-    Future pipeline:
-
-        Intent
-          ↓
-        Route
-          ↓
-        RAG / SQL / Hybrid
-          ↓
-        Check
-          ↓
-        Reflect / Re-plan
-          ↓
-        Final Response
-    """
-
-    # --------------------------------------------------------
-    # Original customer message
-    # --------------------------------------------------------
-
     message: str
 
-    # --------------------------------------------------------
-    # Intent Agent
-    # --------------------------------------------------------
+    # ============================================================
+    # INTENT
+    # ============================================================
 
     intent: str | None = None
-
     intent_confidence: float = 0.0
-
     intent_reason: str | None = None
 
-    # --------------------------------------------------------
-    # Routing
-    # --------------------------------------------------------
+    # ============================================================
+    # ROUTING
+    # ============================================================
 
     route: str | None = None
 
-    # --------------------------------------------------------
-    # Documentation Retrieval Agent
-    # --------------------------------------------------------
+    # ============================================================
+    # RAG
+    # ============================================================
 
     retrieval_confidence: float = 0.0
-
     sufficient_evidence: bool = False
-
     retrieval_results: list[dict[str, Any]] = Field(
         default_factory=list
     )
 
-    # --------------------------------------------------------
-    # SQL pipeline
-    # --------------------------------------------------------
+    # ============================================================
+    # SQL
+    # ============================================================
 
     sql_query: str | None = None
-
     sql_rows: list[dict[str, Any]] = Field(
         default_factory=list
     )
-
     sql_confidence: float = 0.0
-
     sql_success: bool = False
 
-    # --------------------------------------------------------
-    # Hybrid pipeline
-    # --------------------------------------------------------
+    # ============================================================
+    # HYBRID
+    # ============================================================
 
     hybrid_results: list[dict[str, Any]] = Field(
         default_factory=list
     )
-
     hybrid_confidence: float = 0.0
 
-    # --------------------------------------------------------
-    # Future severity
-    # --------------------------------------------------------
+    # ============================================================
+    # SEVERITY
+    # ============================================================
 
     severity: str | None = None
-
     severity_confidence: float = 0.0
+    severity_reason: str | None = None
 
-    # --------------------------------------------------------
-    # Future escalation
-    # --------------------------------------------------------
+    # ============================================================
+    # ESCALATION MANAGER
+    # ============================================================
 
     escalation_required: bool = False
-
     escalation_reason: str | None = None
 
-    # --------------------------------------------------------
-    # Workflow
-    # --------------------------------------------------------
+    escalation_priority: str | None = None
+    escalation_type: str | None = None
+    escalation_reference_id: str | None = None
 
-    iteration: int = 0
+    handoff_context: dict[str, Any] | None = None
+    human_handoff_required: bool = False
+    handoff_summary: str | None = None
+    recommended_action: str | None = None
 
+    # ============================================================
+    # WORKFLOW
+    # ============================================================
+
+    iteration: int = 1
     current_node: str | None = None
-
-    # --------------------------------------------------------
-    # Errors
-    # --------------------------------------------------------
 
     errors: list[str] = Field(
         default_factory=list
@@ -328,6 +295,9 @@ async def chat(
             "severity_confidence",
             0.0,
         ),
+        severity_reason=result.get(
+            "severity_reason"
+        ),
 
         # Escalation
         escalation_required=result.get(
@@ -353,5 +323,33 @@ async def chat(
         errors=result.get(
             "errors",
             [],
+        ),
+
+        escalation_priority=result.get(
+            "escalation_priority"
+        ),
+
+        escalation_type=result.get(
+            "escalation_type"
+        ),
+
+        escalation_reference_id=result.get(
+            "escalation_reference_id"
+        ),
+
+        handoff_context=result.get(
+            "handoff_context"
+        ),
+        human_handoff_required=result.get(
+            "human_handoff_required",
+            False,
+        ),
+
+        handoff_summary=result.get(
+            "handoff_summary"
+        ),
+
+        recommended_action=result.get(
+            "recommended_action"
         ),
     )
