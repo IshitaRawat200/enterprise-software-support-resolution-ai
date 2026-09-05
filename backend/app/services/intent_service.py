@@ -20,8 +20,10 @@ class IntentService:
     async def classify(
         self,
         message: str,
+        conversation_context: str = "",
     ) -> IntentClassificationResult:
 
         return await self.agent.classify(
-            message
+            message,
+            conversation_context,
         )

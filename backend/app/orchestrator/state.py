@@ -4,78 +4,80 @@ from typing import Any, TypedDict
 
 
 class SupportState(TypedDict, total=False):
-    """
-    Shared state for the LangGraph support workflow.
-
-    Plan → Act → Check → Reflect/Re-plan
-
-    This state stores application data and decisions.
-    It does NOT store private chain-of-thought.
-    """
-
-    # ============================================================
-    # REQUEST
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Request / identity
+    # ------------------------------------------------------------------
     message: str
     conversation_id: str | None
     customer_id: str | None
+    user_id: str | None
+    user_role: str | None
 
-    # ============================================================
-    # PLAN
-    # ============================================================
 
+    conversation_history: list[dict[str, Any]]
+    conversation_context: str | None
+    # ------------------------------------------------------------------
+    # Workflow iteration
+    # ------------------------------------------------------------------
+    # 0 = initial investigation
+    # 1 = first replan
+    # 2 = second replan
+    iteration: int
+
+    # Maximum number of workflow iterations allowed.
+    max_iterations: int
+
+    # ------------------------------------------------------------------
+    # Planning
+    # ------------------------------------------------------------------
     plan: list[str]
     plan_step: int
     plan_reason: str | None
 
-    # ============================================================
-    # INTENT AGENT
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Intent
+    # ------------------------------------------------------------------
     intent: str | None
     intent_confidence: float
     intent_reason: str | None
-
     requires_clarification: bool
-
     suggested_route: str | None
     initial_action: str | None
 
-    # ============================================================
-    # ROUTING
-    # ============================================================
 
+    complexity: str | None
+    complexity_reason: str | None
+
+    # ------------------------------------------------------------------
+    # Routing / action
+    # ------------------------------------------------------------------
     route: str | None
     selected_action: str | None
+    current_node: str | None
 
-    # ============================================================
-    # RETRIEVAL AGENT
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Documentation retrieval
+    # ------------------------------------------------------------------
     retrieval_results: list[dict[str, Any]]
     retrieval_confidence: float
     sufficient_evidence: bool
     retrieval_reason: str | None
 
-    # ============================================================
-    # ACCOUNT VALIDATION
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Account validation
+    # ------------------------------------------------------------------
     account_exists: bool
     account_status: str | None
     company_name: str | None
     contact_name: str | None
     region: str | None
     industry: str | None
-
     account_validation_confidence: float
     account_validation_reason: str | None
 
-    # ============================================================
+    # ------------------------------------------------------------------
     # SQL
-    # ============================================================
-
+    # ------------------------------------------------------------------
     sql_query: str | None
     sql_rows: list[dict[str, Any]]
     sql_row_count: int
@@ -85,75 +87,107 @@ class SupportState(TypedDict, total=False):
     sql_success: bool
     sql_error: str | None
 
-    # ============================================================
-    # HYBRID
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Hybrid
+    # ------------------------------------------------------------------
     hybrid_results: list[dict[str, Any]]
     hybrid_confidence: float
     hybrid_success: bool
     hybrid_reason: str | None
     hybrid_errors: list[str]
 
-    # ============================================================
-    # SEVERITY ASSESSMENT AGENT
-    # ============================================================
+    # ------------------------------------------------------------------
+    # Incident / MCP
+    # ------------------------------------------------------------------
+    # Service being investigated for a production incident.
+    service_name: str | None
+    incident_service: str | None
 
+    # Raw incident evidence returned by the MCP incident tool.
+    incident_results: list[dict[str, Any]]
+
+    # Whether an active incident was found.
+    incident_active: bool
+
+    # Confidence in the MCP incident investigation.
+    incident_confidence: float
+
+    # Current incident status.
+    incident_status: str | None
+
+    # Enterprise incident identifier.
+    incident_code: str | None
+
+    # Severity reported by the incident system.
+    incident_severity: str | None
+
+    # Whether production is affected.
+    incident_affects_production: bool
+
+    # Whether an unresolved critical alert exists.
+    incident_unresolved_critical_alert: bool
+
+    # Whether the incident has security implications.
+    incident_security_related: bool
+
+    # Whether data loss has been reported.
+    incident_data_loss_reported: bool
+
+    # MCP tool execution/audit information.
+    # This contains operational metadata, not chain-of-thought.
+    mcp_tool_calls: list[dict[str, Any]]
+
+    # ------------------------------------------------------------------
+    # Severity
+    # ------------------------------------------------------------------
     severity: str | None
     severity_confidence: float
     severity_reason: str | None
 
-    # ============================================================
-    # ESCALATION MANAGER AGENT
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Escalation
+    # ------------------------------------------------------------------
     escalation_required: bool
     escalation_reason: str | None
-
     escalation_priority: str | None
     escalation_type: str | None
-    escalation_reference_id: str | None
-    handoff_context: dict[str, Any] | None
     human_handoff_required: bool
     handoff_summary: str | None
     recommended_action: str | None
+    escalation_reference_id: str | None
+    handoff_context: dict[str, Any] | None
 
-    # ============================================================
-    # CHECK
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Quality / reflection
+    # ------------------------------------------------------------------
     check_passed: bool
     check_reason: str | None
-
     evidence_sufficient: bool
     confidence_sufficient: bool
-
-    # ============================================================
-    # REFLECTION / RE-PLAN
-    # ============================================================
 
     reflection_decision: str | None
     reflection_reason: str | None
     replan_required: bool
 
-    # ============================================================
-    # WORKFLOW CONTROL
-    # ============================================================
-
-    current_node: str | None
-    iteration: int
-    max_iterations: int
-
-    # ============================================================
-    # ERRORS
-    # ============================================================
-
-    errors: list[str]
-
-    # ============================================================
-    # FINAL RESPONSE
-    # ============================================================
-
+    # ------------------------------------------------------------------
+    # Resolution
+    # ------------------------------------------------------------------
+    resolved: bool
+    resolution_reason: str | None
     response: str | None
 
-    
+    # ------------------------------------------------------------------
+    # Ticket lifecycle
+    # ------------------------------------------------------------------
+    ticket_id: str | None
+    ticket_number: str | None
+    ticket_created: bool
+    ticket_updated: bool
+    ticket_required: bool
+    ticket_reason: str | None
+    ticket_action: str | None
+
+    # ------------------------------------------------------------------
+    # Errors
+    # ------------------------------------------------------------------
+    errors: list[str]

@@ -9,12 +9,12 @@ class HandoffContextService:
     """
     Builds the structured context transferred to human support.
 
-    This service does not send email and does not create database
-    records.
+    This service is responsible only for constructing the handoff
+    package. It does not create tickets, escalation records, send
+    notifications, or write to the database.
 
-    It creates a safe, structured handoff package that can later be
-    persisted and delivered through email, a support queue, MCP, or
-    another human-support integration.
+    The resulting dictionary is designed to be stored in the
+    escalations.handoff_package JSONB column.
     """
 
     @staticmethod
@@ -29,15 +29,30 @@ class HandoffContextService:
             HO-20260904-103015-A1B2C3
         """
 
-        timestamp = (
-            now
-            or datetime.now(timezone.utc)
-        )
+        timestamp = now or datetime.now(timezone.utc)
 
         return (
             f"HO-"
             f"{timestamp.strftime('%Y%m%d-%H%M%S')}-"
             f"{secrets.token_hex(3).upper()}"
+        )
+
+    @staticmethod
+    def _normalize_confidence(
+        value: float | None,
+    ) -> float | None:
+        """
+        Normalize a confidence score to the range 0.0-1.0.
+
+        None remains None.
+        """
+
+        if value is None:
+            return None
+
+        return round(
+            max(0.0, min(1.0, float(value))),
+            4,
         )
 
     @staticmethod
@@ -66,15 +81,20 @@ class HandoffContextService:
         recommended_action: str | None = None,
     ) -> dict[str, Any]:
         """
-        Build the complete handoff context.
+        Build the complete human-support handoff package.
 
-        The output contains operational evidence and decisions,
-        not private chain-of-thought.
+        The package contains operational evidence, AI decisions,
+        conversation context, and recommended actions.
+
+        It intentionally excludes private chain-of-thought.
         """
 
-        timestamp = datetime.now(
-            timezone.utc
-        )
+        if not message or not message.strip():
+            raise ValueError(
+                "Handoff message cannot be empty."
+            )
+
+        timestamp = datetime.now(timezone.utc)
 
         reference_id = (
             HandoffContextService.generate_reference_id(
@@ -82,17 +102,49 @@ class HandoffContextService:
             )
         )
 
-        safe_retrieval_results = (
+        normalized_severity_confidence = (
+            HandoffContextService._normalize_confidence(
+                severity_confidence
+            )
+            or 0.0
+        )
+
+        normalized_sql_confidence = (
+            HandoffContextService._normalize_confidence(
+                sql_confidence
+            )
+            or 0.0
+        )
+
+        evaluation_scores = {
+            "faithfulness": (
+                HandoffContextService._normalize_confidence(
+                    faithfulness
+                )
+            ),
+            "relevance": (
+                HandoffContextService._normalize_confidence(
+                    relevance
+                )
+            ),
+            "confidence": (
+                HandoffContextService._normalize_confidence(
+                    confidence
+                )
+            ),
+        }
+
+        safe_retrieval_results = list(
             retrieval_results or []
         )
 
-        safe_sql_rows = sql_rows or []
+        safe_sql_rows = list(
+            sql_rows or []
+        )
 
-        evaluation_scores = {
-            "faithfulness": faithfulness,
-            "relevance": relevance,
-            "confidence": confidence,
-        }
+        safe_conversation_flow = list(
+            conversation_flow or []
+        )
 
         return {
             "reference_id": reference_id,
@@ -105,7 +157,7 @@ class HandoffContextService:
 
             "customer_id": customer_id,
 
-            "message": message,
+            "message": message.strip(),
 
             "intent": intent,
 
@@ -114,7 +166,7 @@ class HandoffContextService:
             "severity": severity,
 
             "severity_confidence": (
-                severity_confidence
+                normalized_severity_confidence
             ),
 
             "trigger_reason": (
@@ -144,7 +196,9 @@ class HandoffContextService:
             "sql_evidence": {
                 "sql_query": sql_query,
                 "rows": safe_sql_rows,
-                "confidence": sql_confidence,
+                "confidence": (
+                    normalized_sql_confidence
+                ),
             },
 
             "evaluation_scores": (
@@ -152,7 +206,7 @@ class HandoffContextService:
             ),
 
             "conversation_flow": (
-                conversation_flow or []
+                safe_conversation_flow
             ),
 
             "recommended_action": (

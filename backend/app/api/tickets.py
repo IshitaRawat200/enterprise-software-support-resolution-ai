@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import (
     APIRouter,
@@ -20,12 +20,7 @@ from app.schemas.ticket import (
     TicketMessageResponse,
     TicketResponse,
 )
-from app.services.ticket_service import (
-    add_customer_message,
-    create_customer_ticket,
-    get_customer_ticket,
-    list_customer_tickets,
-)
+from app.services.ticket_service import TicketService
 
 
 router = APIRouter(
@@ -34,16 +29,15 @@ router = APIRouter(
 )
 
 
-@router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
-async def create_ticket(
-    request: TicketCreateRequest,
-    current_user: User = Depends(require_customer),
-    session: AsyncSession = Depends(get_db_session),
-) -> TicketResponse:
-
+async def get_current_customer(
+    current_user: User,
+    session: AsyncSession,
+):
     customer_repository = CustomerRepository(session)
 
-    customer = await customer_repository.get_by_user_id(current_user.id)
+    customer = await customer_repository.get_by_user_id(
+        current_user.id
+    )
 
     if customer is None:
         raise HTTPException(
@@ -51,11 +45,32 @@ async def create_ticket(
             detail="Customer profile not found.",
         )
 
-    ticket = await create_customer_ticket(
-        session=session,
-        customer=customer,
+    return customer
+
+
+@router.post(
+    "",
+    response_model=TicketResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_ticket(
+    request: TicketCreateRequest,
+    current_user: User = Depends(require_customer),
+    session: AsyncSession = Depends(get_db_session),
+) -> TicketResponse:
+    customer = await get_current_customer(
+        current_user,
+        session,
+    )
+
+    service = TicketService(session)
+
+    ticket = await service.create_customer_ticket(
+        customer_id=customer.id,
         subject=request.subject,
         description=request.description,
+        severity=request.severity,
+        request_id=uuid4(),
     )
 
     return TicketResponse.model_validate(ticket)
@@ -69,23 +84,14 @@ async def list_my_tickets(
     current_user: User = Depends(require_customer),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[TicketResponse]:
-
-    customer_repository = CustomerRepository(session)
-
-    customer = await customer_repository.get_by_user_id(
-        current_user.id
+    customer = await get_current_customer(
+        current_user,
+        session,
     )
 
-    if customer is None:
-        from fastapi import HTTPException
+    service = TicketService(session)
 
-        raise HTTPException(
-            status_code=404,
-            detail="Customer profile not found.",
-        )
-
-    tickets = await list_customer_tickets(
-        session=session,
+    tickets = await service.list_customer_tickets(
         customer_id=customer.id,
     )
 
@@ -104,26 +110,28 @@ async def get_my_ticket(
     current_user: User = Depends(require_customer),
     session: AsyncSession = Depends(get_db_session),
 ) -> TicketResponse:
-
-    customer_repository = CustomerRepository(session)
-
-    customer = await customer_repository.get_by_user_id(
-        current_user.id
+    customer = await get_current_customer(
+        current_user,
+        session,
     )
 
-    if customer is None:
-        from fastapi import HTTPException
+    service = TicketService(session)
 
-        raise HTTPException(
-            status_code=404,
-            detail="Customer profile not found.",
+    try:
+        ticket = await service.get_customer_ticket(
+            customer_id=customer.id,
+            ticket_id=ticket_id,
         )
-
-    ticket = await get_customer_ticket(
-        session=session,
-        customer_id=customer.id,
-        ticket_id=ticket_id,
-    )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
 
     return TicketResponse.model_validate(ticket)
 
@@ -139,27 +147,30 @@ async def add_ticket_message(
     current_user: User = Depends(require_customer),
     session: AsyncSession = Depends(get_db_session),
 ) -> TicketMessageResponse:
-
-    customer_repository = CustomerRepository(session)
-
-    customer = await customer_repository.get_by_user_id(
-        current_user.id
+    customer = await get_current_customer(
+        current_user,
+        session,
     )
 
-    if customer is None:
-        from fastapi import HTTPException
+    service = TicketService(session)
 
-        raise HTTPException(
-            status_code=404,
-            detail="Customer profile not found.",
+    try:
+        message = await service.add_customer_message(
+            ticket_id=ticket_id,
+            customer_id=customer.id,
+            message=request.message,
+            request_id=uuid4(),
+            user_id=current_user.id,
         )
-
-    message = await add_customer_message(
-        session=session,
-        customer_id=customer.id,
-        ticket_id=ticket_id,
-        user_id=current_user.id,
-        message_text=request.message,
-    )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
 
     return TicketMessageResponse.model_validate(message)

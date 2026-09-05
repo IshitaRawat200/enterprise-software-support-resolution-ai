@@ -3,12 +3,9 @@ from __future__ import annotations
 import json
 import re
 
-from langchain_groq import ChatGroq
-
-from app.config import get_settings
-from app.sql.sql_schema import (
-    SQLGenerationResult,
-)
+from app.llm.complexity import assess_complexity
+from app.llm.gateway import get_llm
+from app.sql.sql_schema import SQLGenerationResult
 
 
 # ============================================================
@@ -21,19 +18,33 @@ PostgreSQL database schema.
 Allowed tables:
 
 users
+
 customers
+
 subscriptions
+
 support_tickets
+
 ticket_messages
+
 conversation_history
+
 incident_logs
+
 knowledge_articles
+
 documents
+
 document_chunks
+
 escalations
+
 memory_facts
+
 agent_state
+
 audit_events
+
 knowledge_article_usage
 
 Important columns:
@@ -149,23 +160,78 @@ escalations:
 
 
 # ============================================================
-# LLM
+# SQL VALIDATION
 # ============================================================
 
 
-def create_sql_llm() -> ChatGroq:
-    settings = get_settings()
+def validate_generated_sql(sql: str) -> str:
+    """
+    Validate and normalize LLM-generated SQL before execution.
 
-    if not settings.groq_api_key:
-        raise RuntimeError(
-            "GROQ_API_KEY is not configured."
+    The SQL layer is read-only and must not contain
+    natural-language troubleshooting responses.
+    """
+
+    sql = sql.strip()
+
+    # Remove accidental Markdown fences.
+    if sql.startswith("```"):
+        sql = sql.replace("```sql", "", 1)
+        sql = sql.replace("```", "")
+        sql = sql.strip()
+
+    if not sql:
+        raise ValueError(
+            "SQL generator returned an empty query."
         )
 
-    return ChatGroq(
-        model=settings.groq_complex_model,
-        api_key=settings.groq_api_key,
-        temperature=0.0,
-    )
+    normalized = sql.lower()
+
+    forbidden_keywords = [
+        "insert ",
+        "update ",
+        "delete ",
+        "drop ",
+        "alter ",
+        "create ",
+        "truncate ",
+        "grant ",
+        "revoke ",
+        "execute ",
+        "call ",
+        "merge ",
+    ]
+
+    for keyword in forbidden_keywords:
+        if keyword in normalized:
+            raise ValueError(
+                "Unsafe SQL detected: "
+                f"forbidden operation '{keyword.strip()}'."
+            )
+
+    if not normalized.startswith("select"):
+        raise ValueError(
+            "Only SELECT queries are allowed."
+        )
+
+    # Prevent the LLM from embedding support answers in SQL.
+    suspicious_aliases = [
+        " as troubleshooting",
+        " as answer",
+        " as explanation",
+        " as response",
+        " as advice",
+        " as recommendation",
+    ]
+
+    for alias in suspicious_aliases:
+        if alias in normalized:
+            raise ValueError(
+                "SQL query contains natural-language response content. "
+                "Troubleshooting must be handled by RAG."
+            )
+
+    return sql
 
 
 # ============================================================
@@ -173,9 +239,15 @@ def create_sql_llm() -> ChatGroq:
 # ============================================================
 
 
-def _extract_json(
-    content: str,
-) -> dict:
+def _extract_json(content: str) -> dict:
+    """
+    Extract JSON from an LLM response.
+
+    Handles:
+    - plain JSON
+    - ```json ... ```
+    - accidental surrounding text containing a JSON object
+    """
 
     content = content.strip()
 
@@ -193,12 +265,13 @@ def _extract_json(
         content,
     )
 
-    try:
+    content = content.strip()
 
+    try:
         return json.loads(content)
 
     except json.JSONDecodeError:
-
+        # Look for the first JSON object.
         match = re.search(
             r"\{.*\}",
             content,
@@ -210,13 +283,19 @@ def _extract_json(
                 "LLM did not return valid JSON."
             )
 
-        return json.loads(
-            match.group(0)
-        )
+        try:
+            return json.loads(
+                match.group(0)
+            )
+
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "LLM returned malformed JSON."
+            ) from exc
 
 
 # ============================================================
-# GENERATOR
+# SQL GENERATOR
 # ============================================================
 
 
@@ -225,7 +304,13 @@ class SQLGenerator:
     Natural-language to SQL generator.
 
     The LLM generates SQL only.
+
     It does not execute SQL.
+
+    Complexity is determined by the deterministic
+    complexity evaluator.
+
+    Model selection is handled by the LLM Gateway.
     """
 
     async def generate(
@@ -239,61 +324,180 @@ class SQLGenerator:
                 "SQL question cannot be empty."
             )
 
+        question = question.strip()
+
         customer_context = (
             customer_id
             if customer_id
             else "not provided"
         )
 
+        # ====================================================
+        # COMPLEXITY EVALUATION
+        # ====================================================
+
+        complexity = assess_complexity(
+            question,
+        )
+
+        print("\n===== SQL GENERATOR =====")
+        print(f"Question: {question}")
+        print(f"Complexity: {complexity}")
+        print("=========================\n")
+
+        # ====================================================
+        # PROMPT
+        # ====================================================
+
         prompt = f"""
-You are the SQL generation component of an
-enterprise software support system.
+You are the SQL generation component of an enterprise
+software support system.
 
-Generate ONE safe PostgreSQL SELECT query.
+Your ONLY responsibility is to generate a safe,
+read-only PostgreSQL query for structured information
+stored in the database.
 
-You MUST follow these rules:
+IMPORTANT SEPARATION OF RESPONSIBILITIES:
 
-1. Only generate SELECT statements.
-2. Never generate INSERT, UPDATE, DELETE, DROP,
-   ALTER, CREATE, TRUNCATE, GRANT, REVOKE,
-   EXECUTE, or CALL.
-3. Only use the allowed tables and columns.
-4. Never access system catalogs.
-5. Never access pg_catalog.
-6. Never access information_schema.
-7. Never modify database data.
-8. Prefer explicit columns instead of SELECT *.
-9. Add LIMIT 50 unless the query is an aggregate.
-10. If customer-specific data is requested and a
-    customer_id is provided, constrain the query
-    to that customer.
-11. Do not invent columns.
-12. Return JSON only.
+- SQL is ONLY for structured database facts.
+
+- Documentation, troubleshooting instructions,
+  explanations, and general support advice are handled
+  by the RAG system.
+
+- NEVER put troubleshooting advice, explanations,
+  recommendations, or natural-language answers inside
+  a SQL query.
+
+For example, DO NOT generate:
+
+SELECT
+    'Check the endpoint URL and API version' AS troubleshooting,
+    account_status
+FROM customers
+...
+
+Instead, generate SQL only for the structured
+database information:
+
+SELECT id, account_status
+FROM customers
+WHERE id = '...'
+LIMIT 1
+
+SQL RULES:
+
+1. Generate exactly ONE PostgreSQL SELECT query.
+
+2. Only generate SELECT statements.
+
+3. Never generate:
+
+   INSERT
+   UPDATE
+   DELETE
+   DROP
+   ALTER
+   CREATE
+   TRUNCATE
+   GRANT
+   REVOKE
+   EXECUTE
+   CALL
+   MERGE
+
+4. Only use tables and columns explicitly listed
+   in the allowed schema.
+
+5. Never access:
+
+   pg_catalog
+
+   information_schema
+
+   system catalogs
+
+   database metadata outside the provided schema.
+
+6. Never modify database data.
+
+7. Prefer explicit columns instead of SELECT *.
+
+8. Add LIMIT 50 unless the query is an aggregate
+   or already has a stricter LIMIT.
+
+9. If customer-specific information is requested and
+   customer_id is provided, constrain the query
+   to that customer.
+
+10. Do not invent tables or columns.
+
+11. Do not answer documentation or troubleshooting
+    questions using SQL.
+
+12. If the user's request contains both a
+    documentation/troubleshooting question and a
+    structured-data question, generate SQL ONLY
+    for the structured-data portion.
+
+13. Never create artificial/natural-language columns
+    such as:
+
+    troubleshooting
+    answer
+    explanation
+    advice
+    recommendation
+    response
+
+14. The "explanation" field belongs to the JSON response
+    and must NEVER be embedded inside the SQL query.
+
+15. Return JSON only using exactly this structure:
+
+{{
+  "sql": "SELECT ...",
+  "explanation": "Why this query answers the structured database portion.",
+  "tables_used": ["customers"],
+  "confidence": 0.95
+}}
+
+ALLOWED DATABASE SCHEMA:
 
 {DATABASE_SCHEMA}
 
 Authenticated customer_id:
+
 {customer_context}
 
 Customer question:
 
 {question}
 
-Return exactly this JSON structure:
+Remember:
 
-{{
-  "sql": "SELECT ...",
-  "explanation": "Why this query answers the question.",
-  "tables_used": ["customers"],
-  "confidence": 0.95
-}}
+Generate SQL ONLY for structured database information.
+
+RAG handles documentation and troubleshooting.
+
+Return JSON only.
 """
 
-        llm = create_sql_llm()
+        # ====================================================
+        # LLM GATEWAY
+        # ====================================================
+
+        llm = get_llm(
+            complexity=complexity,
+        )
 
         response = await llm.ainvoke(
             prompt
         )
+
+        # ====================================================
+        # RESPONSE CONTENT
+        # ====================================================
 
         content = (
             response.content
@@ -304,9 +508,38 @@ Return exactly this JSON structure:
             else str(response)
         )
 
+        if isinstance(content, list):
+            content = "".join(
+                item.get("text", str(item))
+                if isinstance(item, dict)
+                else str(item)
+                for item in content
+            )
+
+        # ====================================================
+        # JSON PARSING
+        # ====================================================
+
         data = _extract_json(
-            content
+            str(content)
         )
+
+        # ====================================================
+        # SQL VALIDATION
+        # ====================================================
+
+        if "sql" not in data:
+            raise ValueError(
+                "SQL generator response does not contain 'sql'."
+            )
+
+        data["sql"] = validate_generated_sql(
+            data["sql"]
+        )
+
+        # ====================================================
+        # FINAL SCHEMA VALIDATION
+        # ====================================================
 
         return SQLGenerationResult.model_validate(
             data

@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, Text
+from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
@@ -11,6 +12,16 @@ from app.database.connection import Base
 if TYPE_CHECKING:
     from .ticket import SupportTicket
     from .user import User
+
+
+message_sender_enum = ENUM(
+    "customer",
+    "support_agent",
+    "ai",
+    "system",
+    name="message_sender",
+    create_type=False,
+)
 
 
 class TicketMessage(Base):
@@ -28,7 +39,7 @@ class TicketMessage(Base):
     )
 
     sender_type: Mapped[str] = mapped_column(
-        String(50),
+        message_sender_enum,
         nullable=False,
     )
 
@@ -43,12 +54,12 @@ class TicketMessage(Base):
         nullable=False,
     )
 
-    ticket: Mapped["SupportTicket"] = relationship(
+    ticket: Mapped[SupportTicket] = relationship(
         "SupportTicket",
         back_populates="messages",
     )
 
-    sender_user: Mapped["User | None"] = relationship(
+    sender_user: Mapped[User | None] = relationship(
         "User",
         back_populates="ticket_messages",
     )

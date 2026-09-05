@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import os
 from typing import Any
-
-from dotenv import load_dotenv
-from langchain_groq import ChatGroq
 
 from app.guardrails.handoff_guardrail import (
     evaluate_handoff_conditions,
@@ -12,9 +8,6 @@ from app.guardrails.handoff_guardrail import (
 from app.services.handoff_context_service import (
     HandoffContextService,
 )
-
-
-load_dotenv()
 
 
 class EscalationManagerAgent:
@@ -30,33 +23,22 @@ class EscalationManagerAgent:
     - Preserve actionable investigation information.
 
     This agent does NOT determine severity.
+
+    This agent does NOT directly call an LLM.
+
+    Escalation decisions are intentionally deterministic
+    because critical, security, production and human-handoff
+    conditions must not depend on model availability.
     """
 
     name = "escalation_manager_agent"
 
-    def __init__(
-        self,
-        model: str | None = None,
-    ) -> None:
-
-        self.model = model or os.getenv(
-            "GROQ_SIMPLE_MODEL",
-            "openai/gpt-oss-20b",
-        )
-
-        api_key = os.getenv("GROQ_API_KEY")
-
-        if not api_key:
-            raise RuntimeError(
-                "GROQ_API_KEY is not configured."
-            )
-
-        self.llm = ChatGroq(
-            model=self.model,
-            api_key=api_key,
-            base_url="https://api.groq.com",
-            temperature=0.0,
-        )
+    def __init__(self) -> None:
+        """
+        Escalation manager uses deterministic guardrails.
+        No LLM initialization is required.
+        """
+        pass
 
     async def run(
         self,
@@ -226,33 +208,24 @@ class EscalationManagerAgent:
 
             return {
                 "success": True,
-
                 "escalation_required": True,
-
                 "priority": priority,
-
                 "escalation_type": (
                     escalation_type
                 ),
-
                 "reason": reason,
-
                 "human_handoff_required": True,
-
                 "handoff_summary": (
                     f"Customer reports: {message}"
                 ),
-
                 "handoff_reference_id": (
                     handoff_context[
                         "reference_id"
                     ]
                 ),
-
                 "handoff_context": (
                     handoff_context
                 ),
-
                 "recommended_action": (
                     recommended_action
                 ),
@@ -264,26 +237,17 @@ class EscalationManagerAgent:
 
         return {
             "success": True,
-
             "escalation_required": False,
-
             "priority": None,
-
             "escalation_type": None,
-
             "reason": (
                 "No human escalation criteria "
                 "were detected."
             ),
-
             "human_handoff_required": False,
-
             "handoff_summary": None,
-
             "handoff_reference_id": None,
-
             "handoff_context": None,
-
             "recommended_action": (
                 "Continue automated resolution."
             ),
