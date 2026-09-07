@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
+from app.guardrails.guardrails_service import guardrails_service
 from app.mcp.mcp_client import MCPClient
 from app.observability.logging import logger
 
-
+ 
 class MCPService:
     """
     Application service for the Enterprise Software Support MCP layer.
@@ -26,30 +27,24 @@ class MCPService:
     # APPROVED MCP TOOLS
     # ============================================================
 
-    ALLOWED_TOOLS = {
+    ALLOWED_TOOLS: ClassVar[set[str]] = {
         "mcp_validate_customer_account",
         "mcp_check_incident_status",
         "mcp_get_support_policy",
+        "mcp_get_live_service_status",
     }
 
     def __init__(
         self,
-        server_script: str | Path = (
-            "app/mcp/mcp_server.py"
-        ),
+        server_script: str | Path = "app/mcp/mcp_server.py",
     ) -> None:
-        self.server_script = Path(
-            server_script
-        )
+        self.server_script = Path(server_script)
 
         self.client = MCPClient(
-            server_script=self.server_script
+            server_script=self.server_script,
         )
 
-        self.available_tools: dict[
-            str,
-            Any,
-        ] = {}
+        self.available_tools: dict[str, Any] = {}
 
         self._initialized = False
 
@@ -73,9 +68,7 @@ class MCPService:
         """
 
         if self._initialized:
-            logger.info(
-                "MCP SERVICE: already initialized"
-            )
+            logger.info("MCP SERVICE: already initialized")
             return
 
         logger.info(
@@ -96,9 +89,7 @@ class MCPService:
         logger.info(
             "MCP SERVICE: discovered %d tools: %s",
             len(self.available_tools),
-            list(
-                self.available_tools.keys()
-            ),
+            list(self.available_tools.keys()),
         )
 
         # --------------------------------------------------------
@@ -110,20 +101,17 @@ class MCPService:
         )
 
         missing_tools = (
-            self.ALLOWED_TOOLS
-            - discovered_names
+            self.ALLOWED_TOOLS - discovered_names
         )
 
         if missing_tools:
             logger.warning(
-                "MCP SERVICE: approved tools not "
-                "available: %s",
+                "MCP SERVICE: approved tools not available: %s",
                 sorted(missing_tools),
             )
 
         unexpected_tools = (
-            discovered_names
-            - self.ALLOWED_TOOLS
+            discovered_names - self.ALLOWED_TOOLS
         )
 
         if unexpected_tools:
@@ -140,7 +128,9 @@ class MCPService:
     # ============================================================
 
     def is_initialized(self) -> bool:
-        """Return whether the MCP service is initialized."""
+        """
+        Return whether the MCP service is initialized.
+        """
 
         return self._initialized
 
@@ -160,6 +150,7 @@ class MCPService:
         return list(
             self.available_tools.values()
         )
+
     # ============================================================
     # GET TOOLS
     # ============================================================
@@ -198,10 +189,7 @@ class MCPService:
         Check whether a tool was actually exposed by the MCP server.
         """
 
-        return (
-            tool_name
-            in self.available_tools
-        )
+        return tool_name in self.available_tools
 
     # ============================================================
     # LOW-LEVEL TOOL CALL
@@ -211,24 +199,33 @@ class MCPService:
         self,
         tool_name: str,
         arguments: dict[str, Any] | None = None,
+        role: str = "support_agent",
     ) -> dict[str, Any]:
         """
         Execute an approved MCP tool.
 
-        This is the central tool permission boundary.
+        Security pipeline:
+
+            Application allow-list
+                ↓
+            Server capability check
+                ↓
+            Tool guardrail
+                ↓
+            MCP execution
         """
 
         await self.initialize()
+
+        tool_arguments = arguments or {}
 
         # --------------------------------------------------------
         # Application allow-list
         # --------------------------------------------------------
 
-        if not self.is_tool_allowed(
-            tool_name
-        ):
+        if not self.is_tool_allowed(tool_name):
             logger.warning(
-                "MCP SERVICE: blocked non-allow-listed tool: %s",
+                "MCP SERVICE: blocked non-allow-listed tool=%s",
                 tool_name,
             )
 
@@ -244,12 +241,10 @@ class MCPService:
         # Server capability check
         # --------------------------------------------------------
 
-        if not self.has_tool(
-            tool_name
-        ):
+        if not self.has_tool(tool_name):
             logger.error(
-                "MCP SERVICE: requested tool is "
-                "not exposed by the server: %s",
+                "MCP SERVICE: requested tool is not exposed "
+                "by the server: %s",
                 tool_name,
             )
 
@@ -261,14 +256,54 @@ class MCPService:
                 ),
             }
 
+        # --------------------------------------------------------
+        # TOOL GUARDRAIL
+        # --------------------------------------------------------
+
+        guardrail_result = (
+            guardrails_service.validate_mcp_call(
+                tool_name=tool_name,
+                role=role,
+                arguments=tool_arguments,
+            )
+        )
+
+        if not guardrail_result.allowed:
+            logger.warning(
+                "MCP SERVICE: tool blocked by guardrail "
+                "tool=%s "
+                "role=%s "
+                "code=%s "
+                "reason=%s",
+                tool_name,
+                role,
+                guardrail_result.code,
+                guardrail_result.reason,
+            )
+
+            return {
+                "success": False,
+                "blocked_by_guardrail": True,
+                "guardrail": (
+                    guardrail_result.guardrail_name
+                ),
+                "code": guardrail_result.code,
+                "error": guardrail_result.reason,
+            }
+
+        # --------------------------------------------------------
+        # EXECUTE MCP TOOL
+        # --------------------------------------------------------
+
         logger.info(
-            "MCP SERVICE: calling approved tool=%s",
+            "MCP SERVICE: calling approved tool=%s role=%s",
             tool_name,
+            role,
         )
 
         return await self.client.safe_call_tool(
             tool_name,
-            arguments or {},
+            tool_arguments,
         )
 
     # ============================================================
@@ -279,6 +314,7 @@ class MCPService:
         self,
         *,
         customer_id: str,
+        role: str = "support_agent",
     ) -> dict[str, Any]:
         """
         Validate a customer account through MCP.
@@ -289,9 +325,7 @@ class MCPService:
                 "success": False,
                 "account_exists": False,
                 "customer_id": None,
-                "error": (
-                    "customer_id is required."
-                ),
+                "error": "customer_id is required.",
             }
 
         return await self.call_tool(
@@ -299,6 +333,7 @@ class MCPService:
             {
                 "customer_id": customer_id,
             },
+            role=role,
         )
 
     # ============================================================
@@ -314,9 +349,8 @@ class MCPService:
         """
         Check current production incident status through MCP.
 
-        The role argument is retained at the service boundary so
-        the application can enforce role-based access before the
-        external operation.
+        Only support agents and administrators may perform
+        production incident lookups.
         """
 
         if role not in {
@@ -324,8 +358,7 @@ class MCPService:
             "admin",
         }:
             logger.warning(
-                "MCP SERVICE: incident tool denied "
-                "for role=%s",
+                "MCP SERVICE: incident tool denied for role=%s",
                 role,
             )
 
@@ -334,8 +367,8 @@ class MCPService:
                 "incident_active": False,
                 "service_name": service_name,
                 "error": (
-                    "Role is not permitted to "
-                    "call the incident MCP tool."
+                    "Role is not permitted to call "
+                    "the incident MCP tool."
                 ),
             }
 
@@ -344,9 +377,7 @@ class MCPService:
                 "success": False,
                 "incident_active": False,
                 "service_name": None,
-                "error": (
-                    "service_name is required."
-                ),
+                "error": "service_name is required.",
             }
 
         return await self.call_tool(
@@ -354,6 +385,68 @@ class MCPService:
             {
                 "service_name": service_name,
             },
+            role=role,
+        )
+
+    # ============================================================
+    # LIVE EXTERNAL SERVICE STATUS
+    # ============================================================
+
+    async def get_live_service_status(
+        self,
+        *,
+        service_name: str,
+        role: str = "support_agent",
+    ) -> dict[str, Any]:
+        """
+        Retrieve live status of an approved external dependency
+        through MCP.
+
+        This is supporting evidence for incident investigation.
+
+        It does NOT mean that the external provider represents
+        the health of our own enterprise application.
+        """
+
+        if role not in {
+            "support_agent",
+            "admin",
+        }:
+            logger.warning(
+                "MCP SERVICE: live status tool denied for role=%s",
+                role,
+            )
+
+            return {
+                "success": False,
+                "supported": False,
+                "service_name": service_name,
+                "error": (
+                    "Role is not permitted to call "
+                    "the live status MCP tool."
+                ),
+            }
+
+        if not service_name:
+            return {
+                "success": False,
+                "supported": False,
+                "service_name": None,
+                "error": "service_name is required.",
+            }
+
+        logger.info(
+            "MCP SERVICE: requesting live external status "
+            "for service=%s",
+            service_name,
+        )
+
+        return await self.call_tool(
+            "mcp_get_live_service_status",
+            {
+                "service_name": service_name,
+            },
+            role=role,
         )
 
     # ============================================================
@@ -375,8 +468,7 @@ class MCPService:
             "admin",
         }:
             logger.warning(
-                "MCP SERVICE: policy tool denied "
-                "for role=%s",
+                "MCP SERVICE: policy tool denied for role=%s",
                 role,
             )
 
@@ -384,8 +476,8 @@ class MCPService:
                 "success": False,
                 "policy_type": policy_type,
                 "error": (
-                    "Role is not permitted to "
-                    "call the policy MCP tool."
+                    "Role is not permitted to call "
+                    "the policy MCP tool."
                 ),
             }
 
@@ -393,9 +485,7 @@ class MCPService:
             return {
                 "success": False,
                 "policy_type": None,
-                "error": (
-                    "policy_type is required."
-                ),
+                "error": "policy_type is required.",
             }
 
         return await self.call_tool(
@@ -403,4 +493,5 @@ class MCPService:
             {
                 "policy_type": policy_type,
             },
+            role=role,
         )

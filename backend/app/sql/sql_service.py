@@ -4,6 +4,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.guardrails.guardrails_service import (
+    guardrails_service,
+)
 from app.sql.sql_executor import (
     SQLExecutor,
 )
@@ -20,11 +23,15 @@ class SQLService:
                ↓
         SQL Generator
                ↓
-        SQL Validator
+        SQL Guardrail
                ↓
-        Read-only Executor
+        SQL Validator / Executor
                ↓
              Result
+
+    The SQL guardrail is enforced immediately before
+    database execution so generated SQL cannot bypass
+    the read-only safety boundary.
     """
 
     def __init__(
@@ -49,6 +56,28 @@ class SQLService:
         question: str,
         customer_id: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Generate, guard, validate, and execute a SQL query.
+
+        Flow:
+
+            question
+                ↓
+            SQL generation
+                ↓
+            SQL guardrail
+                ↓
+            SQL execution
+                ↓
+            result
+
+        If the SQL guardrail blocks the generated query,
+        the database executor is never called.
+        """
+
+        # =====================================================
+        # 1. GENERATE SQL
+        # =====================================================
 
         generation = (
             await self.generator.generate(
@@ -57,11 +86,73 @@ class SQLService:
             )
         )
 
-        execution = (
-            await self.executor.execute(
-                generation.sql
+        generated_sql = generation.sql
+
+        # =====================================================
+        # 2. SQL GUARDRAIL
+        # =====================================================
+
+        guardrail_result = (
+            guardrails_service.validate_sql(
+                generated_sql
             )
         )
+
+        if not guardrail_result.allowed:
+            return {
+                "success": False,
+
+                "sql": generated_sql,
+
+                "rows": [],
+
+                "row_count": 0,
+
+                "sql_confidence": (
+                    generation.confidence
+                ),
+
+                "explanation": (
+                    generation.explanation
+                ),
+
+                "tables_used": (
+                    generation.tables_used
+                ),
+
+                "error": (
+                    "SQL query blocked by guardrail: "
+                    f"{guardrail_result.reason}"
+                ),
+
+                "guardrail_blocked": True,
+
+                "guardrail": (
+                    guardrail_result.guardrail_name
+                ),
+
+                "guardrail_code": (
+                    guardrail_result.code
+                ),
+
+                "guardrail_risk_level": (
+                    guardrail_result.risk_level
+                ),
+            }
+
+        # =====================================================
+        # 3. EXECUTE SQL
+        # =====================================================
+
+        execution = (
+            await self.executor.execute(
+                generated_sql
+            )
+        )
+
+        # =====================================================
+        # 4. RETURN RESULT
+        # =====================================================
 
         return {
             "success": execution[
@@ -95,4 +186,14 @@ class SQLService:
             "error": execution[
                 "error"
             ],
+
+            "guardrail_blocked": False,
+
+            "guardrail": (
+                guardrail_result.guardrail_name
+            ),
+
+            "guardrail_code": (
+                guardrail_result.code
+            ),
         }

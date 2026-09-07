@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator
 
 from sqlalchemy import text
@@ -10,15 +12,22 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
 
-
 settings = get_settings()
 
 
+# ============================================================
+# SQLALCHEMY BASE
+# ============================================================
+
 class Base(DeclarativeBase):
-    """Base class for SQLAlchemy ORM models."""
+    """
+    Base class for all SQLAlchemy ORM models.
+    """
 
-    pass
 
+# ============================================================
+# DATABASE ENGINE
+# ============================================================
 
 engine = create_async_engine(
     settings.database_url,
@@ -27,6 +36,10 @@ engine = create_async_engine(
 )
 
 
+# ============================================================
+# ASYNC SESSION FACTORY
+# ============================================================
+
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -34,20 +47,45 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Provide an async database session."""
+# ============================================================
+# DATABASE DEPENDENCY
+# ============================================================
+
+async def get_db_session() -> AsyncGenerator[
+    AsyncSession,
+    None,
+]:
+    """
+    Provide an async SQLAlchemy database session.
+
+    The session is automatically closed after the request
+    finishes.
+    """
+
     async with AsyncSessionLocal() as session:
         yield session
 
 
+# ============================================================
+# DATABASE HEALTH CHECK
+# ============================================================
+
 async def check_database_connection() -> bool:
-    """Check whether PostgreSQL is reachable."""
+    """
+    Check whether PostgreSQL is reachable.
+    """
+
     try:
         async with engine.connect() as connection:
-            await connection.execute(text("SELECT 1"))
+            await connection.execute(
+                text("SELECT 1")
+            )
 
         return True
 
     except Exception as exc:
-        print(f"Database connection failed: {exc}")
+        print(
+            f"Database connection failed: {exc}"
+        )
+
         return False

@@ -9,9 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.connection import Base
 
 if TYPE_CHECKING:
+    from .subscription import Subscription
     from .ticket import SupportTicket
     from .user import User
-    from .subscription import Subscription
 
 
 class Customer(Base):
@@ -62,18 +62,18 @@ class Customer(Base):
         default="active",
     )
 
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         "User",
         back_populates="customer",
     )
 
-    tickets: Mapped[list["SupportTicket"]] = relationship(
+    tickets: Mapped[list[SupportTicket]] = relationship(
         "SupportTicket",
         back_populates="customer",
         cascade="all, delete-orphan",
     )
 
-    subscriptions: Mapped[list["Subscription"]] = relationship(
+    subscriptions: Mapped[list[Subscription]] = relationship(
         "Subscription",
         back_populates="customer",
         cascade="all, delete-orphan",

@@ -137,6 +137,12 @@ class SupportState(TypedDict, total=False):
     # This contains operational metadata, not chain-of-thought.
     mcp_tool_calls: list[dict[str, Any]]
 
+    # Live external service status
+    live_status: str | None
+    live_status_confidence: float | None
+    live_status_checked_at: str | None
+    live_status_source: str | None
+    live_status_details: dict[str, Any] | None
     # ------------------------------------------------------------------
     # Severity
     # ------------------------------------------------------------------

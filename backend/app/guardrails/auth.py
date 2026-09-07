@@ -8,8 +8,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Load every ORM model before executing queries.
-import app.database.model_registry  # noqa: F401
 from app.config import get_settings
 from app.database.connection import get_db_session
 from app.database.models.user import User

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, Text, text
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
@@ -108,12 +109,12 @@ class Escalation(Base):
         nullable=True,
     )
 
-    ticket: Mapped["SupportTicket"] = relationship(
+    ticket: Mapped[SupportTicket] = relationship(
         "SupportTicket",
         back_populates="escalation",
     )
 
-    support_agent: Mapped["User | None"] = relationship(
+    support_agent: Mapped[User | None] = relationship(
         "User",
         back_populates="escalations",
     )

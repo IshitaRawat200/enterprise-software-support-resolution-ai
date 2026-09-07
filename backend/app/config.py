@@ -168,6 +168,24 @@ class Settings(BaseSettings):
     )
 
     # =========================================================
+    # Live Status / External Service
+    # =========================================================
+
+    live_status_base_url: str = Field(
+        default=""
+    )
+
+    live_status_provider_name: str = Field(
+        default="External Status Provider"
+    )
+
+    live_status_timeout_seconds: float = Field(
+        default=8.0,
+        ge=1.0,
+        le=30.0,
+    )
+
+    # =========================================================
     # Environment configuration
     # =========================================================
 

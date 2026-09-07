@@ -7,14 +7,31 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from app.api.agent_test import router as agent_test_router
+# ============================================================
+# API ROUTERS
+# ============================================================
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
 from app.api.customers import router as customers_router
 from app.api.knowledge_base import router as knowledge_base_router
 from app.api.tickets import router as tickets_router
+
+# ============================================================
+# APPLICATION SERVICES
+# ============================================================
 from app.config import get_settings
 from app.database.connection import check_database_connection
+
+# ============================================================
+# DATABASE MODEL REGISTRATION
+# ============================================================
+#
+# Import the registry before routers or ORM queries are used.
+# The registry imports all SQLAlchemy models so relationship
+# targets such as Customer, Subscription, SupportTicket, etc.
+# are known to SQLAlchemy.
+#
+from app.database.models import registry  # noqa: F401
 from app.observability.logging import logger
 from app.orchestrator.graph import build_support_graph
 from app.rag.embeddings import get_embedding_model
@@ -36,59 +53,51 @@ async def lifespan(app: FastAPI):
     Application startup/shutdown lifecycle.
 
     Startup:
-        1. Validate database configuration.
-        2. Preload the RAG embedding model once.
-        3. Initialize the LangGraph PostgreSQL checkpointer.
+        1. Validate DATABASE_URL.
+        2. Preload the RAG embedding model.
+        3. Initialize LangGraph PostgreSQL checkpointer.
         4. Compile the production support graph.
 
     Shutdown:
-        Close the LangGraph checkpointer cleanly.
+        Cleanly release the LangGraph checkpointer.
     """
 
     # ========================================================
     # DATABASE URL
     # ========================================================
 
-    database_url = os.getenv(
-        "DATABASE_URL"
-    )
+    database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
         raise RuntimeError(
             "DATABASE_URL environment variable is not configured."
         )
 
+    logger.info("Application startup: DATABASE_URL configured.")
+
     # ========================================================
     # PRELOAD RAG EMBEDDING MODEL
     # ========================================================
-    #
-    # The model is loaded once when the application starts.
-    # Customer requests can then reuse the in-memory model.
-    #
 
-    logger.info(
-        "RAG: preloading embedding model..."
-    )
+    logger.info("RAG: preloading embedding model...")
 
     get_embedding_model()
 
-    logger.info(
-        "RAG: embedding model ready."
-    )
+    logger.info("RAG: embedding model ready.")
 
     # ========================================================
     # LANGGRAPH DATABASE URL
     # ========================================================
     #
-    # Existing SQLAlchemy connection:
+    # SQLAlchemy uses:
     #
     #     postgresql+asyncpg://
     #
-    # LangGraph / psycopg:
+    # LangGraph's psycopg checkpointer uses:
     #
     #     postgresql://
     #
-    # Keep DATABASE_URL unchanged for the rest of the app.
+    # Convert only the URL used by LangGraph.
     #
 
     langgraph_database_url = database_url.replace(
@@ -120,22 +129,26 @@ async def lifespan(app: FastAPI):
         )
 
         # ----------------------------------------------------
-        # Compile production graph
+        # Store checkpointer on application state
         # ----------------------------------------------------
 
-        app.state.langgraph_checkpointer = (
-            checkpointer
-        )
+        app.state.langgraph_checkpointer = checkpointer
 
-        app.state.support_graph = (
-            build_support_graph(
-                checkpointer
-            )
+        # ----------------------------------------------------
+        # Compile production support graph
+        # ----------------------------------------------------
+
+        app.state.support_graph = build_support_graph(
+            checkpointer
         )
 
         logger.info(
             "LangGraph: production support graph ready."
         )
+
+        # ----------------------------------------------------
+        # Application is ready
+        # ----------------------------------------------------
 
         try:
             yield
@@ -144,6 +157,9 @@ async def lifespan(app: FastAPI):
             logger.info(
                 "LangGraph: shutting down checkpointer."
             )
+
+            # AsyncPostgresSaver context manager handles the
+            # actual connection cleanup.
 
 
 # ============================================================
@@ -169,7 +185,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        settings.frontend_url
+        settings.frontend_url,
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -181,29 +197,15 @@ app.add_middleware(
 # ROUTERS
 # ============================================================
 
-app.include_router(
-    auth_router
-)
+app.include_router(auth_router)
 
-app.include_router(
-    customers_router
-)
+app.include_router(customers_router)
 
-app.include_router(
-    tickets_router
-)
+app.include_router(tickets_router)
 
-app.include_router(
-    agent_test_router
-)
+app.include_router(knowledge_base_router)
 
-app.include_router(
-    knowledge_base_router
-)
-
-app.include_router(
-    chat_router
-)
+app.include_router(chat_router)
 
 
 # ============================================================
@@ -220,33 +222,28 @@ async def health_check() -> dict:
         - LangGraph checkpointer initialization
     """
 
-    database_available = (
-        await check_database_connection()
-    )
+    database_available = await check_database_connection()
 
     checkpointer_available = hasattr(
         app.state,
         "langgraph_checkpointer",
     )
 
+    application_status = (
+        "ok"
+        if database_available and checkpointer_available
+        else "degraded"
+    )
+
     return {
-        "status": (
-            "ok"
-            if database_available
-            and checkpointer_available
-            else "degraded"
-        ),
-
+        "status": application_status,
         "application": settings.app_name,
-
         "environment": settings.environment,
-
         "database": (
             "connected"
             if database_available
             else "unavailable"
         ),
-
         "langgraph_checkpointer": (
             "connected"
             if checkpointer_available

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 from fastapi import (
@@ -17,10 +17,10 @@ from sqlalchemy import select
 from app.database.connection import get_db_session
 from app.database.models.customer import Customer
 from app.guardrails.auth import get_current_user
+from app.guardrails.guardrails_service import guardrails_service
 from app.observability.logging import logger
 from app.observability.tracing import support_trace
 from app.services.conversation_service import ConversationService
-
 
 # ============================================================
 # ROUTER
@@ -281,9 +281,10 @@ def build_conversation_context(
 async def chat(
     request: Request,
     body: ChatRequest,
-    current_user: Any = Depends(
-        get_current_user,
-    ),
+    current_user: Annotated[
+        Any,
+        Depends(get_current_user),
+    ],
 ) -> ChatResponse:
     """
     Main customer support entry point.
@@ -522,13 +523,69 @@ async def chat(
             )
 
             # =================================================
+            # INPUT GUARDRAILS
+            # =================================================
+
+            guardrail_result = guardrails_service.validate_request(
+                body.message
+            )
+
+            if not guardrail_result.allowed:
+                logger.warning(
+                    "Chat request blocked by guardrails "
+                    "request_id=%s "
+                    "guardrail=%s "
+                    "code=%s "
+                    "reason=%s",
+                    request_id,
+                    guardrail_result.guardrail_name,
+                    guardrail_result.code,
+                    guardrail_result.reason,
+                )
+
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Request blocked by security guardrails.",
+                        "guardrail": guardrail_result.guardrail_name,
+                        "code": guardrail_result.code,
+                        "reason": guardrail_result.reason,
+                        "request_id": request_id,
+                    },
+                )
+
+            # Extract the PII-safe version.
+            guardrail_metadata = guardrail_result.metadata or {}
+
+            sanitized_message = guardrail_metadata.get(
+                "sanitized_message"
+            )
+
+            if not isinstance(sanitized_message, str):
+                sanitized_message = body.message
+
+            pii_metadata = guardrail_metadata.get(
+                "pii_detection",
+                {},
+            )
+
+            logger.info(
+                "Input guardrails passed "
+                "request_id=%s "
+                "pii_detected=%s "
+                "pii_types=%s",
+                request_id,
+                pii_metadata.get("contains_pii", False),
+                pii_metadata.get("pii_types", []),
+            )
+            # =================================================
             # SAVE CUSTOMER MESSAGE
             # =================================================
 
             await conversation_service.add_customer_message(
                 session_id=session_id,
                 user_id=user_id,
-                content=body.message,
+                content=sanitized_message,
             )
 
             await db_session.commit()
@@ -546,7 +603,7 @@ async def chat(
             # =================================================
 
             initial_state = {
-                "message": body.message,
+                "message": sanitized_message,
 
                 "conversation_id": str(
                     session_id
@@ -677,7 +734,7 @@ async def chat(
             # =================================================
 
             with support_trace(
-                message=body.message,
+                message=sanitized_message,
                 conversation_id=thread_id,
                 customer_id=str(customer_id),
                 request_id=request_id,
@@ -796,6 +853,41 @@ async def chat(
                     "generate a resolution."
                 )
             )
+
+            # =================================================
+            # FINAL OUTPUT GUARDRAILS
+            # =================================================
+
+            response_guardrail_result = (
+                guardrails_service.validate_output(
+                    response_message
+                )
+            )
+
+            if not response_guardrail_result.allowed:
+                logger.error(
+                    "AI response blocked by output guardrail "
+                    "request_id=%s "
+                    "guardrail=%s "
+                    "code=%s "
+                    "reason=%s",
+                    request_id,
+                    response_guardrail_result.guardrail_name,
+                    response_guardrail_result.code,
+                    response_guardrail_result.reason,
+                )
+
+                response_message = (
+                    "I’m sorry, but I cannot safely provide "
+                    "the generated response. A support agent "
+                    "may need to review this request."
+                )
+            else:
+                response_message, _ = (
+                    guardrails_service.sanitize_output(
+                        response_message
+                    )
+                )
 
             # =================================================
             # SAVE AI MESSAGE
@@ -1047,7 +1139,7 @@ async def chat(
 
             raise
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             await db_session.rollback()
 
             logger.exception(
@@ -1066,13 +1158,11 @@ async def chat(
                     "to complete the support "
                     "investigation."
                 ),
-
                 conversation_id=(
                     str(session_id)
                     if session_id is not None
                     else None
                 ),
-
                 errors=[
                     f"Support workflow failed: {exc}"
                 ],

@@ -16,6 +16,10 @@ MCP_TOOL_PERMISSIONS: dict[str, set[str]] = {
         "support_agent",
         "admin",
     },
+    "mcp_get_live_service_status": {
+        "support_agent",
+        "admin",
+    },
 }
 
 
