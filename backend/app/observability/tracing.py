@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from langfuse import get_client
 
 from app.observability.logging import logger
 
-
 # ============================================================
 # SUPPORT TRACE
 # ============================================================
+
 
 @contextmanager
 def support_trace(
@@ -24,6 +25,10 @@ def support_trace(
     """
     Create the root Langfuse observation for one
     enterprise support request.
+
+    The returned observation exposes its Langfuse ID so
+    request-level evaluation scores can be attached to
+    the correct trace.
     """
 
     langfuse = get_client()
@@ -31,9 +36,7 @@ def support_trace(
     start = time.perf_counter()
 
     logger.info(
-        "Support trace started "
-        "request_id=%s "
-        "conversation_id=%s",
+        "Support trace started request_id=%s conversation_id=%s",
         request_id,
         conversation_id,
     )
@@ -45,15 +48,11 @@ def support_trace(
             "message": message,
         },
     ) as trace:
-
         try:
             yield trace
 
         finally:
-
-            latency_ms = (
-                time.perf_counter() - start
-            ) * 1000
+            latency_ms = (time.perf_counter() - start) * 1000
 
             trace.update(
                 metadata={
@@ -82,6 +81,7 @@ def support_trace(
 # AGENT OBSERVATION
 # ============================================================
 
+
 @contextmanager
 def agent_observation(
     name: str,
@@ -101,12 +101,10 @@ def agent_observation(
         as_type="span",
         name=name,
     ) as observation:
-
         try:
             yield observation
 
         finally:
-
             logger.info(
                 "Agent completed name=%s",
                 name,
@@ -116,6 +114,7 @@ def agent_observation(
 # ============================================================
 # TOOL OBSERVATION
 # ============================================================
+
 
 @contextmanager
 def tool_observation(
@@ -136,12 +135,10 @@ def tool_observation(
         as_type="span",
         name=name,
     ) as observation:
-
         try:
             yield observation
 
         finally:
-
             logger.info(
                 "Tool completed name=%s",
                 name,
@@ -151,6 +148,7 @@ def tool_observation(
 # ============================================================
 # LLM OBSERVATION
 # ============================================================
+
 
 @contextmanager
 def llm_observation(
@@ -164,9 +162,7 @@ def llm_observation(
     langfuse = get_client()
 
     logger.info(
-        "LLM started "
-        "name=%s "
-        "model=%s",
+        "LLM started name=%s model=%s",
         name,
         model,
     )
@@ -176,16 +172,12 @@ def llm_observation(
         name=name,
         model=model,
     ) as generation:
-
         try:
             yield generation
 
         finally:
-
             logger.info(
-                "LLM completed "
-                "name=%s "
-                "model=%s",
+                "LLM completed name=%s model=%s",
                 name,
                 model,
             )

@@ -68,7 +68,7 @@ class MemoryFact(Base):
         server_default=text("now()"),
     )
 
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         "User",
         back_populates="memory_facts",
     )

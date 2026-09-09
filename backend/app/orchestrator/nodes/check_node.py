@@ -71,36 +71,23 @@ async def check_node(
     if errors:
         return {
             "check_passed": False,
-
             # Canonical reflection field.
             "sufficient_evidence": False,
-
             # Detailed validation field.
             "evidence_sufficient": False,
-
             "confidence_sufficient": False,
-
-            "check_reason": (
-                "Resolution action produced errors."
-            ),
-
+            "check_reason": ("Resolution action produced errors."),
             "current_node": "check",
-
             "errors": errors,
         }
 
-    route = (
-        state.get("route")
-        or state.get("suggested_route")
-        or "rag"
-    )
+    route = state.get("route") or state.get("suggested_route") or "rag"
 
     # ========================================================
     # RAG CHECK
     # ========================================================
 
     if route == "rag":
-
         retrieval_confidence = float(
             state.get(
                 "retrieval_confidence",
@@ -117,43 +104,24 @@ async def check_node(
         )
 
         confidence_sufficient = (
-            retrieval_confidence
-            >= RetrievalAgent.SUFFICIENT_EVIDENCE_THRESHOLD
+            retrieval_confidence >= RetrievalAgent.SUFFICIENT_EVIDENCE_THRESHOLD
         )
 
-        check_passed = (
-            evidence_sufficient
-            and confidence_sufficient
-        )
+        check_passed = evidence_sufficient and confidence_sufficient
 
         check_reason = (
             "Documentation evidence passed validation."
             if check_passed
-            else (
-                "Documentation evidence did not "
-                "meet the validation threshold."
-            )
+            else ("Documentation evidence did not meet the validation threshold.")
         )
 
         return {
             "check_passed": check_passed,
-
-            "sufficient_evidence": (
-                evidence_sufficient
-            ),
-
-            "evidence_sufficient": (
-                evidence_sufficient
-            ),
-
-            "confidence_sufficient": (
-                confidence_sufficient
-            ),
-
+            "sufficient_evidence": (evidence_sufficient),
+            "evidence_sufficient": (evidence_sufficient),
+            "confidence_sufficient": (confidence_sufficient),
             "check_reason": check_reason,
-
             "current_node": "check",
-
             "errors": [],
         }
 
@@ -162,7 +130,6 @@ async def check_node(
     # ========================================================
 
     if route == "sql":
-
         sql_confidence = float(
             state.get(
                 "sql_confidence",
@@ -181,43 +148,23 @@ async def check_node(
         # SQL execution itself establishes evidence.
         evidence_sufficient = sql_success
 
-        confidence_sufficient = (
-            sql_confidence >= 0.70
-        )
+        confidence_sufficient = sql_confidence >= 0.70
 
-        check_passed = (
-            evidence_sufficient
-            and confidence_sufficient
-        )
+        check_passed = evidence_sufficient and confidence_sufficient
 
         check_reason = (
             "SQL validation succeeded."
             if check_passed
-            else (
-                "SQL result did not meet "
-                "the validation requirements."
-            )
+            else ("SQL result did not meet the validation requirements.")
         )
 
         return {
             "check_passed": check_passed,
-
-            "sufficient_evidence": (
-                evidence_sufficient
-            ),
-
-            "evidence_sufficient": (
-                evidence_sufficient
-            ),
-
-            "confidence_sufficient": (
-                confidence_sufficient
-            ),
-
+            "sufficient_evidence": (evidence_sufficient),
+            "evidence_sufficient": (evidence_sufficient),
+            "confidence_sufficient": (confidence_sufficient),
             "check_reason": check_reason,
-
             "current_node": "check",
-
             "errors": [],
         }
 
@@ -226,7 +173,6 @@ async def check_node(
     # ========================================================
 
     if route == "hybrid":
-
         hybrid_confidence = float(
             state.get(
                 "hybrid_confidence",
@@ -249,49 +195,25 @@ async def check_node(
             )
         )
 
-        evidence_sufficient = (
-            rag_evidence_sufficient
-            and sql_success
-        )
+        evidence_sufficient = rag_evidence_sufficient and sql_success
 
-        confidence_sufficient = (
-            hybrid_confidence >= 0.70
-        )
+        confidence_sufficient = hybrid_confidence >= 0.70
 
-        check_passed = (
-            evidence_sufficient
-            and confidence_sufficient
-        )
+        check_passed = evidence_sufficient and confidence_sufficient
 
         check_reason = (
-            "Hybrid RAG and SQL evidence "
-            "passed validation."
+            "Hybrid RAG and SQL evidence passed validation."
             if check_passed
-            else (
-                "Hybrid evidence did not meet "
-                "the validation requirements."
-            )
+            else ("Hybrid evidence did not meet the validation requirements.")
         )
 
         return {
             "check_passed": check_passed,
-
-            "sufficient_evidence": (
-                evidence_sufficient
-            ),
-
-            "evidence_sufficient": (
-                evidence_sufficient
-            ),
-
-            "confidence_sufficient": (
-                confidence_sufficient
-            ),
-
+            "sufficient_evidence": (evidence_sufficient),
+            "evidence_sufficient": (evidence_sufficient),
+            "confidence_sufficient": (confidence_sufficient),
             "check_reason": check_reason,
-
             "current_node": "check",
-
             "errors": [],
         }
 
@@ -300,7 +222,6 @@ async def check_node(
     # ========================================================
 
     if route == "incident":
-
         # ----------------------------------------------------
         # Internal incident evidence
         # ----------------------------------------------------
@@ -318,7 +239,8 @@ async def check_node(
                     0.0,
                 )
                 or 0.0
-            ) > 0.0
+            )
+            > 0.0
         )
 
         incident_active = bool(
@@ -340,9 +262,7 @@ async def check_node(
         # Live external status evidence
         # ----------------------------------------------------
 
-        live_status = state.get(
-            "live_status"
-        )
+        live_status = state.get("live_status")
 
         live_status_details = state.get(
             "live_status_details",
@@ -362,11 +282,8 @@ async def check_node(
             )
         )
 
-        live_status_degraded = (
-            live_status_success
-            and _is_external_degradation(
-                live_status
-            )
+        live_status_degraded = live_status_success and _is_external_degradation(
+            live_status
         )
 
         live_status_confidence = float(
@@ -392,21 +309,16 @@ async def check_node(
 
         internal_evidence = incident_success
 
-        external_evidence = (
-            live_status_success
-            and (
-                live_status_degraded
-                or live_status in {
-                    "none",
-                    "operational",
-                }
-            )
+        external_evidence = live_status_success and (
+            live_status_degraded
+            or live_status
+            in {
+                "none",
+                "operational",
+            }
         )
 
-        evidence_sufficient = (
-            internal_evidence
-            or external_evidence
-        )
+        evidence_sufficient = internal_evidence or external_evidence
 
         # ----------------------------------------------------
         # Combined confidence
@@ -419,10 +331,7 @@ async def check_node(
 
         # Strongest case:
         # internal incident + external degradation.
-        if (
-            incident_active
-            and live_status_degraded
-        ):
+        if incident_active and live_status_degraded:
             combined_confidence = max(
                 combined_confidence,
                 0.95,
@@ -436,23 +345,15 @@ async def check_node(
                 0.80,
             )
 
-        confidence_sufficient = (
-            combined_confidence >= 0.70
-        )
+        confidence_sufficient = combined_confidence >= 0.70
 
-        check_passed = (
-            evidence_sufficient
-            and confidence_sufficient
-        )
+        check_passed = evidence_sufficient and confidence_sufficient
 
         # ----------------------------------------------------
         # Explanation
         # ----------------------------------------------------
 
-        if (
-            incident_active
-            and live_status_degraded
-        ):
+        if incident_active and live_status_degraded:
             check_reason = (
                 "Internal incident evidence and live "
                 "external dependency degradation both "
@@ -476,10 +377,7 @@ async def check_node(
             )
 
         elif internal_evidence:
-            check_reason = (
-                "Internal incident investigation "
-                "completed successfully."
-            )
+            check_reason = "Internal incident investigation completed successfully."
 
         elif live_status_success:
             check_reason = (
@@ -488,32 +386,17 @@ async def check_node(
             )
 
         else:
-            check_reason = (
-                "Incident investigation did not produce "
-                "sufficient evidence."
-            )
+            check_reason = "Incident investigation did not produce sufficient evidence."
 
         return {
             "check_passed": check_passed,
-
             # Canonical reflection field.
-            "sufficient_evidence": (
-                evidence_sufficient
-            ),
-
+            "sufficient_evidence": (evidence_sufficient),
             # Detailed validation field.
-            "evidence_sufficient": (
-                evidence_sufficient
-            ),
-
-            "confidence_sufficient": (
-                confidence_sufficient
-            ),
-
+            "evidence_sufficient": (evidence_sufficient),
+            "confidence_sufficient": (confidence_sufficient),
             "check_reason": check_reason,
-
             "current_node": "check",
-
             "errors": [],
         }
 
@@ -523,20 +406,10 @@ async def check_node(
 
     return {
         "check_passed": False,
-
         "sufficient_evidence": False,
-
         "evidence_sufficient": False,
-
         "confidence_sufficient": False,
-
-        "check_reason": (
-            f"Unsupported resolution route: {route}"
-        ),
-
+        "check_reason": (f"Unsupported resolution route: {route}"),
         "current_node": "check",
-
-        "errors": [
-            f"Unsupported resolution route: {route}"
-        ],
+        "errors": [f"Unsupported resolution route: {route}"],
     }

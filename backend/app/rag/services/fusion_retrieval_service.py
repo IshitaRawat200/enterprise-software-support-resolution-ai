@@ -11,9 +11,8 @@ from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.retrievers import (
     QueryFusionRetriever,
 )
-from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.llms.groq import Groq
-
+from llama_index.retrievers.bm25 import BM25Retriever
 from pydantic import PrivateAttr
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,54 +37,41 @@ class RAGLlamaIndexEmbedding(BaseEmbedding):
         1536
     """
 
-    _embedding_service: RAGEmbeddingService = (
-        PrivateAttr()
-    )
+    _embedding_service: RAGEmbeddingService = PrivateAttr()
 
     def __init__(self) -> None:
 
         super().__init__()
 
-        self._embedding_service = (
-            RAGEmbeddingService()
-        )
+        self._embedding_service = RAGEmbeddingService()
 
     def _get_query_embedding(
         self,
         query: str,
     ) -> list[float]:
 
-        return self._embedding_service.embed_query(
-            query
-        )
+        return self._embedding_service.embed_query(query)
 
     async def _aget_query_embedding(
         self,
         query: str,
     ) -> list[float]:
 
-        return self._get_query_embedding(
-            query
-        )
+        return self._get_query_embedding(query)
 
     def _get_text_embedding(
         self,
         text: str,
     ) -> list[float]:
 
-        return self._embedding_service.embed_document(
-            text
-        )
+        return self._embedding_service.embed_document(text)
 
     def _get_text_embeddings(
         self,
         texts: list[str],
     ) -> list[list[float]]:
 
-        return [
-            self._get_text_embedding(text)
-            for text in texts
-        ]
+        return [self._get_text_embedding(text) for text in texts]
 
 
 class FusionRetrievalService:
@@ -125,28 +111,18 @@ class FusionRetrievalService:
     ) -> None:
 
         if similarity_top_k <= 0:
-            raise ValueError(
-                "similarity_top_k must be greater than zero."
-            )
+            raise ValueError("similarity_top_k must be greater than zero.")
 
         if not 0.0 <= minimum_similarity <= 1.0:
-            raise ValueError(
-                "minimum_similarity must be between 0.0 and 1.0."
-            )
+            raise ValueError("minimum_similarity must be between 0.0 and 1.0.")
 
         self.session = session
 
-        self.similarity_top_k = (
-            similarity_top_k
-        )
+        self.similarity_top_k = similarity_top_k
 
-        self.minimum_similarity = (
-            minimum_similarity
-        )
+        self.minimum_similarity = minimum_similarity
 
-        self.repository = (
-            RAGDatabaseRepository(session)
-        )
+        self.repository = RAGDatabaseRepository(session)
 
         self.vector_index = None
         self.vector_retriever = None
@@ -173,18 +149,12 @@ class FusionRetrievalService:
         chunks = await self.repository.list_chunks()
 
         if not chunks:
-            raise ValueError(
-                "No knowledge-base chunks are available "
-                "for retrieval."
-            )
+            raise ValueError("No knowledge-base chunks are available for retrieval.")
 
         documents: list[Document] = []
 
         for chunk in chunks:
-
-            content = (
-                chunk.get("content") or ""
-            ).strip()
+            content = (chunk.get("content") or "").strip()
 
             if not content:
                 continue
@@ -204,84 +174,63 @@ class FusionRetrievalService:
             )
 
         if not documents:
-            raise ValueError(
-                "No usable knowledge-base documents "
-                "were found."
-            )
+            raise ValueError("No usable knowledge-base documents were found.")
 
         # --------------------------------------------------------
         # Configure local embedding model
         # --------------------------------------------------------
 
-        Settings.embed_model = (
-            RAGLlamaIndexEmbedding()
-        )
+        Settings.embed_model = RAGLlamaIndexEmbedding()
 
         # --------------------------------------------------------
         # Vector index
         # --------------------------------------------------------
 
-        self.vector_index = (
-            VectorStoreIndex.from_documents(
-                documents
-            )
-        )
+        self.vector_index = VectorStoreIndex.from_documents(documents)
 
-        self.vector_retriever = (
-            self.vector_index.as_retriever(
-                similarity_top_k=(
-                    self.similarity_top_k
-                )
-            )
+        self.vector_retriever = self.vector_index.as_retriever(
+            similarity_top_k=(self.similarity_top_k)
         )
 
         # --------------------------------------------------------
         # BM25
         # --------------------------------------------------------
 
-        nodes = list(
-            self.vector_index.docstore.docs.values()
-        )
+        nodes = list(self.vector_index.docstore.docs.values())
 
         if not nodes:
-            raise ValueError(
-                "No nodes were created for BM25 retrieval."
-            )
+            raise ValueError("No nodes were created for BM25 retrieval.")
 
-        self.bm25_retriever = (
-            BM25Retriever.from_defaults(
-                nodes=nodes,
-                similarity_top_k=(
-                    min(
-                        self.similarity_top_k,
-                        len(nodes),
-                    )
-                ),
-            )
+        self.bm25_retriever = BM25Retriever.from_defaults(
+            nodes=nodes,
+            similarity_top_k=(
+                min(
+                    self.similarity_top_k,
+                    len(nodes),
+                )
+            ),
         )
 
         # --------------------------------------------------------
         # QueryFusionRetriever
         # --------------------------------------------------------
 
-        self.fusion_retriever = (
-            QueryFusionRetriever(
-                retrievers=[
-                    self.vector_retriever,
-                    self.bm25_retriever,
-                ],
-                llm=self._create_fusion_llm(),
-                similarity_top_k=(
-                    min(
-                        self.similarity_top_k,
-                        len(nodes),
-                    )
-                ),
-                num_queries=1,
-                mode="reciprocal_rerank",
-                use_async=True,
-                verbose=False,
-            )
+        self.fusion_retriever = QueryFusionRetriever(
+            retrievers=[
+                self.vector_retriever,
+                self.bm25_retriever,
+            ],
+            llm=self._create_fusion_llm(),
+            similarity_top_k=(
+                min(
+                    self.similarity_top_k,
+                    len(nodes),
+                )
+            ),
+            num_queries=1,
+            mode="reciprocal_rerank",
+            use_async=True,
+            verbose=False,
         )
 
     # ============================================================
@@ -294,9 +243,7 @@ class FusionRetrievalService:
         settings = get_settings()
 
         if not settings.groq_api_key:
-            raise RuntimeError(
-                "GROQ_API_KEY is not configured."
-            )
+            raise RuntimeError("GROQ_API_KEY is not configured.")
 
         return Groq(
             model=settings.groq_simple_model,
@@ -322,39 +269,21 @@ class FusionRetrievalService:
         """
 
         if self.vector_retriever is None:
-
             await self._build_retrieval_index()
 
         if self.vector_retriever is None:
-            raise RuntimeError(
-                "Vector retriever was not initialized."
-            )
+            raise RuntimeError("Vector retriever was not initialized.")
 
-        results = await self.vector_retriever.aretrieve(
-            query
-        )
+        results = await self.vector_retriever.aretrieve(query)
 
         scores: dict[str, float] = {}
 
         for item in results:
-
             node = item.node
 
-            document_id = (
-                node.metadata.get(
-                    "document_id"
-                )
-                if node.metadata
-                else None
-            )
+            document_id = node.metadata.get("document_id") if node.metadata else None
 
-            chunk_id = (
-                node.metadata.get(
-                    "chunk_id"
-                )
-                if node.metadata
-                else None
-            )
+            chunk_id = node.metadata.get("chunk_id") if node.metadata else None
 
             key = (
                 str(chunk_id)
@@ -364,11 +293,7 @@ class FusionRetrievalService:
                 else node.get_content()
             )
 
-            score = (
-                float(item.score)
-                if item.score is not None
-                else 0.0
-            )
+            score = float(item.score) if item.score is not None else 0.0
 
             scores[key] = max(
                 scores.get(key, 0.0),
@@ -390,22 +315,15 @@ class FusionRetrievalService:
         """
 
         if not query or not query.strip():
-            raise ValueError(
-                "Retrieval query cannot be empty."
-            )
+            raise ValueError("Retrieval query cannot be empty.")
 
         if self.fusion_retriever is None:
-
             await self._build_retrieval_index()
 
         if self.fusion_retriever is None:
-            raise RuntimeError(
-                "Fusion retriever was not initialized."
-            )
+            raise RuntimeError("Fusion retriever was not initialized.")
 
-        return await self.fusion_retriever.aretrieve(
-            query.strip()
-        )
+        return await self.fusion_retriever.aretrieve(query.strip())
 
     # ============================================================
     # EVIDENCE
@@ -429,60 +347,41 @@ class FusionRetrievalService:
         query = query.strip()
 
         if not query:
-            raise ValueError(
-                "Retrieval query cannot be empty."
-            )
+            raise ValueError("Retrieval query cannot be empty.")
 
         # --------------------------------------------------------
         # Run RRF
         # --------------------------------------------------------
 
-        fusion_results = await self.retrieve(
-            query
-        )
+        fusion_results = await self.retrieve(query)
 
         # --------------------------------------------------------
         # Run vector retrieval separately to obtain
         # meaningful semantic similarity scores.
         # --------------------------------------------------------
 
-        vector_scores = (
-            await self._retrieve_vector_results(
-                query
-            )
-        )
+        vector_scores = await self._retrieve_vector_results(query)
 
         evidence: list[dict[str, Any]] = []
 
         for item in fusion_results:
-
             node = item.node
 
-            metadata = (
-                node.metadata or {}
-            )
+            metadata = node.metadata or {}
 
             # ----------------------------------------------------
             # RRF score
             # ----------------------------------------------------
 
-            rrf_score = (
-                float(item.score)
-                if item.score is not None
-                else 0.0
-            )
+            rrf_score = float(item.score) if item.score is not None else 0.0
 
             # ----------------------------------------------------
             # Identify chunk
             # ----------------------------------------------------
 
-            chunk_id = metadata.get(
-                "chunk_id"
-            )
+            chunk_id = metadata.get("chunk_id")
 
-            document_id = metadata.get(
-                "document_id"
-            )
+            document_id = metadata.get("document_id")
 
             key = (
                 str(chunk_id)
@@ -513,10 +412,7 @@ class FusionRetrievalService:
             # Minimum semantic relevance filter
             # ----------------------------------------------------
 
-            if (
-                vector_score
-                < self.minimum_similarity
-            ):
+            if vector_score < self.minimum_similarity:
                 continue
 
             # ----------------------------------------------------
@@ -524,9 +420,7 @@ class FusionRetrievalService:
             # ----------------------------------------------------
 
             source = (
-                metadata.get("source_url")
-                or metadata.get("document_name")
-                or "unknown"
+                metadata.get("source_url") or metadata.get("document_name") or "unknown"
             )
 
             title = (
@@ -540,51 +434,27 @@ class FusionRetrievalService:
                     "title": title,
                     "content": node.get_content(),
                     "source": source,
-
                     # Semantic relevance.
                     "vector_score": round(
                         vector_score,
                         4,
                     ),
-
                     # Fusion ranking score.
                     "rrf_score": round(
                         rrf_score,
                         4,
                     ),
-
                     "relevance_score": round(
                         vector_score,
                         4,
                     ),
-
-                    "document_name": metadata.get(
-                        "document_name"
-                    ),
-
-                    "document_id": metadata.get(
-                        "document_id"
-                    ),
-
-                    "chunk_id": metadata.get(
-                        "chunk_id"
-                    ),
-
-                    "chunk_index": metadata.get(
-                        "chunk_index"
-                    ),
-
-                    "product_name": metadata.get(
-                        "product_name"
-                    ),
-
-                    "product_version": metadata.get(
-                        "product_version"
-                    ),
-
-                    "version": metadata.get(
-                        "version"
-                    ),
+                    "document_name": metadata.get("document_name"),
+                    "document_id": metadata.get("document_id"),
+                    "chunk_id": metadata.get("chunk_id"),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "product_name": metadata.get("product_name"),
+                    "product_version": metadata.get("product_version"),
+                    "version": metadata.get("version"),
                 }
             )
 
@@ -617,20 +487,12 @@ class FusionRetrievalService:
     ) -> dict[str, Any]:
 
         if not query or not query.strip():
-            raise ValueError(
-                "Retrieval query cannot be empty."
-            )
+            raise ValueError("Retrieval query cannot be empty.")
 
-        evidence = (
-            await self.retrieve_evidence(
-                query
-            )
-        )
+        evidence = await self.retrieve_evidence(query)
 
         return {
             "query": query.strip(),
-            "result_count": len(
-                evidence
-            ),
+            "result_count": len(evidence),
             "results": evidence,
         }

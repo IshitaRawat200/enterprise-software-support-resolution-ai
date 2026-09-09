@@ -19,9 +19,7 @@ class SubscriptionRepository:
         subscription_id: UUID,
     ) -> Subscription | None:
         result = await self.session.execute(
-            select(Subscription).where(
-                Subscription.id == subscription_id
-            )
+            select(Subscription).where(Subscription.id == subscription_id)
         )
         return result.scalar_one_or_none()
 

@@ -4,8 +4,6 @@ from pathlib import Path
 from app.orchestrator.graph import build_uncheckpointed_graph
 
 
-
-
 def main():
     # ---------------------------------------------------------
     # Generate Mermaid content from the actual LangGraph
@@ -17,9 +15,7 @@ def main():
     # Project root
     # ---------------------------------------------------------
 
-    project_root = (
-        Path(__file__).resolve().parent.parent.parent
-    )
+    project_root = Path(__file__).resolve().parent.parent.parent
 
     # ---------------------------------------------------------
     # Output files
@@ -43,9 +39,7 @@ def main():
         encoding="utf-8",
     )
 
-    print(
-        f"Mermaid file generated: {mmd_file}"
-    )
+    print(f"Mermaid file generated: {mmd_file}")
 
     # ---------------------------------------------------------
     # Generate PNG image
@@ -66,25 +60,16 @@ def main():
             check=True,
         )
 
-        print(
-            f"PNG image generated: {png_file}"
-        )
+        print(f"PNG image generated: {png_file}")
 
     except subprocess.CalledProcessError as exc:
-        print(
-            "Could not generate PNG image."
-        )
+        print("Could not generate PNG image.")
         print(exc)
 
     except FileNotFoundError:
-        print(
-            "Could not generate PNG image because "
-            "'npx' was not found."
-        )
+        print("Could not generate PNG image because 'npx' was not found.")
 
-    print(
-        "\nWorkflow diagram generation completed."
-    )
+    print("\nWorkflow diagram generation completed.")
 
 
 if __name__ == "__main__":

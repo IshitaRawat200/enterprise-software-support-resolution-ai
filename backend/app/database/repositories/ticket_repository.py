@@ -44,8 +44,7 @@ class TicketRepository:
         customer_id: UUID,
     ) -> list[SupportTicket]:
         result = await self.session.execute(
-            select(SupportTicket)
-            .where(
+            select(SupportTicket).where(
                 SupportTicket.customer_id == customer_id,
             )
         )

@@ -91,9 +91,7 @@ class HybridSQLEvidence(BaseModel):
 
     sql_query: str | None = None
 
-    rows: list[dict[str, Any]] = Field(
-        default_factory=list
-    )
+    rows: list[dict[str, Any]] = Field(default_factory=list)
 
     row_count: int = 0
 
@@ -122,9 +120,7 @@ class HybridRetrievalResult(BaseModel):
 
     route: HybridRoute = "hybrid"
 
-    rag_results: list[HybridRAGEvidence] = Field(
-        default_factory=list
-    )
+    rag_results: list[HybridRAGEvidence] = Field(default_factory=list)
 
     sql_result: HybridSQLEvidence | None = None
 
@@ -150,6 +146,4 @@ class HybridRetrievalResult(BaseModel):
 
     evidence_summary: str = ""
 
-    errors: list[str] = Field(
-        default_factory=list
-    )
+    errors: list[str] = Field(default_factory=list)

@@ -66,9 +66,7 @@ class DBRAGIngestionService:
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(
-                f"Document not found: {path}"
-            )
+            raise FileNotFoundError(f"Document not found: {path}")
 
         # -------------------------------------------------
         # Determine the canonical document name.
@@ -85,8 +83,7 @@ class DBRAGIngestionService:
 
         document_name = (
             original_filename.strip()
-            if original_filename
-            and original_filename.strip()
+            if original_filename and original_filename.strip()
             else path.name
         )
 
@@ -96,41 +93,26 @@ class DBRAGIngestionService:
 
         file_bytes = path.read_bytes()
 
-        content_hash = hashlib.sha256(
-            file_bytes
-        ).hexdigest()
+        content_hash = hashlib.sha256(file_bytes).hexdigest()
 
         # -------------------------------------------------
         # Avoid ingesting the same document twice.
         # -------------------------------------------------
 
-        existing_document_id = (
-            await self.repository.find_document_by_hash(
-                content_hash
-            )
-        )
+        existing_document_id = await self.repository.find_document_by_hash(content_hash)
 
         if existing_document_id is not None:
-
-            existing_chunk_count = (
-                await self.repository.count_chunks(
-                    existing_document_id
-                )
+            existing_chunk_count = await self.repository.count_chunks(
+                existing_document_id
             )
 
             return {
                 "status": "already_exists",
-                "document_id": str(
-                    existing_document_id
-                ),
+                "document_id": str(existing_document_id),
                 "document_name": document_name,
                 "document_type": path.suffix.lower(),
-                "chunks_created": (
-                    existing_chunk_count
-                ),
-                "embedding_dimension": (
-                    self.embedding_service.EMBEDDING_DIMENSION
-                ),
+                "chunks_created": (existing_chunk_count),
+                "embedding_dimension": (self.embedding_service.EMBEDDING_DIMENSION),
             }
 
         # -------------------------------------------------
@@ -143,9 +125,7 @@ class DBRAGIngestionService:
         )
 
         if not documents:
-            raise ValueError(
-                f"No chunks generated from {path}."
-            )
+            raise ValueError(f"No chunks generated from {path}.")
 
         # -------------------------------------------------
         # Replace temporary loader filename metadata with
@@ -153,22 +133,15 @@ class DBRAGIngestionService:
         # -------------------------------------------------
 
         for document in documents:
+            document.metadata["document_name"] = document_name
 
-            document.metadata["document_name"] = (
-                document_name
-            )
-
-            document.metadata["original_filename"] = (
-                document_name
-            )
+            document.metadata["original_filename"] = document_name
 
         # -------------------------------------------------
         # Extract metadata from the first chunk.
         # -------------------------------------------------
 
-        first_metadata = dict(
-            documents[0].metadata
-        )
+        first_metadata = dict(documents[0].metadata)
 
         # -------------------------------------------------
         # Build document-level metadata.
@@ -180,7 +153,8 @@ class DBRAGIngestionService:
         document_metadata = {
             key: value
             for key, value in first_metadata.items()
-            if key not in {
+            if key
+            not in {
                 "chunk_index",
                 "file_path",
                 "document_name",
@@ -188,37 +162,23 @@ class DBRAGIngestionService:
             }
         }
 
-        document_metadata["document_name"] = (
-            document_name
-        )
+        document_metadata["document_name"] = document_name
 
-        document_metadata["original_filename"] = (
-            document_name
-        )
+        document_metadata["original_filename"] = document_name
 
         # -------------------------------------------------
         # Create documents row.
         # -------------------------------------------------
 
-        document_id = (
-            await self.repository.create_document(
-                document_name=document_name,
-                document_type=path.suffix.lower(),
-                source_url=first_metadata.get(
-                    "source_url"
-                ),
-                product_name=first_metadata.get(
-                    "product_name"
-                ),
-                product_version=first_metadata.get(
-                    "product_version"
-                ),
-                version=first_metadata.get(
-                    "version"
-                ),
-                content_hash=content_hash,
-                metadata=document_metadata,
-            )
+        document_id = await self.repository.create_document(
+            document_name=document_name,
+            document_type=path.suffix.lower(),
+            source_url=first_metadata.get("source_url"),
+            product_name=first_metadata.get("product_name"),
+            product_version=first_metadata.get("product_version"),
+            version=first_metadata.get("version"),
+            content_hash=content_hash,
+            metadata=document_metadata,
         )
 
         # -------------------------------------------------
@@ -228,11 +188,7 @@ class DBRAGIngestionService:
         chunks_created = 0
 
         try:
-
-            for index, document in enumerate(
-                documents
-            ):
-
+            for index, document in enumerate(documents):
                 content = document.text.strip()
 
                 if not content:
@@ -242,11 +198,7 @@ class DBRAGIngestionService:
                 # Generate 1536-dimensional embedding.
                 # -------------------------------------------------
 
-                embedding = (
-                    self.embedding_service.embed_document(
-                        content
-                    )
-                )
+                embedding = self.embedding_service.embed_document(content)
 
                 # -------------------------------------------------
                 # Store chunk metadata.
@@ -254,17 +206,13 @@ class DBRAGIngestionService:
 
                 chunk_metadata = {
                     **document.metadata,
-                    "document_id": str(
-                        document_id
-                    ),
+                    "document_id": str(document_id),
                     "chunk_index": index,
                     "document_name": document_name,
                     "original_filename": document_name,
                 }
 
-                token_count = len(
-                    content.split()
-                )
+                token_count = len(content.split())
 
                 # -------------------------------------------------
                 # Insert chunk into document_chunks.
@@ -288,7 +236,6 @@ class DBRAGIngestionService:
             await self.session.commit()
 
         except Exception:
-
             await self.session.rollback()
 
             raise
@@ -299,13 +246,9 @@ class DBRAGIngestionService:
 
         return {
             "status": "indexed",
-            "document_id": str(
-                document_id
-            ),
+            "document_id": str(document_id),
             "document_name": document_name,
             "document_type": path.suffix.lower(),
             "chunks_created": chunks_created,
-            "embedding_dimension": (
-                self.embedding_service.EMBEDDING_DIMENSION
-            ),
+            "embedding_dimension": (self.embedding_service.EMBEDDING_DIMENSION),
         }

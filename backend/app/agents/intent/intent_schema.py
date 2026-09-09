@@ -4,7 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 IntentType = Literal[
     "usage_configuration",
     "integration_api",

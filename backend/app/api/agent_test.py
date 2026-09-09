@@ -6,15 +6,13 @@ from pydantic import BaseModel, Field
 from app.agents.intent.intent_schema import (
     IntentClassificationResult,
 )
-from app.services.intent_service import IntentService
-
 from app.agents.retrieval.retrieval_agent import (
     RetrievalAgent,
 )
 from app.agents.retrieval.retrieval_schema import (
     RetrievalResult,
 )
-
+from app.services.intent_service import IntentService
 
 router = APIRouter(
     prefix="/agent-test",
@@ -28,7 +26,6 @@ router = APIRouter(
 
 
 class IntentAgentTestRequest(BaseModel):
-
     message: str = Field(
         min_length=1,
         max_length=10000,
@@ -45,9 +42,7 @@ async def test_intent_agent(
 
     intent_service = IntentService()
 
-    result = await intent_service.classify(
-        request.message
-    )
+    result = await intent_service.classify(request.message)
 
     return result
 
@@ -58,7 +53,6 @@ async def test_intent_agent(
 
 
 class RetrievalAgentTestRequest(BaseModel):
-
     query: str = Field(
         min_length=1,
         max_length=10000,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict
+import operator
+from typing import Annotated, Any, TypedDict
 
 
 class SupportState(TypedDict, total=False):
@@ -12,7 +13,6 @@ class SupportState(TypedDict, total=False):
     customer_id: str | None
     user_id: str | None
     user_role: str | None
-
 
     conversation_history: list[dict[str, Any]]
     conversation_context: str | None
@@ -43,7 +43,6 @@ class SupportState(TypedDict, total=False):
     requires_clarification: bool
     suggested_route: str | None
     initial_action: str | None
-
 
     complexity: str | None
     complexity_reason: str | None
@@ -143,6 +142,11 @@ class SupportState(TypedDict, total=False):
     live_status_checked_at: str | None
     live_status_source: str | None
     live_status_details: dict[str, Any] | None
+
+    llm_usage: Annotated[
+        list[dict[str, Any]],
+        operator.add,
+    ]
     # ------------------------------------------------------------------
     # Severity
     # ------------------------------------------------------------------

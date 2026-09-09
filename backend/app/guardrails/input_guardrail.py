@@ -148,8 +148,7 @@ def validate_input(
     if not security_result.allowed:
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=security_result.reason
-            or "Security policy rejected the message.",
+            reason=security_result.reason or "Security policy rejected the message.",
             risk_level=security_result.risk_level,
             code=security_result.code,
             metadata={

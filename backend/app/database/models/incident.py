@@ -5,11 +5,11 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.connection import Base
-
 
 ticket_severity_enum = ENUM(
     "low",

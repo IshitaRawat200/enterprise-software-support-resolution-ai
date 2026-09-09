@@ -24,9 +24,7 @@ class KnowledgeRepository:
         article_id: UUID,
     ) -> KnowledgeArticle | None:
         result = await self.session.execute(
-            select(KnowledgeArticle).where(
-                KnowledgeArticle.id == article_id
-            )
+            select(KnowledgeArticle).where(KnowledgeArticle.id == article_id)
         )
         return result.scalar_one_or_none()
 

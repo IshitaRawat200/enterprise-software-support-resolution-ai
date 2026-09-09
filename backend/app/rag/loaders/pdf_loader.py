@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 from langchain_community.document_loaders import PyPDFLoader
 
@@ -13,7 +14,7 @@ class PDFDocumentLoader:
         .pdf
     """
 
-    SUPPORTED_EXTENSIONS = {
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {
         ".pdf",
     }
 
@@ -21,23 +22,14 @@ class PDFDocumentLoader:
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(
-                f"PDF document not found: {path}"
-            )
+            raise FileNotFoundError(f"PDF document not found: {path}")
 
         if not path.is_file():
-            raise ValueError(
-                f"Path is not a file: {path}"
-            )
+            raise ValueError(f"Path is not a file: {path}")
 
         if path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-            raise ValueError(
-                f"Unsupported PDF document type: "
-                f"{path.suffix}"
-            )
+            raise ValueError(f"Unsupported PDF document type: {path.suffix}")
 
-        loader = PyPDFLoader(
-            str(path)
-        )
+        loader = PyPDFLoader(str(path))
 
         return loader.load()

@@ -4,19 +4,20 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, Float, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import ENUM, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .customer import Customer
-    from .ticket_message import TicketMessage
-    from .knowledge import KnowledgeArticleUsage
-    from .conversation import ConversationHistory
-    from .escalation import Escalation
-    from .audit import AuditEvent
     from .agent_state import AgentState
+    from .audit import AuditEvent
+    from .conversation import ConversationHistory
+    from .customer import Customer
+    from .escalation import Escalation
+    from .knowledge import KnowledgeArticleUsage
+    from .ticket_message import TicketMessage
 
 
 ticket_status_enum = ENUM(
@@ -112,40 +113,40 @@ class SupportTicket(Base):
         nullable=True,
     )
 
-    customer: Mapped["Customer"] = relationship(
+    customer: Mapped[Customer] = relationship(
         "Customer",
         back_populates="tickets",
     )
 
-    messages: Mapped[list["TicketMessage"]] = relationship(
+    messages: Mapped[list[TicketMessage]] = relationship(
         "TicketMessage",
         back_populates="ticket",
         cascade="all, delete-orphan",
     )
 
-    article_usage: Mapped[list["KnowledgeArticleUsage"]] = relationship(
+    article_usage: Mapped[list[KnowledgeArticleUsage]] = relationship(
         "KnowledgeArticleUsage",
         back_populates="ticket",
         cascade="all, delete-orphan",
     )
 
-    conversation_history: Mapped[list["ConversationHistory"]] = relationship(
+    conversation_history: Mapped[list[ConversationHistory]] = relationship(
         "ConversationHistory",
         back_populates="ticket",
     )
 
-    escalation: Mapped["Escalation | None"] = relationship(
+    escalation: Mapped[Escalation | None] = relationship(
         "Escalation",
         back_populates="ticket",
         uselist=False,
     )
 
-    audit_events: Mapped[list["AuditEvent"]] = relationship(
+    audit_events: Mapped[list[AuditEvent]] = relationship(
         "AuditEvent",
         back_populates="ticket",
     )
 
-    agent_states: Mapped[list["AgentState"]] = relationship(
+    agent_states: Mapped[list[AgentState]] = relationship(
         "AgentState",
         back_populates="ticket",
     )

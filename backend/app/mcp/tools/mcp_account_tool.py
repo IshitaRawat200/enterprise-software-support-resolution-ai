@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.database.connection import get_db_session
 from app.observability.logging import logger
@@ -59,9 +60,7 @@ async def mcp_validate_customer_account(
                     "success": True,
                     "account_exists": False,
                     "customer_id": customer_id,
-                    "reason": (
-                        "Customer account was not found."
-                    ),
+                    "reason": ("Customer account was not found."),
                 }
 
             return {
@@ -76,10 +75,8 @@ async def mcp_validate_customer_account(
                 "account_status": row["account_status"],
             }
 
-    except Exception:
-        logger.exception(
-            "MCP customer account validation failed."
-        )
+    except SQLAlchemyError:
+        logger.exception("MCP customer account validation failed.")
 
         return {
             "success": False,

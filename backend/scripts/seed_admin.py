@@ -8,10 +8,8 @@ import bcrypt
 from dotenv import load_dotenv
 from sqlalchemy import select
 
-import app.database.model_registry
 from app.database.connection import get_db_session
 from app.database.models.user import User
-
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,14 +21,10 @@ async def seed_admin() -> None:
     password = os.getenv("SEED_ADMIN_PASSWORD")
 
     if not email:
-        raise RuntimeError(
-            "SEED_ADMIN_EMAIL is not configured in .env"
-        )
+        raise RuntimeError("SEED_ADMIN_EMAIL is not configured in .env")
 
     if not password:
-        raise RuntimeError(
-            "SEED_ADMIN_PASSWORD is not configured in .env"
-        )
+        raise RuntimeError("SEED_ADMIN_PASSWORD is not configured in .env")
 
     email = email.strip().lower()
 
@@ -41,22 +35,15 @@ async def seed_admin() -> None:
         )
 
     async for session in get_db_session():
-
-        result = await session.execute(
-            select(User).where(
-                User.email == email
-            )
-        )
+        result = await session.execute(select(User).where(User.email == email))
 
         existing_user = result.scalar_one_or_none()
 
         if existing_user:
-
             print(f"User already exists: {email}")
             print(f"Current role: {existing_user.role}")
 
             if str(existing_user.role) != "admin":
-
                 existing_user.role = "admin"
 
                 await session.commit()

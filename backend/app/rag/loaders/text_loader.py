@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 from langchain_community.document_loaders import TextLoader
 
@@ -14,7 +15,7 @@ class TextDocumentLoader:
         .md
     """
 
-    SUPPORTED_EXTENSIONS = {
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {
         ".txt",
         ".md",
     }
@@ -23,20 +24,13 @@ class TextDocumentLoader:
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(
-                f"Document not found: {path}"
-            )
+            raise FileNotFoundError(f"Document not found: {path}")
 
         if not path.is_file():
-            raise ValueError(
-                f"Path is not a file: {path}"
-            )
+            raise ValueError(f"Path is not a file: {path}")
 
         if path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-            raise ValueError(
-                f"Unsupported text document type: "
-                f"{path.suffix}"
-            )
+            raise ValueError(f"Unsupported text document type: {path.suffix}")
 
         loader = TextLoader(
             str(path),

@@ -4,7 +4,6 @@ import logging
 import sys
 from typing import Any
 
-
 LOGGER_NAME = "enterprise_support_ai"
 
 
@@ -32,12 +31,7 @@ def configure_logging(
     handler = logging.StreamHandler(sys.stdout)
 
     formatter = logging.Formatter(
-        fmt=(
-            "%(asctime)s | "
-            "%(levelname)s | "
-            "%(name)s | "
-            "%(message)s"
-        ),
+        fmt=("%(asctime)s | %(levelname)s | %(name)s | %(message)s"),
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
@@ -65,10 +59,7 @@ def log_request_start(
     """
 
     logger.info(
-        "request_started "
-        "request_id=%s "
-        "conversation_id=%s "
-        "customer_id=%s",
+        "request_started request_id=%s conversation_id=%s customer_id=%s",
         request_id,
         conversation_id,
         customer_id,
@@ -121,10 +112,7 @@ def log_node(
 
     if latency_ms is None:
         logger.info(
-            "graph_node "
-            "request_id=%s "
-            "node=%s "
-            "status=%s",
+            "graph_node request_id=%s node=%s status=%s",
             request_id,
             node,
             status,
@@ -132,11 +120,7 @@ def log_node(
         return
 
     logger.info(
-        "graph_node "
-        "request_id=%s "
-        "node=%s "
-        "status=%s "
-        "latency_ms=%.2f",
+        "graph_node request_id=%s node=%s status=%s latency_ms=%.2f",
         request_id,
         node,
         status,
@@ -158,10 +142,7 @@ def log_error(
     """
 
     logger.error(
-        "application_error "
-        "request_id=%s "
-        "component=%s "
-        "error=%s",
+        "application_error request_id=%s component=%s error=%s",
         request_id,
         component,
         str(error),
@@ -184,10 +165,7 @@ def log_event(
         )
     """
 
-    safe_fields = " ".join(
-        f"{key}={value}"
-        for key, value in fields.items()
-    )
+    safe_fields = " ".join(f"{key}={value}" for key, value in fields.items())
 
     logger.info(
         "%s %s",

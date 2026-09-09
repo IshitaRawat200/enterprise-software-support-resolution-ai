@@ -19,10 +19,15 @@ security = HTTPBearer(
     auto_error=True,
 )
 
+# Module-level dependency objects to avoid calling Depends() in
+# argument defaults (satisfies ruff B008).
+security_dep = Depends(security)
+get_db_session_dep = Depends(get_db_session)
+
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_db_session),
+    credentials: HTTPAuthorizationCredentials = security_dep,
+    session: AsyncSession = get_db_session_dep,
 ) -> User:
     token = credentials.credentials
 

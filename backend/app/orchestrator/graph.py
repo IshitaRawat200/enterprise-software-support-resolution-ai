@@ -5,7 +5,13 @@ from langgraph.graph import END, START, StateGraph
 
 from app.orchestrator.nodes.act_node import act_node
 from app.orchestrator.nodes.check_node import check_node
-from app.orchestrator.nodes.escalation_node import escalation_node
+from app.orchestrator.nodes.conversation_node import (
+    conversation_node,
+    is_simple_conversation,
+)
+from app.orchestrator.nodes.escalation_node import (
+    escalation_node,
+)
 from app.orchestrator.nodes.intent_node import intent_node
 from app.orchestrator.nodes.plan_node import plan_node
 from app.orchestrator.nodes.reflect_node import reflect_node
@@ -29,15 +35,55 @@ builder = StateGraph(SupportState)
 # NODES
 # ============================================================
 
-builder.add_node("plan", plan_node)
-builder.add_node("intent", intent_node)
-builder.add_node("act", act_node)
-builder.add_node("check", check_node)
-builder.add_node("reflect", reflect_node)
-builder.add_node("replan", replan_node)
-builder.add_node("resolve", resolve_node)
-builder.add_node("severity", severity_node)
-builder.add_node("escalation", escalation_node)
+builder.add_node(
+    "plan",
+    plan_node,
+)
+
+builder.add_node(
+    "intent",
+    intent_node,
+)
+
+builder.add_node(
+    "conversation",
+    conversation_node,
+)
+
+builder.add_node(
+    "act",
+    act_node,
+)
+
+builder.add_node(
+    "check",
+    check_node,
+)
+
+builder.add_node(
+    "reflect",
+    reflect_node,
+)
+
+builder.add_node(
+    "replan",
+    replan_node,
+)
+
+builder.add_node(
+    "resolve",
+    resolve_node,
+)
+
+builder.add_node(
+    "severity",
+    severity_node,
+)
+
+builder.add_node(
+    "escalation",
+    escalation_node,
+)
 
 
 # ============================================================
@@ -54,10 +100,64 @@ builder.add_edge(
     "intent",
 )
 
-builder.add_edge(
+
+# ============================================================
+# INTENT → CONVERSATION / NORMAL WORKFLOW
+# ============================================================
+
+
+def route_after_intent(
+    state: SupportState,
+) -> str:
+    """
+    Decide whether the customer message should use the
+    conversational fast path or continue through the
+    full support investigation workflow.
+
+    Simple greetings bypass:
+
+        ACT
+        CHECK
+        REFLECT
+        REPLAN
+        RESOLVE
+        SEVERITY
+
+    All actual support issues continue through the
+    normal workflow.
+    """
+
+    message = (state.get("message") or "").strip()
+
+    if is_simple_conversation(message):
+        return "conversation"
+
+    return "act"
+
+
+builder.add_conditional_edges(
     "intent",
-    "act",
+    route_after_intent,
+    {
+        "conversation": "conversation",
+        "act": "act",
+    },
 )
+
+
+# ============================================================
+# CONVERSATION FAST PATH
+# ============================================================
+
+builder.add_edge(
+    "conversation",
+    END,
+)
+
+
+# ============================================================
+# NORMAL SUPPORT WORKFLOW
+# ============================================================
 
 builder.add_edge(
     "act",
@@ -132,21 +232,25 @@ builder.add_edge(
 # BUILD COMPILED GRAPH
 # ============================================================
 
+
 def build_support_graph(
     checkpointer: AsyncPostgresSaver,
 ):
     """
-    Compile the support graph with the supplied LangGraph
-    checkpointer.
+    Compile the production support graph with the supplied
+    PostgreSQL LangGraph checkpointer.
     """
 
     return builder.compile(
         checkpointer=checkpointer,
     )
 
+
 def build_uncheckpointed_graph():
     """
-    Build a graph for visualization/testing where persistence
-    is not required.
+    Build a graph without persistence.
+
+    Useful for unit tests and graph visualization.
     """
+
     return builder.compile()

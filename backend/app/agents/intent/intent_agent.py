@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from app.agents.base_agent import BaseAgent
-from app.agents.intent.intent_prompt import (
-    INTENT_CLASSIFICATION_PROMPT,
-)
 from app.agents.intent.intent_schema import (
     IntentClassificationResult,
 )
 from app.llm.complexity import assess_complexity
 from app.llm.gateway import get_llm
+from app.llm.static_prompts.intent_prompt import (
+    INTENT_CLASSIFICATION_PROMPT,
+)
 
 
 class IntentAgent(BaseAgent):
@@ -23,9 +23,7 @@ class IntentAgent(BaseAgent):
     complexity evaluator.
     """
 
-    agent_name = (
-        "intent_and_initial_planning_agent"
-    )
+    agent_name = "intent_and_initial_planning_agent"
 
     def __init__(
         self,
@@ -46,9 +44,7 @@ class IntentAgent(BaseAgent):
         # ========================================================
 
         if not message or not message.strip():
-            raise ValueError(
-                "Customer message cannot be empty."
-            )
+            raise ValueError("Customer message cannot be empty.")
 
         message = message.strip()
 
@@ -56,9 +52,7 @@ class IntentAgent(BaseAgent):
         # NORMALIZE CONTEXT
         # ========================================================
 
-        context = (
-            conversation_context or ""
-        ).strip()
+        context = (conversation_context or "").strip()
 
         # ========================================================
         # COMPLEXITY EVALUATION
@@ -95,6 +89,4 @@ class IntentAgent(BaseAgent):
             },
         )
 
-        return IntentClassificationResult.model_validate(
-            result
-        )
+        return IntentClassificationResult.model_validate(result)

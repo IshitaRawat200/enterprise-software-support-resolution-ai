@@ -150,11 +150,7 @@ class PIIGuardrail:
                 "[REDACTED_PII]",
             )
 
-            sanitized = (
-                sanitized[: match.start]
-                + replacement
-                + sanitized[match.end :]
-            )
+            sanitized = sanitized[: match.start] + replacement + sanitized[match.end :]
 
         return sanitized
 

@@ -87,7 +87,6 @@ class HybridRetrievalService:
             # --------------------------------------------------------
 
             if hasattr(self.rag_service, "run"):
-
                 result = await self.rag_service.run(
                     query=query,
                     session=session,
@@ -106,21 +105,13 @@ class HybridRetrievalService:
                 self.rag_service,
                 "retrieve_evidence",
             ):
-
-                raw_results = (
-                    await self.rag_service.retrieve_evidence(
-                        query
-                    )
-                )
+                raw_results = await self.rag_service.retrieve_evidence(query)
 
             elif hasattr(
                 self.rag_service,
                 "query",
             ):
-
-                result = await self.rag_service.query(
-                    query
-                )
+                result = await self.rag_service.query(query)
 
                 raw_results = result.get(
                     "results",
@@ -128,7 +119,6 @@ class HybridRetrievalService:
                 )
 
             else:
-
                 raise RuntimeError(
                     "Configured RAG service does not provide "
                     "run(), retrieve_evidence(), or query()."
@@ -139,7 +129,6 @@ class HybridRetrievalService:
             evidence: list[HybridRAGEvidence] = []
 
             for item in raw_results:
-
                 if not isinstance(
                     item,
                     dict,
@@ -184,34 +173,16 @@ class HybridRetrievalService:
                             "",
                         ),
                         source=item.get("source"),
-                        document_name=item.get(
-                            "document_name"
-                        ),
+                        document_name=item.get("document_name"),
                         document_id=(
-                            str(
-                                item.get(
-                                    "document_id"
-                                )
-                            )
-                            if item.get(
-                                "document_id"
-                            )
+                            str(item.get("document_id"))
+                            if item.get("document_id")
                             else None
                         ),
                         chunk_id=(
-                            str(
-                                item.get(
-                                    "chunk_id"
-                                )
-                            )
-                            if item.get(
-                                "chunk_id"
-                            )
-                            else None
+                            str(item.get("chunk_id")) if item.get("chunk_id") else None
                         ),
-                        chunk_index=item.get(
-                            "chunk_index"
-                        ),
+                        chunk_index=item.get("chunk_index"),
                         vector_score=max(
                             0.0,
                             min(
@@ -238,16 +209,9 @@ class HybridRetrievalService:
             # RRF score is ranking evidence, not confidence.
             # --------------------------------------------------------
 
-            semantic_scores = [
-                item.vector_score
-                for item in evidence
-            ]
+            semantic_scores = [item.vector_score for item in evidence]
 
-            rag_confidence = (
-                max(semantic_scores)
-                if semantic_scores
-                else 0.0
-            )
+            rag_confidence = max(semantic_scores) if semantic_scores else 0.0
 
             return (
                 evidence,
@@ -264,10 +228,8 @@ class HybridRetrievalService:
             )
 
         except Exception as exc:
+            raise RuntimeError(f"RAG retrieval failed: {exc}") from exc
 
-            raise RuntimeError(
-                f"RAG retrieval failed: {exc}"
-            ) from exc
     # ========================================================
     # SQL
     # ========================================================
@@ -279,17 +241,13 @@ class HybridRetrievalService:
     ) -> HybridSQLEvidence:
 
         if self.sql_service is None:
-
             return HybridSQLEvidence(
                 success=False,
                 confidence=0.0,
-                validation_message=(
-                    "SQL service is not configured."
-                ),
+                validation_message=("SQL service is not configured."),
             )
 
         try:
-
             # ------------------------------------------------
             # Preferred interface
             # ------------------------------------------------
@@ -298,7 +256,6 @@ class HybridRetrievalService:
                 self.sql_service,
                 "run",
             ):
-
                 result = await self.sql_service.run(
                     query=query,
                     customer_id=customer_id,
@@ -312,38 +269,28 @@ class HybridRetrievalService:
                 self.sql_service,
                 "query",
             ):
-
                 result = await self.sql_service.query(
                     question=query,
                     customer_id=customer_id,
                 )
 
             else:
-
                 raise RuntimeError(
-                    "Configured SQL service does not "
-                    "provide run() or query()."
+                    "Configured SQL service does not provide run() or query()."
                 )
 
             if result is None:
-
                 return HybridSQLEvidence(
                     success=False,
                     confidence=0.0,
-                    validation_message=(
-                        "SQL service returned no result."
-                    ),
+                    validation_message=("SQL service returned no result."),
                 )
 
             if not isinstance(
                 result,
                 dict,
             ):
-
-                raise TypeError(
-                    "SQL service returned an "
-                    "unexpected result type."
-                )
+                raise TypeError("SQL service returned an unexpected result type.")
 
             rows = result.get(
                 "rows",
@@ -377,9 +324,7 @@ class HybridRetrievalService:
 
             return HybridSQLEvidence(
                 sql_query=(
-                    result.get("sql_query")
-                    or result.get("sql")
-                    or result.get("query")
+                    result.get("sql_query") or result.get("sql") or result.get("query")
                 ),
                 rows=rows,
                 row_count=result.get(
@@ -409,13 +354,10 @@ class HybridRetrievalService:
             ValueError,
             RuntimeError,
         ) as exc:
-
             return HybridSQLEvidence(
                 success=False,
                 confidence=0.0,
-                validation_message=(
-                    f"SQL retrieval failed: {exc}"
-                ),
+                validation_message=(f"SQL retrieval failed: {exc}"),
             )
 
     # ========================================================
@@ -466,13 +408,8 @@ class HybridRetrievalService:
         # ----------------------------------------------------
 
         if rag_available and sql_available:
-
             confidence = (
-                cls.RAG_WEIGHT
-                * rag_confidence
-                +
-                cls.SQL_WEIGHT
-                * sql_confidence
+                cls.RAG_WEIGHT * rag_confidence + cls.SQL_WEIGHT * sql_confidence
             )
 
             # Agreement bonus.
@@ -480,11 +417,7 @@ class HybridRetrievalService:
             # If both sources independently provide
             # strong evidence, increase confidence slightly.
 
-            if (
-                rag_confidence >= 0.70
-                and sql_confidence >= 0.70
-            ):
-
+            if rag_confidence >= 0.70 and sql_confidence >= 0.70:
                 confidence += 0.10
 
         # ----------------------------------------------------
@@ -492,7 +425,6 @@ class HybridRetrievalService:
         # ----------------------------------------------------
 
         elif rag_available:
-
             confidence = rag_confidence
 
         # ----------------------------------------------------
@@ -500,11 +432,9 @@ class HybridRetrievalService:
         # ----------------------------------------------------
 
         elif sql_available:
-
             confidence = sql_confidence
 
         else:
-
             confidence = 0.0
 
         return round(
@@ -535,42 +465,24 @@ class HybridRetrievalService:
         # ----------------------------------------------------
 
         if rag_results:
-
-            parts.append(
-                f"{len(rag_results)} relevant "
-                "documentation result(s) found."
-            )
+            parts.append(f"{len(rag_results)} relevant documentation result(s) found.")
 
         else:
-
-            parts.append(
-                "No relevant documentation evidence found."
-            )
+            parts.append("No relevant documentation evidence found.")
 
         # ----------------------------------------------------
         # SQL
         # ----------------------------------------------------
 
         if sql_result is not None:
-
             if sql_result.success:
-
-                parts.append(
-                    f"SQL validation returned "
-                    f"{sql_result.row_count} row(s)."
-                )
+                parts.append(f"SQL validation returned {sql_result.row_count} row(s).")
 
             else:
-
-                parts.append(
-                    "SQL validation did not succeed."
-                )
+                parts.append("SQL validation did not succeed.")
 
         else:
-
-            parts.append(
-                "No SQL evidence was available."
-            )
+            parts.append("No SQL evidence was available.")
 
         return " ".join(parts)
 
@@ -589,18 +501,13 @@ class HybridRetrievalService:
     ) -> HybridRetrievalResult:
 
         if not query or not query.strip():
-
-            raise ValueError(
-                "Hybrid retrieval query cannot be empty."
-            )
+            raise ValueError("Hybrid retrieval query cannot be empty.")
 
         query = query.strip()
 
         errors: list[str] = []
 
-        rag_results: list[
-            HybridRAGEvidence
-        ] = []
+        rag_results: list[HybridRAGEvidence] = []
 
         rag_confidence = 0.0
 
@@ -611,9 +518,7 @@ class HybridRetrievalService:
         # ====================================================
 
         if include_rag:
-
             try:
-
                 rag_results, rag_confidence = await self.retrieve_rag(
                     query=query,
                     top_k=top_k,
@@ -621,78 +526,55 @@ class HybridRetrievalService:
                 )
 
             except RuntimeError as exc:
-
-                errors.append(
-                    str(exc)
-                )
+                errors.append(str(exc))
 
         # ====================================================
         # SQL
         # ====================================================
 
         if include_sql:
-
             sql_result = await self.retrieve_sql(
                 query=query,
                 customer_id=customer_id,
             )
 
             if not sql_result.success and sql_result.validation_message:
-
-                errors.append(
-                    sql_result.validation_message
-                )
+                errors.append(sql_result.validation_message)
 
         # ====================================================
         # AVAILABILITY
         # ====================================================
 
-        rag_available = bool(
-            rag_results
-        )
+        rag_available = bool(rag_results)
 
-        sql_available = bool(
-            sql_result is not None
-            and sql_result.success
-        )
+        sql_available = bool(sql_result is not None and sql_result.success)
 
         # ====================================================
         # HYBRID CONFIDENCE
         # ====================================================
 
-        sql_confidence = (
-            sql_result.confidence
-            if sql_result is not None
-            else 0.0
-        )
+        sql_confidence = sql_result.confidence if sql_result is not None else 0.0
 
-        hybrid_confidence = (
-            self.calculate_hybrid_confidence(
-                rag_confidence=rag_confidence,
-                sql_confidence=sql_confidence,
-                rag_available=rag_available,
-                sql_available=sql_available,
-            )
+        hybrid_confidence = self.calculate_hybrid_confidence(
+            rag_confidence=rag_confidence,
+            sql_confidence=sql_confidence,
+            rag_available=rag_available,
+            sql_available=sql_available,
         )
 
         # ====================================================
         # SUFFICIENT EVIDENCE
         # ====================================================
 
-        sufficient_evidence = (
-            hybrid_confidence
-            >= self.SUFFICIENT_EVIDENCE_THRESHOLD
-        )
+        sufficient_evidence = hybrid_confidence >= self.SUFFICIENT_EVIDENCE_THRESHOLD
 
         # ====================================================
         # SUMMARY
         # ====================================================
 
-        evidence_summary = (
-            self.build_evidence_summary(
-                rag_results=rag_results,
-                sql_result=sql_result,
-            )
+        evidence_summary = self.build_evidence_summary(
+            rag_results=rag_results,
+            sql_result=sql_result,
         )
 
         # ====================================================

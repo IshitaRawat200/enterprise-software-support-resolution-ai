@@ -249,11 +249,7 @@ def validate_response_payload(
         "escalation_required",
     }
 
-    missing_fields = sorted(
-        field
-        for field in required_fields
-        if field not in payload
-    )
+    missing_fields = sorted(field for field in required_fields if field not in payload)
 
     if missing_fields:
         return GuardrailResult.block(
@@ -294,9 +290,7 @@ def validate_response_payload(
             code="INVALID_CONFIDENCE",
         )
 
-    escalation_required = payload.get(
-        "escalation_required"
-    )
+    escalation_required = payload.get("escalation_required")
 
     if not isinstance(
         escalation_required,

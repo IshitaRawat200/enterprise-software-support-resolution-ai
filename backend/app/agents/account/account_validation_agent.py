@@ -36,17 +36,11 @@ class AccountValidationAgent:
     ) -> AccountValidationResult:
 
         if not customer_id:
-            raise ValueError(
-                "Customer ID is required."
-            )
+            raise ValueError("Customer ID is required.")
 
-        repository = CustomerRepository(
-            session
-        )
+        repository = CustomerRepository(session)
 
-        customer = await repository.get_by_id(
-            customer_id
-        )
+        customer = await repository.get_by_id(customer_id)
 
         # Customer does not exist.
         if customer is None:
@@ -55,10 +49,7 @@ class AccountValidationAgent:
                 account_exists=False,
                 account_status="unknown",
                 validation_confidence=1.0,
-                reason=(
-                    "No customer account was found "
-                    "for the supplied customer ID."
-                ),
+                reason=("No customer account was found for the supplied customer ID."),
             )
 
         # Customer exists.

@@ -76,8 +76,7 @@ class LiveStatusService:
 
         if not service_name:
             logger.warning(
-                "Live status check requested without "
-                "an external dependency name."
+                "Live status check requested without an external dependency name."
             )
 
             return {
@@ -92,8 +91,7 @@ class LiveStatusService:
 
         if not service_name:
             logger.warning(
-                "Live status check requested with an empty "
-                "external dependency name."
+                "Live status check requested with an empty external dependency name."
             )
 
             return {
@@ -112,8 +110,7 @@ class LiveStatusService:
 
         if provider is None:
             logger.info(
-                "No live status provider configured. "
-                "dependency=%s",
+                "No live status provider configured. dependency=%s",
                 service_name,
             )
 
@@ -133,8 +130,7 @@ class LiveStatusService:
         base_url = provider["base_url"].rstrip("/")
 
         logger.info(
-            "Live status check started. "
-            "provider=%s dependency=%s",
+            "Live status check started. provider=%s dependency=%s",
             provider_name,
             service_name,
         )
@@ -152,14 +148,9 @@ class LiveStatusService:
                 timeout=self.timeout_seconds,
                 follow_redirects=True,
             ) as client:
+                status_response = await client.get(status_url)
 
-                status_response = await client.get(
-                    status_url
-                )
-
-                incidents_response = await client.get(
-                    incidents_url
-                )
+                incidents_response = await client.get(incidents_url)
 
                 status_response.raise_for_status()
                 incidents_response.raise_for_status()
@@ -198,7 +189,6 @@ class LiveStatusService:
             active_incidents = []
 
             for incident in incidents:
-
                 if not isinstance(incident, dict):
                     continue
 
@@ -208,18 +198,10 @@ class LiveStatusService:
                         "name": incident.get("name"),
                         "status": incident.get("status"),
                         "impact": incident.get("impact"),
-                        "created_at": incident.get(
-                            "created_at"
-                        ),
-                        "updated_at": incident.get(
-                            "updated_at"
-                        ),
-                        "shortlink": incident.get(
-                            "shortlink"
-                        ),
-                        "page_id": incident.get(
-                            "page_id"
-                        ),
+                        "created_at": incident.get("created_at"),
+                        "updated_at": incident.get("updated_at"),
+                        "shortlink": incident.get("shortlink"),
+                        "page_id": incident.get("page_id"),
                     }
                 )
 
@@ -246,9 +228,7 @@ class LiveStatusService:
                 "checked_at": checked_at,
                 "status": overall_status,
                 "status_description": status_description,
-                "active_incident_count": len(
-                    active_incidents
-                ),
+                "active_incident_count": len(active_incidents),
                 "active_incidents": active_incidents,
                 "status_url": status_url,
                 "incidents_url": incidents_url,
@@ -259,10 +239,8 @@ class LiveStatusService:
         # -----------------------------------------------------
 
         except httpx.HTTPStatusError as exc:
-
             logger.warning(
-                "Live status HTTP error. "
-                "provider=%s dependency=%s status=%s",
+                "Live status HTTP error. provider=%s dependency=%s status=%s",
                 provider_name,
                 service_name,
                 exc.response.status_code,
@@ -276,8 +254,7 @@ class LiveStatusService:
                 "service_name": service_name,
                 "checked_at": checked_at,
                 "error": (
-                    "External status service returned "
-                    f"HTTP {exc.response.status_code}."
+                    f"External status service returned HTTP {exc.response.status_code}."
                 ),
             }
 
@@ -286,10 +263,8 @@ class LiveStatusService:
         # -----------------------------------------------------
 
         except httpx.RequestError:
-
             logger.warning(
-                "Live status request failed. "
-                "provider=%s dependency=%s",
+                "Live status request failed. provider=%s dependency=%s",
                 provider_name,
                 service_name,
             )
@@ -301,10 +276,7 @@ class LiveStatusService:
                 "provider": provider_name,
                 "service_name": service_name,
                 "checked_at": checked_at,
-                "error": (
-                    "Unable to reach the external "
-                    "status service."
-                ),
+                "error": ("Unable to reach the external status service."),
             }
 
         # -----------------------------------------------------
@@ -312,10 +284,8 @@ class LiveStatusService:
         # -----------------------------------------------------
 
         except ValueError:
-
             logger.warning(
-                "Live status returned invalid JSON. "
-                "provider=%s dependency=%s",
+                "Live status returned invalid JSON. provider=%s dependency=%s",
                 provider_name,
                 service_name,
             )
@@ -327,16 +297,14 @@ class LiveStatusService:
                 "provider": provider_name,
                 "service_name": service_name,
                 "checked_at": checked_at,
-                "error": (
-                    "External status service returned "
-                    "an invalid response."
-                ),
+                "error": ("External status service returned an invalid response."),
             }
 
 
 # =============================================================
 # Factory
 # =============================================================
+
 
 def create_live_status_service() -> LiveStatusService:
     """

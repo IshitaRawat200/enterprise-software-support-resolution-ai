@@ -6,9 +6,7 @@ from sentence_transformers import SentenceTransformer
 
 from app.observability.logging import logger
 
-EMBEDDING_MODEL_NAME = (
-    "Orange/orange-nomic-v1.5-1536"
-)
+EMBEDDING_MODEL_NAME = "Orange/orange-nomic-v1.5-1536"
 
 
 # ============================================================
@@ -57,6 +55,7 @@ def get_embedding_model() -> SentenceTransformer:
 # EMBEDDING SERVICE
 # ============================================================
 
+
 class RAGEmbeddingService:
     """
     Generates 1536-dimensional embeddings for RAG.
@@ -97,9 +96,7 @@ class RAGEmbeddingService:
         """
 
         if not text or not text.strip():
-            raise ValueError(
-                "Document text cannot be empty."
-            )
+            raise ValueError("Document text cannot be empty.")
 
         start = perf_counter()
 
@@ -111,8 +108,7 @@ class RAGEmbeddingService:
         duration = perf_counter() - start
 
         logger.debug(
-            "RAG EMBEDDINGS: document embedding generated "
-            "in %.3fs",
+            "RAG EMBEDDINGS: document embedding generated in %.3fs",
             duration,
         )
 
@@ -140,9 +136,7 @@ class RAGEmbeddingService:
         """
 
         if not query or not query.strip():
-            raise ValueError(
-                "Query cannot be empty."
-            )
+            raise ValueError("Query cannot be empty.")
 
         start = perf_counter()
 
@@ -154,8 +148,7 @@ class RAGEmbeddingService:
         duration = perf_counter() - start
 
         logger.debug(
-            "RAG EMBEDDINGS: query embedding generated "
-            "in %.3fs",
+            "RAG EMBEDDINGS: query embedding generated in %.3fs",
             duration,
         )
 

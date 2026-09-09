@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, String, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .user import User
     from .ticket import SupportTicket
+    from .user import User
 
 
 class AuditEvent(Base):
@@ -78,12 +79,12 @@ class AuditEvent(Base):
         server_default=text("now()"),
     )
 
-    user: Mapped["User | None"] = relationship(
+    user: Mapped[User | None] = relationship(
         "User",
         back_populates="audit_events",
     )
 
-    ticket: Mapped["SupportTicket | None"] = relationship(
+    ticket: Mapped[SupportTicket | None] = relationship(
         "SupportTicket",
         back_populates="audit_events",
     )

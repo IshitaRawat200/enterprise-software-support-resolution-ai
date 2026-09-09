@@ -41,15 +41,9 @@ class SQLService:
 
         self.session = session
 
-        self.generator = (
-            SQLGenerator()
-        )
+        self.generator = SQLGenerator()
 
-        self.executor = (
-            SQLExecutor(
-                session
-            )
-        )
+        self.executor = SQLExecutor(session)
 
     async def query(
         self,
@@ -79,11 +73,9 @@ class SQLService:
         # 1. GENERATE SQL
         # =====================================================
 
-        generation = (
-            await self.generator.generate(
-                question=question,
-                customer_id=customer_id,
-            )
+        generation = await self.generator.generate(
+            question=question,
+            customer_id=customer_id,
         )
 
         generated_sql = generation.sql
@@ -92,108 +84,44 @@ class SQLService:
         # 2. SQL GUARDRAIL
         # =====================================================
 
-        guardrail_result = (
-            guardrails_service.validate_sql(
-                generated_sql
-            )
-        )
+        guardrail_result = guardrails_service.validate_sql(generated_sql)
 
         if not guardrail_result.allowed:
             return {
                 "success": False,
-
                 "sql": generated_sql,
-
                 "rows": [],
-
                 "row_count": 0,
-
-                "sql_confidence": (
-                    generation.confidence
-                ),
-
-                "explanation": (
-                    generation.explanation
-                ),
-
-                "tables_used": (
-                    generation.tables_used
-                ),
-
-                "error": (
-                    "SQL query blocked by guardrail: "
-                    f"{guardrail_result.reason}"
-                ),
-
+                "sql_confidence": (generation.confidence),
+                "explanation": (generation.explanation),
+                "tables_used": (generation.tables_used),
+                "error": (f"SQL query blocked by guardrail: {guardrail_result.reason}"),
                 "guardrail_blocked": True,
-
-                "guardrail": (
-                    guardrail_result.guardrail_name
-                ),
-
-                "guardrail_code": (
-                    guardrail_result.code
-                ),
-
-                "guardrail_risk_level": (
-                    guardrail_result.risk_level
-                ),
+                "guardrail": (guardrail_result.guardrail_name),
+                "guardrail_code": (guardrail_result.code),
+                "guardrail_risk_level": (guardrail_result.risk_level),
             }
 
         # =====================================================
         # 3. EXECUTE SQL
         # =====================================================
 
-        execution = (
-            await self.executor.execute(
-                generated_sql
-            )
-        )
+        execution = await self.executor.execute(generated_sql)
 
         # =====================================================
         # 4. RETURN RESULT
         # =====================================================
 
         return {
-            "success": execution[
-                "success"
-            ],
-
-            "sql": execution[
-                "sql"
-            ],
-
-            "rows": execution[
-                "rows"
-            ],
-
-            "row_count": execution[
-                "row_count"
-            ],
-
-            "sql_confidence": (
-                generation.confidence
-            ),
-
-            "explanation": (
-                generation.explanation
-            ),
-
-            "tables_used": (
-                generation.tables_used
-            ),
-
-            "error": execution[
-                "error"
-            ],
-
+            "success": execution["success"],
+            "sql": execution["sql"],
+            "rows": execution["rows"],
+            "row_count": execution["row_count"],
+            "sql_confidence": (generation.confidence),
+            "explanation": (generation.explanation),
+            "tables_used": (generation.tables_used),
+            "error": execution["error"],
             "guardrail_blocked": False,
-
-            "guardrail": (
-                guardrail_result.guardrail_name
-            ),
-
-            "guardrail_code": (
-                guardrail_result.code
-            ),
+            "guardrail": (guardrail_result.guardrail_name),
+            "guardrail_code": (guardrail_result.code),
         }

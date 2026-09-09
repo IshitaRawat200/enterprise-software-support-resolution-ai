@@ -47,6 +47,7 @@ settings = get_settings()
 # LIFESPAN
 # ============================================================
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -69,9 +70,7 @@ async def lifespan(app: FastAPI):
     database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
-        raise RuntimeError(
-            "DATABASE_URL environment variable is not configured."
-        )
+        raise RuntimeError("DATABASE_URL environment variable is not configured.")
 
     logger.info("Application startup: DATABASE_URL configured.")
 
@@ -110,23 +109,18 @@ async def lifespan(app: FastAPI):
     # START LANGGRAPH CHECKPOINTER
     # ========================================================
 
-    logger.info(
-        "LangGraph: initializing PostgreSQL checkpointer..."
-    )
+    logger.info("LangGraph: initializing PostgreSQL checkpointer...")
 
     async with AsyncPostgresSaver.from_conn_string(
         langgraph_database_url
     ) as checkpointer:
-
         # ----------------------------------------------------
         # Initialize LangGraph persistence schema
         # ----------------------------------------------------
 
         await checkpointer.setup()
 
-        logger.info(
-            "LangGraph: PostgreSQL checkpointer initialized."
-        )
+        logger.info("LangGraph: PostgreSQL checkpointer initialized.")
 
         # ----------------------------------------------------
         # Store checkpointer on application state
@@ -138,13 +132,9 @@ async def lifespan(app: FastAPI):
         # Compile production support graph
         # ----------------------------------------------------
 
-        app.state.support_graph = build_support_graph(
-            checkpointer
-        )
+        app.state.support_graph = build_support_graph(checkpointer)
 
-        logger.info(
-            "LangGraph: production support graph ready."
-        )
+        logger.info("LangGraph: production support graph ready.")
 
         # ----------------------------------------------------
         # Application is ready
@@ -154,9 +144,7 @@ async def lifespan(app: FastAPI):
             yield
 
         finally:
-            logger.info(
-                "LangGraph: shutting down checkpointer."
-            )
+            logger.info("LangGraph: shutting down checkpointer.")
 
             # AsyncPostgresSaver context manager handles the
             # actual connection cleanup.
@@ -168,10 +156,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    description=(
-        "Enterprise Software Support & "
-        "Resolution Intelligence System"
-    ),
+    description=("Enterprise Software Support & Resolution Intelligence System"),
     version="0.1.0",
     debug=settings.debug,
     lifespan=lifespan,
@@ -212,6 +197,7 @@ app.include_router(chat_router)
 # HEALTH
 # ============================================================
 
+
 @app.get("/health")
 async def health_check() -> dict:
     """
@@ -230,24 +216,16 @@ async def health_check() -> dict:
     )
 
     application_status = (
-        "ok"
-        if database_available and checkpointer_available
-        else "degraded"
+        "ok" if database_available and checkpointer_available else "degraded"
     )
 
     return {
         "status": application_status,
         "application": settings.app_name,
         "environment": settings.environment,
-        "database": (
-            "connected"
-            if database_available
-            else "unavailable"
-        ),
+        "database": ("connected" if database_available else "unavailable"),
         "langgraph_checkpointer": (
-            "connected"
-            if checkpointer_available
-            else "unavailable"
+            "connected" if checkpointer_available else "unavailable"
         ),
     }
 
@@ -256,15 +234,11 @@ async def health_check() -> dict:
 # ROOT
 # ============================================================
 
+
 @app.get("/")
 async def root() -> dict:
     """
     Root endpoint.
     """
 
-    return {
-        "message": (
-            "Enterprise Support AI "
-            "backend is running."
-        )
-    }
+    return {"message": ("Enterprise Support AI backend is running.")}

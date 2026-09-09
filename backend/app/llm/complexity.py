@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 Complexity = Literal["simple", "medium", "complex"]
 
 
@@ -88,10 +87,7 @@ def assess_complexity(
     # 1. High-risk keywords
     # ---------------------------------------------------------
 
-    if any(
-        keyword in query_lower
-        for keyword in HIGH_RISK_KEYWORDS
-    ):
+    if any(keyword in query_lower for keyword in HIGH_RISK_KEYWORDS):
         complexity: Complexity = "complex"
 
         print("\n===== COMPLEXITY EVALUATOR =====")
@@ -120,15 +116,9 @@ def assess_complexity(
         "completely unavailable",
     ]
 
-    has_production = any(
-        word in query_lower
-        for word in production_words
-    )
+    has_production = any(word in query_lower for word in production_words)
 
-    has_outage = any(
-        word in query_lower
-        for word in outage_words
-    )
+    has_outage = any(word in query_lower for word in outage_words)
 
     if has_production and has_outage:
         complexity = "complex"
@@ -175,10 +165,7 @@ def assess_complexity(
     # 5. Explicit complex reasoning keywords
     # ---------------------------------------------------------
 
-    if any(
-        keyword in query_lower
-        for keyword in COMPLEX_KEYWORDS
-    ):
+    if any(keyword in query_lower for keyword in COMPLEX_KEYWORDS):
         complexity = "complex"
 
         print("\n===== COMPLEXITY EVALUATOR =====")
@@ -193,10 +180,7 @@ def assess_complexity(
     # 6. Medium-complexity support keywords
     # ---------------------------------------------------------
 
-    if any(
-        keyword in query_lower
-        for keyword in MEDIUM_KEYWORDS
-    ):
+    if any(keyword in query_lower for keyword in MEDIUM_KEYWORDS):
         complexity = "medium"
 
         print("\n===== COMPLEXITY EVALUATOR =====")

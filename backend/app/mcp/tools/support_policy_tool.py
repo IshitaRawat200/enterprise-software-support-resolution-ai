@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 ALLOWED_POLICIES = {
     "escalation": {
         "policy": (
@@ -86,10 +85,7 @@ async def get_support_policy(
             "success": False,
             "policy_type": normalized,
             "policy": None,
-            "reason": (
-                "Requested policy is not available "
-                "through the MCP tool."
-            ),
+            "reason": ("Requested policy is not available through the MCP tool."),
         }
 
     return {

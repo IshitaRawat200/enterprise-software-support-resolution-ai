@@ -37,10 +37,7 @@ def _determine_ticket_requirement(
     if human_handoff_required:
         return (
             True,
-            (
-                "Human support was explicitly required "
-                "by the escalation decision."
-            ),
+            ("Human support was explicitly required by the escalation decision."),
         )
 
     # --------------------------------------------------------
@@ -50,10 +47,7 @@ def _determine_ticket_requirement(
     if escalation_required:
         return (
             True,
-            (
-                "The escalation decision requires "
-                "persistent support handling."
-            ),
+            ("The escalation decision requires persistent support handling."),
         )
 
     # --------------------------------------------------------
@@ -66,10 +60,7 @@ def _determine_ticket_requirement(
     }:
         return (
             True,
-            (
-                f"{severity.capitalize()} severity "
-                "requires a support ticket."
-            ),
+            (f"{severity.capitalize()} severity requires a support ticket."),
         )
 
     # --------------------------------------------------------
@@ -79,10 +70,7 @@ def _determine_ticket_requirement(
     if not sufficient_evidence:
         return (
             True,
-            (
-                "The investigation did not produce "
-                "sufficient evidence."
-            ),
+            ("The investigation did not produce sufficient evidence."),
         )
 
     # --------------------------------------------------------
@@ -92,10 +80,7 @@ def _determine_ticket_requirement(
     if intent == "production_incident":
         return (
             True,
-            (
-                "The interaction represents "
-                "a production incident."
-            ),
+            ("The interaction represents a production incident."),
         )
 
     # --------------------------------------------------------
@@ -130,9 +115,7 @@ async def escalation_node(
         AuditService
     """
 
-    message = (
-        state.get("message") or ""
-    ).strip()
+    message = (state.get("message") or "").strip()
 
     if not message:
         return {
@@ -140,18 +123,10 @@ async def escalation_node(
             "ticket_required": False,
             "ticket_reason": None,
             "ticket_action": None,
-            "errors": [
-                (
-                    "Escalation assessment requires "
-                    "a customer message."
-                )
-            ],
+            "errors": [("Escalation assessment requires a customer message.")],
         }
 
-    severity = (
-        state.get("severity")
-        or "low"
-    )
+    severity = state.get("severity") or "low"
 
     severity_confidence = float(
         state.get(
@@ -166,52 +141,26 @@ async def escalation_node(
 
         result = await agent.run(
             message=message,
-
-            intent=state.get(
-                "intent"
-            ),
-
-            route=state.get(
-                "route"
-            ),
-
+            intent=state.get("intent"),
+            route=state.get("route"),
             severity=severity,
-
-            severity_confidence=(
-                severity_confidence
-            ),
-
+            severity_confidence=(severity_confidence),
             escalation_required=state.get(
                 "escalation_required",
                 False,
             ),
-
-            escalation_reason=state.get(
-                "escalation_reason"
-            ),
-
-            conversation_id=state.get(
-                "conversation_id"
-            ),
-
-            customer_id=state.get(
-                "customer_id"
-            ),
-
+            escalation_reason=state.get("escalation_reason"),
+            conversation_id=state.get("conversation_id"),
+            customer_id=state.get("customer_id"),
             retrieval_results=state.get(
                 "retrieval_results",
                 [],
             ),
-
-            sql_query=state.get(
-                "sql_query"
-            ),
-
+            sql_query=state.get("sql_query"),
             sql_rows=state.get(
                 "sql_rows",
                 [],
             ),
-
             sql_confidence=float(
                 state.get(
                     "sql_confidence",
@@ -219,15 +168,8 @@ async def escalation_node(
                 )
                 or 0.0
             ),
-
-            generated_answer=state.get(
-                "response"
-            ),
-
-            investigation_summary=state.get(
-                "resolution_reason"
-            ),
-
+            generated_answer=state.get("response"),
+            investigation_summary=state.get("resolution_reason"),
             conversation_flow=[],
         )
 
@@ -242,12 +184,7 @@ async def escalation_node(
             "ticket_required": False,
             "ticket_reason": None,
             "ticket_action": None,
-            "errors": [
-                (
-                    "Escalation assessment failed: "
-                    f"{exc}"
-                )
-            ],
+            "errors": [(f"Escalation assessment failed: {exc}")],
         }
 
     # ========================================================
@@ -268,33 +205,19 @@ async def escalation_node(
         )
     )
 
-    escalation_priority = result.get(
-        "priority"
-    )
+    escalation_priority = result.get("priority")
 
-    escalation_type = result.get(
-        "escalation_type"
-    )
+    escalation_type = result.get("escalation_type")
 
-    escalation_reason = result.get(
-        "reason"
-    )
+    escalation_reason = result.get("reason")
 
-    handoff_summary = result.get(
-        "handoff_summary"
-    )
+    handoff_summary = result.get("handoff_summary")
 
-    recommended_action = result.get(
-        "recommended_action"
-    )
+    recommended_action = result.get("recommended_action")
 
-    escalation_reference_id = result.get(
-        "handoff_reference_id"
-    )
+    escalation_reference_id = result.get("handoff_reference_id")
 
-    handoff_context = result.get(
-        "handoff_context"
-    )
+    handoff_context = result.get("handoff_context")
 
     # ========================================================
     # CRITICAL SAFETY GUARANTEE
@@ -310,8 +233,7 @@ async def escalation_node(
 
         if not escalation_reason:
             escalation_reason = (
-                "Critical severity requires immediate "
-                "human support intervention."
+                "Critical severity requires immediate human support intervention."
             )
 
     # ========================================================
@@ -332,107 +254,47 @@ async def escalation_node(
     # TICKET DECISION
     # ========================================================
 
-    ticket_required, ticket_reason = (
-        _determine_ticket_requirement(
-            severity=severity,
-
-            escalation_required=(
-                escalation_required
-            ),
-
-            human_handoff_required=(
-                human_handoff_required
-            ),
-
-            sufficient_evidence=(
-                sufficient_evidence
-            ),
-
-            intent=state.get(
-                "intent"
-            ),
-        )
+    ticket_required, ticket_reason = _determine_ticket_requirement(
+        severity=severity,
+        escalation_required=(escalation_required),
+        human_handoff_required=(human_handoff_required),
+        sufficient_evidence=(sufficient_evidence),
+        intent=state.get("intent"),
     )
 
     # ========================================================
     # CREATE OR UPDATE
     # ========================================================
 
-    existing_ticket_id = state.get(
-        "ticket_id"
-    )
+    existing_ticket_id = state.get("ticket_id")
 
     if ticket_required:
-        ticket_action = (
-            "update"
-            if existing_ticket_id
-            else "create"
-        )
+        ticket_action = "update" if existing_ticket_id else "create"
     else:
         ticket_action = None
 
     return {
         "current_node": "escalation",
-
         # ----------------------------------------------------
         # Escalation
         # ----------------------------------------------------
-
-        "escalation_required": (
-            escalation_required
-        ),
-
-        "escalation_reason": (
-            escalation_reason
-        ),
-
-        "escalation_priority": (
-            escalation_priority
-        ),
-
-        "escalation_type": (
-            escalation_type
-        ),
-
-        "human_handoff_required": (
-            human_handoff_required
-        ),
-
-        "handoff_summary": (
-            handoff_summary
-        ),
-
-        "recommended_action": (
-            recommended_action
-        ),
-
-        "escalation_reference_id": (
-            escalation_reference_id
-        ),
-
-        "handoff_context": (
-            handoff_context
-        ),
-
+        "escalation_required": (escalation_required),
+        "escalation_reason": (escalation_reason),
+        "escalation_priority": (escalation_priority),
+        "escalation_type": (escalation_type),
+        "human_handoff_required": (human_handoff_required),
+        "handoff_summary": (handoff_summary),
+        "recommended_action": (recommended_action),
+        "escalation_reference_id": (escalation_reference_id),
+        "handoff_context": (handoff_context),
         # ----------------------------------------------------
         # Ticket decision
         # ----------------------------------------------------
-
-        "ticket_required": (
-            ticket_required
-        ),
-
-        "ticket_reason": (
-            ticket_reason
-        ),
-
-        "ticket_action": (
-            ticket_action
-        ),
-
+        "ticket_required": (ticket_required),
+        "ticket_reason": (ticket_reason),
+        "ticket_action": (ticket_action),
         # ----------------------------------------------------
         # Errors
         # ----------------------------------------------------
-
         "errors": [],
     }

@@ -37,13 +37,9 @@ class RAGDocumentIngestionService:
         chunk_overlap: int = 150,
     ) -> None:
 
-        self.loader = (
-            KnowledgeBaseDocumentLoader()
-        )
+        self.loader = KnowledgeBaseDocumentLoader()
 
-        self.processor = (
-            DocumentProcessingService()
-        )
+        self.processor = DocumentProcessingService()
 
         self.chunker = DocumentChunker(
             chunk_size=chunk_size,
@@ -56,42 +52,22 @@ class RAGDocumentIngestionService:
         metadata: dict[str, Any] | None = None,
     ) -> list[LlamaIndexDocument]:
 
-        loaded_documents = (
-            self.loader.load_file(
-                file_path
-            )
-        )
+        loaded_documents = self.loader.load_file(file_path)
 
-        processed_documents = (
-            self.processor.process(
-                loaded_documents
-            )
-        )
+        processed_documents = self.processor.process(loaded_documents)
 
-        chunks = self.chunker.split_documents(
-            processed_documents
-        )
+        chunks = self.chunker.split_documents(processed_documents)
 
         if not chunks:
-            raise ValueError(
-                f"No chunks generated from "
-                f"{file_path}"
-            )
+            raise ValueError(f"No chunks generated from {file_path}")
 
-        llama_documents: list[
-            LlamaIndexDocument
-        ] = []
+        llama_documents: list[LlamaIndexDocument] = []
 
         for chunk in chunks:
-
-            chunk_metadata = dict(
-                chunk.metadata
-            )
+            chunk_metadata = dict(chunk.metadata)
 
             if metadata:
-                chunk_metadata.update(
-                    metadata
-                )
+                chunk_metadata.update(metadata)
 
             llama_documents.append(
                 LlamaIndexDocument(
@@ -108,42 +84,22 @@ class RAGDocumentIngestionService:
         metadata: dict[str, Any] | None = None,
     ) -> list[LlamaIndexDocument]:
 
-        loaded_documents = (
-            self.loader.load_directory(
-                directory_path
-            )
-        )
+        loaded_documents = self.loader.load_directory(directory_path)
 
-        processed_documents = (
-            self.processor.process(
-                loaded_documents
-            )
-        )
+        processed_documents = self.processor.process(loaded_documents)
 
-        chunks = self.chunker.split_documents(
-            processed_documents
-        )
+        chunks = self.chunker.split_documents(processed_documents)
 
         if not chunks:
-            raise ValueError(
-                f"No chunks generated from "
-                f"{directory_path}"
-            )
+            raise ValueError(f"No chunks generated from {directory_path}")
 
-        llama_documents: list[
-            LlamaIndexDocument
-        ] = []
+        llama_documents: list[LlamaIndexDocument] = []
 
         for chunk in chunks:
-
-            chunk_metadata = dict(
-                chunk.metadata
-            )
+            chunk_metadata = dict(chunk.metadata)
 
             if metadata:
-                chunk_metadata.update(
-                    metadata
-                )
+                chunk_metadata.update(metadata)
 
             llama_documents.append(
                 LlamaIndexDocument(

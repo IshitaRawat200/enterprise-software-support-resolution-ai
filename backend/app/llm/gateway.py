@@ -70,34 +70,24 @@ class LLMGateway:
             -> minimum complex model
         """
 
-        normalized_complexity = (
-            complexity.strip().lower()
-        )
+        normalized_complexity = complexity.strip().lower()
 
         if normalized_complexity not in {
             "simple",
             "medium",
             "complex",
         }:
-            raise ValueError(
-                f"Unsupported LLM complexity: "
-                f"{complexity}"
-            )
+            raise ValueError(f"Unsupported LLM complexity: {complexity}")
 
         # High-risk requests must use the
         # complex model.
-        if (
-            high_risk
-            and normalized_complexity
-            in {
-                "simple",
-                "medium",
-            }
-        ):
+        if high_risk and normalized_complexity in {
+            "simple",
+            "medium",
+        }:
             normalized_complexity = "complex"
 
         if normalized_complexity == "simple":
-
             return LLMRoute(
                 provider="groq",
                 model=self.settings.groq_simple_model,
@@ -110,7 +100,6 @@ class LLMGateway:
             )
 
         if normalized_complexity == "medium":
-
             return LLMRoute(
                 provider="groq",
                 model=self.settings.groq_simple_model,
@@ -126,10 +115,7 @@ class LLMGateway:
             provider="groq",
             model=self.settings.groq_complex_model,
             complexity="complex",
-            reason=(
-                "Complex or high-risk workload "
-                "routed to Groq GPT-OSS-120B."
-            ),
+            reason=("Complex or high-risk workload routed to Groq GPT-OSS-120B."),
         )
 
     def get_llm(
@@ -159,14 +145,9 @@ class LLMGateway:
         )
 
         if route.provider == "groq":
-            return create_groq_llm(
-                complexity=route.complexity
-            )
+            return create_groq_llm(complexity=route.complexity)
 
-        raise RuntimeError(
-            f"Unsupported LLM provider: "
-            f"{route.provider}"
-        )
+        raise RuntimeError(f"Unsupported LLM provider: {route.provider}")
 
 
 llm_gateway = LLMGateway()

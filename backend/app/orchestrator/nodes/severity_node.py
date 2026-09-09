@@ -32,25 +32,15 @@ async def severity_node(
     # CURRENT CUSTOMER MESSAGE
     # ========================================================
 
-    message = (
-        state.get("message") or ""
-    ).strip()
+    message = (state.get("message") or "").strip()
 
     if not message:
         return {
             "current_node": "severity",
             "severity": None,
             "severity_confidence": 0.0,
-            "severity_reason": (
-                "Cannot assess severity without "
-                "a customer message."
-            ),
-            "errors": [
-                (
-                    "Severity assessment requires "
-                    "a customer message."
-                )
-            ],
+            "severity_reason": ("Cannot assess severity without a customer message."),
+            "errors": [("Severity assessment requires a customer message.")],
         }
 
     try:
@@ -68,21 +58,12 @@ async def severity_node(
             # ------------------------------------------------
             # Current request
             # ------------------------------------------------
-
             message=message,
-
             # ------------------------------------------------
             # Intent / route
             # ------------------------------------------------
-
-            intent=state.get(
-                "intent"
-            ),
-
-            route=state.get(
-                "route"
-            ),
-
+            intent=state.get("intent"),
+            route=state.get("route"),
             intent_confidence=float(
                 state.get(
                     "intent_confidence",
@@ -90,11 +71,9 @@ async def severity_node(
                 )
                 or 0.0
             ),
-
             # ------------------------------------------------
             # Evidence confidence
             # ------------------------------------------------
-
             retrieval_confidence=float(
                 state.get(
                     "retrieval_confidence",
@@ -102,7 +81,6 @@ async def severity_node(
                 )
                 or 0.0
             ),
-
             sql_confidence=float(
                 state.get(
                     "sql_confidence",
@@ -110,11 +88,9 @@ async def severity_node(
                 )
                 or 0.0
             ),
-
             # ------------------------------------------------
             # Multi-turn context
             # ------------------------------------------------
-
             conversation_context=(
                 state.get(
                     "conversation_context",
@@ -122,47 +98,39 @@ async def severity_node(
                 )
                 or ""
             ),
-
             # ------------------------------------------------
             # Validated incident evidence
             # ------------------------------------------------
-
             incident_active=bool(
                 state.get(
                     "incident_active",
                     False,
                 )
             ),
-
             incident_affects_production=bool(
                 state.get(
                     "incident_affects_production",
                     False,
                 )
             ),
-
             incident_unresolved_critical_alert=bool(
                 state.get(
                     "incident_unresolved_critical_alert",
                     False,
                 )
             ),
-
             # ------------------------------------------------
             # Security
             # ------------------------------------------------
-
             incident_security_related=bool(
                 state.get(
                     "incident_security_related",
                     False,
                 )
             ),
-
             # ------------------------------------------------
             # Data loss
             # ------------------------------------------------
-
             incident_data_loss_reported=bool(
                 state.get(
                     "incident_data_loss_reported",
@@ -177,15 +145,12 @@ async def severity_node(
         TypeError,
         AttributeError,
     ) as exc:
-
         return {
             "current_node": "severity",
             "severity": None,
             "severity_confidence": 0.0,
             "severity_reason": None,
-            "errors": [
-                f"Severity assessment failed: {exc}"
-            ],
+            "errors": [f"Severity assessment failed: {exc}"],
         }
 
     # ========================================================
@@ -205,9 +170,7 @@ async def severity_node(
         or 0.0
     )
 
-    severity_reason = result.get(
-        "reason"
-    )
+    severity_reason = result.get("reason")
 
     escalation_required = bool(
         result.get(
@@ -216,9 +179,7 @@ async def severity_node(
         )
     )
 
-    escalation_reason = result.get(
-        "escalation_reason"
-    )
+    escalation_reason = result.get("escalation_reason")
 
     # ========================================================
     # RETURN STATE UPDATE
@@ -226,24 +187,10 @@ async def severity_node(
 
     return {
         "current_node": "severity",
-
         "severity": severity,
-
-        "severity_confidence": (
-            severity_confidence
-        ),
-
-        "severity_reason": (
-            severity_reason
-        ),
-
-        "escalation_required": (
-            escalation_required
-        ),
-
-        "escalation_reason": (
-            escalation_reason
-        ),
-
+        "severity_confidence": (severity_confidence),
+        "severity_reason": (severity_reason),
+        "escalation_required": (escalation_required),
+        "escalation_reason": (escalation_reason),
         "errors": [],
     }

@@ -32,7 +32,7 @@ class RegisterRequest(BaseModel):
     )
 
     @model_validator(mode="after")
-    def passwords_match(self) -> "RegisterRequest":
+    def passwords_match(self) -> RegisterRequest:
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match.")
 

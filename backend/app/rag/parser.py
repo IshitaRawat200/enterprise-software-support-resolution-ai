@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 
 class DocumentParser:
@@ -8,7 +9,7 @@ class DocumentParser:
     Parses supported documentation files into plain text.
     """
 
-    SUPPORTED_EXTENSIONS = {
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {
         ".txt",
         ".md",
     }
@@ -20,14 +21,10 @@ class DocumentParser:
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(
-                f"Document not found: {path}"
-            )
+            raise FileNotFoundError(f"Document not found: {path}")
 
         if not path.is_file():
-            raise ValueError(
-                f"Path is not a file: {path}"
-            )
+            raise ValueError(f"Path is not a file: {path}")
 
         extension = path.suffix.lower()
 
@@ -37,13 +34,9 @@ class DocumentParser:
                 f"Supported types: {sorted(self.SUPPORTED_EXTENSIONS)}"
             )
 
-        content = path.read_text(
-            encoding="utf-8"
-        ).strip()
+        content = path.read_text(encoding="utf-8").strip()
 
         if not content:
-            raise ValueError(
-                f"Document is empty: {path}"
-            )
+            raise ValueError(f"Document is empty: {path}")
 
         return content

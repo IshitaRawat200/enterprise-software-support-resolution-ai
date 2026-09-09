@@ -13,37 +13,21 @@ from app.rag.services.db_rag_ingestion_service import (
 
 async def ingest() -> None:
 
-    project_root = (
-        Path(__file__).resolve().parents[2]
-    )
+    project_root = Path(__file__).resolve().parents[2]
 
-    knowledge_base = (
-        project_root
-        / "data"
-        / "knowledge_base"
-    )
+    knowledge_base = project_root / "data" / "knowledge_base"
 
-    print(
-        f"Knowledge base: {knowledge_base}"
-    )
+    print(f"Knowledge base: {knowledge_base}")
 
     if not knowledge_base.exists():
-        raise FileNotFoundError(
-            f"Knowledge base not found: "
-            f"{knowledge_base}"
-        )
+        raise FileNotFoundError(f"Knowledge base not found: {knowledge_base}")
 
     async for session in get_db_session():
-
-        service = DBRAGIngestionService(
-            session=session
-        )
+        service = DBRAGIngestionService(session=session)
 
         supported_files = [
             file_path
-            for file_path in sorted(
-                knowledge_base.iterdir()
-            )
+            for file_path in sorted(knowledge_base.iterdir())
             if file_path.is_file()
             and file_path.suffix.lower()
             in {
@@ -56,37 +40,20 @@ async def ingest() -> None:
         ]
 
         if not supported_files:
-            raise ValueError(
-                "No supported documents found."
-            )
+            raise ValueError("No supported documents found.")
 
-        print(
-            f"Found {len(supported_files)} document(s)."
-        )
+        print(f"Found {len(supported_files)} document(s).")
 
         for file_path in supported_files:
+            print(f"\nIngesting: {file_path.name}")
 
-            print(
-                f"\nIngesting: {file_path.name}"
-            )
+            result = await service.ingest_file(file_path)
 
-            result = await service.ingest_file(
-                file_path
-            )
+            print(f"Status: {result['status']}")
 
-            print(
-                f"Status: {result['status']}"
-            )
+            print(f"Document ID: {result['document_id']}")
 
-            print(
-                f"Document ID: "
-                f"{result['document_id']}"
-            )
-
-            print(
-                f"Chunks: "
-                f"{result['chunks_created']}"
-            )
+            print(f"Chunks: {result['chunks_created']}")
 
 
 def main() -> None:

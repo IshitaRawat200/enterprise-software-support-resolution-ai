@@ -40,8 +40,7 @@ def replan_node(
             "replan_required": False,
             "reflection_decision": "resolve",
             "reflection_reason": (
-                "The maximum number of investigation "
-                "iterations has been reached."
+                "The maximum number of investigation iterations has been reached."
             ),
             "current_node": "replan",
             "errors": [],
@@ -57,10 +56,7 @@ def replan_node(
         "sufficient_evidence": False,
         "check_passed": False,
         "reflection_decision": None,
-        "reflection_reason": (
-            f"Starting investigation iteration "
-            f"{next_iteration}."
-        ),
+        "reflection_reason": (f"Starting investigation iteration {next_iteration}."),
         "current_node": "replan",
         "errors": [],
     }

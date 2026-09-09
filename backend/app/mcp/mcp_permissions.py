@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 MCP_TOOL_PERMISSIONS: dict[str, set[str]] = {
     "mcp_validate_customer_account": {
         "customer",

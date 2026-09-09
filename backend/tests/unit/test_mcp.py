@@ -68,13 +68,16 @@ def test_live_status_calls_mcp_tool(
     async def fake_call_tool(
         tool_name: str,
         arguments: dict[str, Any],
+        *,
+        role: str = "support_agent",
     ) -> dict[str, Any]:
-
         assert tool_name == "mcp_get_live_service_status"
 
         assert arguments == {
             "service_name": "github",
         }
+
+        assert role == "support_agent"
 
         return expected
 

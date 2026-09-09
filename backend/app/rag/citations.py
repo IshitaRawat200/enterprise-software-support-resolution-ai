@@ -38,13 +38,9 @@ class RAGEvidence(BaseModel):
 class RAGSearchResult(BaseModel):
     query: str
 
-    evidence: list[RAGEvidence] = Field(
-        default_factory=list
-    )
+    evidence: list[RAGEvidence] = Field(default_factory=list)
 
-    citations: list[dict] = Field(
-        default_factory=list
-    )
+    citations: list[dict] = Field(default_factory=list)
 
     confidence: float = Field(
         ge=0.0,

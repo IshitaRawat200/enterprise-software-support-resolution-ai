@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -18,6 +19,7 @@ settings = get_settings()
 # ============================================================
 # SQLALCHEMY BASE
 # ============================================================
+
 
 class Base(DeclarativeBase):
     """
@@ -51,10 +53,8 @@ AsyncSessionLocal = async_sessionmaker(
 # DATABASE DEPENDENCY
 # ============================================================
 
-async def get_db_session() -> AsyncGenerator[
-    AsyncSession,
-    None,
-]:
+
+async def get_db_session() -> AsyncGenerator[AsyncSession]:
     """
     Provide an async SQLAlchemy database session.
 
@@ -70,6 +70,7 @@ async def get_db_session() -> AsyncGenerator[
 # DATABASE HEALTH CHECK
 # ============================================================
 
+
 async def check_database_connection() -> bool:
     """
     Check whether PostgreSQL is reachable.
@@ -77,15 +78,10 @@ async def check_database_connection() -> bool:
 
     try:
         async with engine.connect() as connection:
-            await connection.execute(
-                text("SELECT 1")
-            )
+            await connection.execute(text("SELECT 1"))
 
         return True
-
-    except Exception as exc:
-        print(
-            f"Database connection failed: {exc}"
-        )
+    except SQLAlchemyError as exc:
+        print(f"Database connection failed: {exc}")
 
         return False

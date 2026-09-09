@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import ClassVar
 
 from langchain_core.documents import Document as LangChainDocument
 
@@ -22,7 +22,7 @@ class KnowledgeBaseDocumentLoader:
         .htm
     """
 
-    SUPPORTED_EXTENSIONS = {
+    SUPPORTED_EXTENSIONS: ClassVar[set[str]] = {
         ".txt",
         ".md",
         ".pdf",
@@ -43,9 +43,7 @@ class KnowledgeBaseDocumentLoader:
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(
-                f"Document not found: {path}"
-            )
+            raise FileNotFoundError(f"Document not found: {path}")
 
         extension = path.suffix.lower()
 
@@ -66,9 +64,7 @@ class KnowledgeBaseDocumentLoader:
             documents = self.html_loader.load(path)
 
         else:
-            raise ValueError(
-                f"No loader configured for {extension}"
-            )
+            raise ValueError(f"No loader configured for {extension}")
 
         for document in documents:
             document.metadata = {
@@ -88,38 +84,25 @@ class KnowledgeBaseDocumentLoader:
         directory = Path(directory_path)
 
         if not directory.exists():
-            raise FileNotFoundError(
-                f"Knowledge-base directory not found: "
-                f"{directory}"
-            )
+            raise FileNotFoundError(f"Knowledge-base directory not found: {directory}")
 
         if not directory.is_dir():
-            raise ValueError(
-                f"Path is not a directory: {directory}"
-            )
+            raise ValueError(f"Path is not a directory: {directory}")
 
         documents: list[LangChainDocument] = []
 
         for file_path in sorted(directory.iterdir()):
-
             if not file_path.is_file():
                 continue
 
             if file_path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
                 continue
 
-            loaded_documents = self.load_file(
-                file_path
-            )
+            loaded_documents = self.load_file(file_path)
 
-            documents.extend(
-                loaded_documents
-            )
+            documents.extend(loaded_documents)
 
         if not documents:
-            raise ValueError(
-                f"No supported documents found in "
-                f"{directory}"
-            )
+            raise ValueError(f"No supported documents found in {directory}")
 
         return documents

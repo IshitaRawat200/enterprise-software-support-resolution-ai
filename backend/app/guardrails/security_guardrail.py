@@ -60,48 +60,39 @@ SECRET_EXTRACTION_PATTERNS: tuple[str, ...] = (
     # --------------------------------------------------------
     # Direct API key extraction
     # --------------------------------------------------------
-
     r"\bshow\s+(me\s+)?the\s+api\s+key\b",
     r"\breveal\s+(the\s+)?api\s+key\b",
     r"\bgive\s+(me\s+)?the\s+api\s+key\b",
     r"\bprovide\s+(me\s+)?the\s+api\s+key\b",
     r"\bprint\s+(the\s+)?api\s+key\b",
     r"\bexpose\s+(the\s+)?api\s+key\b",
-
     # --------------------------------------------------------
     # Database credential extraction
     # --------------------------------------------------------
-
     r"\bshow\s+(me\s+)?the\s+database\s+password\b",
     r"\breveal\s+(the\s+)?database\s+password\b",
     r"\bgive\s+(me\s+)?the\s+database\s+password\b",
     r"\bprovide\s+(me\s+)?the\s+database\s+password\b",
     r"\bprint\s+(the\s+)?database\s+password\b",
-
     # --------------------------------------------------------
     # JWT / authentication secrets
     # --------------------------------------------------------
-
     r"\bshow\s+(me\s+)?the\s+jwt\s+secret\b",
     r"\breveal\s+(the\s+)?jwt\s+secret\b",
     r"\bgive\s+(me\s+)?the\s+jwt\s+secret\b",
     r"\bprovide\s+(me\s+)?the\s+jwt\s+secret\b",
     r"\bprint\s+(the\s+)?jwt\s+secret\b",
-
     # --------------------------------------------------------
     # Environment variable extraction
     # --------------------------------------------------------
-
     r"\bshow\s+(me\s+)?(the\s+)?environment\s+variables\b",
     r"\breveal\s+(the\s+)?environment\s+variables\b",
     r"\bgive\s+(me\s+)?(the\s+)?environment\s+variables\b",
     r"\bprint\s+(the\s+)?environment\s+variables\b",
     r"\bexpose\s+(the\s+)?environment\s+variables\b",
-
     # --------------------------------------------------------
     # .env file extraction
     # --------------------------------------------------------
-
     r"\bshow\s+(me\s+)?(the\s+)?contents?\s+of\s+the\s+\.env\s+file\b",
     r"\breveal\s+(the\s+)?contents?\s+of\s+the\s+\.env\s+file\b",
     r"\bprint\s+(the\s+)?contents?\s+of\s+the\s+\.env\s+file\b",
@@ -110,21 +101,17 @@ SECRET_EXTRACTION_PATTERNS: tuple[str, ...] = (
     r"\bshow\s+(me\s+)?the\s+\.env\s+file\b",
     r"\breveal\s+(the\s+)?\.env\s+file\b",
     r"\bprint\s+(the\s+)?\.env\s+file\b",
-
     # --------------------------------------------------------
     # Generic application secret extraction
     # --------------------------------------------------------
-
     r"\bshow\s+(me\s+)?application\s+secrets\b",
     r"\breveal\s+(the\s+)?application\s+secrets\b",
     r"\bgive\s+(me\s+)?application\s+secrets\b",
     r"\bprovide\s+(me\s+)?application\s+secrets\b",
     r"\bprint\s+(the\s+)?application\s+secrets\b",
-
     # --------------------------------------------------------
     # Credential/config dump requests
     # --------------------------------------------------------
-
     r"\b(dump|export|extract|expose)\s+(all\s+)?(credentials|secrets|passwords|api\s+keys|tokens)\b",
 )
 
@@ -204,10 +191,7 @@ def inspect_message(
     if matched:
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                "Request for private internal reasoning "
-                "was blocked."
-            ),
+            reason=("Request for private internal reasoning was blocked."),
             risk_level="high",
             code="INTERNAL_REASONING_REQUEST",
             metadata={

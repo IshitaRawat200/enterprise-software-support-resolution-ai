@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import re
+from typing import ClassVar
 
 
-class SQLValidationError(
-    ValueError
-):
+class SQLValidationError(ValueError):
     pass
 
 
@@ -26,7 +25,7 @@ class SQLValidator:
         Database
     """
 
-    ALLOWED_TABLES = {
+    ALLOWED_TABLES: ClassVar[set[str]] = {
         "users",
         "customers",
         "subscriptions",
@@ -44,7 +43,7 @@ class SQLValidator:
         "knowledge_article_usage",
     }
 
-    FORBIDDEN_KEYWORDS = {
+    FORBIDDEN_KEYWORDS: ClassVar[set[str]] = {
         "insert",
         "update",
         "delete",
@@ -68,10 +67,7 @@ class SQLValidator:
     ) -> str:
 
         if not sql or not sql.strip():
-
-            raise SQLValidationError(
-                "SQL query is empty."
-            )
+            raise SQLValidationError("SQL query is empty.")
 
         normalized = sql.strip()
 
@@ -84,44 +80,28 @@ class SQLValidator:
         # Must begin with SELECT or WITH
         # ----------------------------------------------------
 
-        if not (
-            lowered.startswith("select ")
-            or lowered.startswith("select\n")
-            or lowered.startswith("with ")
-        ):
-
-            raise SQLValidationError(
-                "Only SELECT or WITH queries are allowed."
-            )
+        if not lowered.startswith(("select ", "select\n", "with ")):
+            raise SQLValidationError("Only SELECT or WITH queries are allowed.")
 
         # ----------------------------------------------------
         # Multiple statements
         # ----------------------------------------------------
 
         if ";" in normalized:
-
-            raise SQLValidationError(
-                "Multiple SQL statements are not allowed."
-            )
+            raise SQLValidationError("Multiple SQL statements are not allowed.")
 
         # ----------------------------------------------------
         # Forbidden operations
         # ----------------------------------------------------
 
         for keyword in self.FORBIDDEN_KEYWORDS:
-
-            pattern = (
-                rf"\b{re.escape(keyword)}\b"
-            )
+            pattern = rf"\b{re.escape(keyword)}\b"
 
             if re.search(
                 pattern,
                 lowered,
             ):
-
-                raise SQLValidationError(
-                    f"Forbidden SQL operation: {keyword}"
-                )
+                raise SQLValidationError(f"Forbidden SQL operation: {keyword}")
 
         # ----------------------------------------------------
         # System databases
@@ -132,10 +112,7 @@ class SQLValidator:
             or "information_schema" in lowered
             or "pg_" in lowered
         ):
-
-            raise SQLValidationError(
-                "System catalog access is not allowed."
-            )
+            raise SQLValidationError("System catalog access is not allowed.")
 
         # ----------------------------------------------------
         # Extract table references
@@ -149,12 +126,8 @@ class SQLValidator:
         )
 
         for table in table_matches:
-
             if table not in self.ALLOWED_TABLES:
-
-                raise SQLValidationError(
-                    f"Table '{table}' is not allowed."
-                )
+                raise SQLValidationError(f"Table '{table}' is not allowed.")
 
         # ----------------------------------------------------
         # LIMIT
@@ -171,10 +144,6 @@ class SQLValidator:
             and "min(" not in lowered
             and "max(" not in lowered
         ):
-
-            normalized = (
-                normalized
-                + "\nLIMIT 50"
-            )
+            normalized = normalized + "\nLIMIT 50"
 
         return normalized

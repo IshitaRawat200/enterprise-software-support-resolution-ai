@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
@@ -111,9 +111,7 @@ class RAGDatabaseRepository:
                     metadata,
                     ensure_ascii=False,
                 ),
-                "created_at": datetime.now(
-                    timezone.utc
-                ),
+                "created_at": datetime.now(UTC),
             },
         )
 
@@ -131,14 +129,7 @@ class RAGDatabaseRepository:
 
         chunk_id = uuid4()
 
-        embedding_text = (
-            "["
-            + ",".join(
-                str(value)
-                for value in embedding
-            )
-            + "]"
-        )
+        embedding_text = "[" + ",".join(str(value) for value in embedding) + "]"
 
         await self.session.execute(
             text(
@@ -176,9 +167,7 @@ class RAGDatabaseRepository:
                     metadata,
                     ensure_ascii=False,
                 ),
-                "created_at": datetime.now(
-                    timezone.utc
-                ),
+                "created_at": datetime.now(UTC),
             },
         )
 
@@ -214,9 +203,7 @@ class RAGDatabaseRepository:
     ) -> list[dict]:
 
         if limit <= 0:
-            raise ValueError(
-                "limit must be greater than zero."
-            )
+            raise ValueError("limit must be greater than zero.")
 
         result = await self.session.execute(
             text(
@@ -253,7 +240,6 @@ class RAGDatabaseRepository:
         chunks: list[dict] = []
 
         for row in rows:
-
             metadata = row["metadata"] or {}
 
             if isinstance(metadata, str):
@@ -261,46 +247,24 @@ class RAGDatabaseRepository:
 
             combined_metadata = {
                 **metadata,
-                "document_id": str(
-                    row["document_id"]
-                ),
-                "chunk_id": str(
-                    row["id"]
-                ),
+                "document_id": str(row["document_id"]),
+                "chunk_id": str(row["id"]),
                 "chunk_index": row["chunk_index"],
-                "document_name": row[
-                    "document_name"
-                ],
-                "document_type": row[
-                    "document_type"
-                ],
-                "source_url": row[
-                    "source_url"
-                ],
-                "product_name": row[
-                    "product_name"
-                ],
-                "product_version": row[
-                    "product_version"
-                ],
-                "version": row[
-                    "version"
-                ],
+                "document_name": row["document_name"],
+                "document_type": row["document_type"],
+                "source_url": row["source_url"],
+                "product_name": row["product_name"],
+                "product_version": row["product_version"],
+                "version": row["version"],
             }
 
             chunks.append(
                 {
                     "id": row["id"],
-                    "document_id": row[
-                        "document_id"
-                    ],
-                    "chunk_index": row[
-                        "chunk_index"
-                    ],
+                    "document_id": row["document_id"],
+                    "chunk_index": row["chunk_index"],
                     "content": row["content"],
-                    "token_count": row[
-                        "token_count"
-                    ],
+                    "token_count": row["token_count"],
                     "metadata": combined_metadata,
                 }
             )

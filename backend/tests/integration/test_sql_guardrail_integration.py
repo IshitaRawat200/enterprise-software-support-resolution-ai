@@ -71,10 +71,7 @@ def test_sql_service_blocks_update_before_execution(
                 "GenerationResult",
                 (),
                 {
-                    "sql": (
-                        "UPDATE support_tickets "
-                        "SET status = 'closed'"
-                    ),
+                    "sql": ("UPDATE support_tickets SET status = 'closed'"),
                     "confidence": 0.90,
                     "explanation": "Generated SQL",
                     "tables_used": ["support_tickets"],
@@ -118,9 +115,7 @@ def test_sql_service_blocks_delete_before_execution(
                 "GenerationResult",
                 (),
                 {
-                    "sql": (
-                        "DELETE FROM support_tickets"
-                    ),
+                    "sql": ("DELETE FROM support_tickets"),
                     "confidence": 0.90,
                     "explanation": "Generated SQL",
                     "tables_used": ["support_tickets"],
@@ -166,8 +161,7 @@ def test_sql_service_blocks_multiple_statements_before_execution(
                 (),
                 {
                     "sql": (
-                        "SELECT * FROM support_tickets; "
-                        "DROP TABLE support_tickets"
+                        "SELECT * FROM support_tickets; DROP TABLE support_tickets"
                     ),
                     "confidence": 0.95,
                     "explanation": "Generated SQL",
@@ -191,9 +185,7 @@ def test_sql_service_blocks_multiple_statements_before_execution(
 
         assert result["success"] is False
         assert result["guardrail_blocked"] is True
-        assert result["guardrail_code"] == (
-            "MULTI_STATEMENT_SQL"
-        )
+        assert result["guardrail_code"] == ("MULTI_STATEMENT_SQL")
 
         execute.assert_not_awaited()
 
@@ -216,15 +208,9 @@ def test_sql_service_allows_select_to_reach_executor(
                 "GenerationResult",
                 (),
                 {
-                    "sql": (
-                        "SELECT id, status "
-                        "FROM support_tickets "
-                        "LIMIT 10"
-                    ),
+                    "sql": ("SELECT id, status FROM support_tickets LIMIT 10"),
                     "confidence": 0.95,
-                    "explanation": (
-                        "Retrieve recent support tickets."
-                    ),
+                    "explanation": ("Retrieve recent support tickets."),
                     "tables_used": ["support_tickets"],
                 },
             )()
@@ -233,11 +219,7 @@ def test_sql_service_allows_select_to_reach_executor(
         execute = AsyncMock(
             return_value={
                 "success": True,
-                "sql": (
-                    "SELECT id, status "
-                    "FROM support_tickets "
-                    "LIMIT 10"
-                ),
+                "sql": ("SELECT id, status FROM support_tickets LIMIT 10"),
                 "rows": [
                     {
                         "id": "ticket-001",
@@ -265,11 +247,7 @@ def test_sql_service_allows_select_to_reach_executor(
         assert result["row_count"] == 1
 
         execute.assert_awaited_once_with(
-            
-                "SELECT id, status "
-                "FROM support_tickets "
-                "LIMIT 10"
-            
+            "SELECT id, status FROM support_tickets LIMIT 10"
         )
 
     run_async(scenario())

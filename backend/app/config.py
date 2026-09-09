@@ -22,13 +22,9 @@ class Settings(BaseSettings):
         default="Enterprise Software Support & Resolution Intelligence System"
     )
 
-    environment: str = Field(
-        default="development"
-    )
+    environment: str = Field(default="development")
 
-    debug: bool = Field(
-        default=True
-    )
+    debug: bool = Field(default=True)
 
     # =========================================================
     # Database
@@ -42,13 +38,9 @@ class Settings(BaseSettings):
     # Authentication
     # =========================================================
 
-    jwt_secret_key: str = Field(
-        default="change-this-secret"
-    )
+    jwt_secret_key: str = Field(default="change-this-secret")
 
-    jwt_algorithm: str = Field(
-        default="HS256"
-    )
+    jwt_algorithm: str = Field(default="HS256")
 
     access_token_expire_minutes: int = Field(
         default=60,
@@ -59,61 +51,41 @@ class Settings(BaseSettings):
     # CORS
     # =========================================================
 
-    frontend_url: str = Field(
-        default="http://localhost:5173"
-    )
+    frontend_url: str = Field(default="http://localhost:5173")
 
     # =========================================================
     # LLM Provider
     # =========================================================
 
-    llm_provider: str = Field(
-        default="groq"
-    )
+    llm_provider: str = Field(default="groq")
 
     # =========================================================
     # Groq
     # =========================================================
 
-    groq_api_key: str | None = Field(
-        default=None
-    )
+    groq_api_key: str | None = Field(default=None)
 
-    groq_simple_model: str | None = Field(
-        default=None
-    )
+    groq_simple_model: str | None = Field(default=None)
 
-    groq_complex_model: str | None = Field(
-        default=None
-    )
+    groq_complex_model: str | None = Field(default=None)
 
-    groq_base_url: str = Field(
-        default="https://api.groq.com/openai/v1"
-    )
+    groq_base_url: str = Field(default="https://api.groq.com/openai/v1")
 
     # =========================================================
     # OpenAI
     # =========================================================
 
-    openai_api_key: str | None = Field(
-        default=None
-    )
+    openai_api_key: str | None = Field(default=None)
 
-    openai_model: str | None = Field(
-        default=None
-    )
+    openai_model: str | None = Field(default=None)
 
-    openai_base_url: str = Field(
-        default="https://api.openai.com/v1"
-    )
+    openai_base_url: str = Field(default="https://api.openai.com/v1")
 
     # =========================================================
     # Embeddings
     # =========================================================
 
-    embedding_model: str = Field(
-        default="BAAI/bge-small-en-v1.5"
-    )
+    embedding_model: str = Field(default="BAAI/bge-small-en-v1.5")
 
     embedding_dimensions: int = Field(
         default=1536,
@@ -163,21 +135,15 @@ class Settings(BaseSettings):
         le=1.0,
     )
 
-    critical_auto_escalation: bool = Field(
-        default=True
-    )
+    critical_auto_escalation: bool = Field(default=True)
 
     # =========================================================
     # Live Status / External Service
     # =========================================================
 
-    live_status_base_url: str = Field(
-        default=""
-    )
+    live_status_base_url: str = Field(default="")
 
-    live_status_provider_name: str = Field(
-        default="External Status Provider"
-    )
+    live_status_provider_name: str = Field(default="External Status Provider")
 
     live_status_timeout_seconds: float = Field(
         default=8.0,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 MCP_SUPPORT_POLICIES: dict[str, dict] = {
     "escalation": {
         "policy": (
@@ -25,8 +24,7 @@ MCP_SUPPORT_POLICIES: dict[str, dict] = {
     },
     "production": {
         "policy": (
-            "Production outages require incident validation "
-            "and priority handling."
+            "Production outages require incident validation and priority handling."
         ),
         "allowed_roles": [
             "support_agent",
@@ -57,9 +55,7 @@ async def mcp_get_support_policy(
 
     policy_type = policy_type.strip().lower()
 
-    policy = MCP_SUPPORT_POLICIES.get(
-        policy_type
-    )
+    policy = MCP_SUPPORT_POLICIES.get(policy_type)
 
     if policy is None:
         return {
@@ -67,12 +63,7 @@ async def mcp_get_support_policy(
             "policy_type": policy_type,
             "error": (
                 "Unknown policy type. "
-                "Supported policies: "
-                + ", ".join(
-                    sorted(
-                        MCP_SUPPORT_POLICIES.keys()
-                    )
-                )
+                "Supported policies: " + ", ".join(sorted(MCP_SUPPORT_POLICIES.keys()))
             ),
         }
 

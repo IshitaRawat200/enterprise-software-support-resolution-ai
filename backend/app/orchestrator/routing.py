@@ -14,6 +14,7 @@ MAX_ITERATIONS = 2
 # PLAN ROUTER
 # ============================================================
 
+
 def route_after_plan(state: SupportState) -> str:
     """
     PLAN → INTENT
@@ -27,9 +28,7 @@ def route_after_plan(state: SupportState) -> str:
     )
 
     if state.get("errors"):
-        logger.warning(
-            "ROUTER: PLAN encountered errors"
-        )
+        logger.warning("ROUTER: PLAN encountered errors")
         return "complete"
 
     return "intent"
@@ -38,6 +37,7 @@ def route_after_plan(state: SupportState) -> str:
 # ============================================================
 # INTENT ROUTER
 # ============================================================
+
 
 def route_after_intent(state: SupportState) -> str:
     """
@@ -67,6 +67,7 @@ def route_after_intent(state: SupportState) -> str:
 # CHECK ROUTER
 # ============================================================
 
+
 def route_after_check(state: SupportState) -> str:
     """
     CHECK always proceeds to REFLECT.
@@ -85,6 +86,7 @@ def route_after_check(state: SupportState) -> str:
 # ============================================================
 # REFLECT ROUTER
 # ============================================================
+
 
 def route_after_reflect(state: SupportState) -> str:
     """
@@ -128,10 +130,7 @@ def route_after_reflect(state: SupportState) -> str:
     # --------------------------------------------------------
 
     if state.get("errors"):
-        logger.warning(
-            "ROUTER: REFLECT encountered errors, "
-            "routing to RESOLVE"
-        )
+        logger.warning("ROUTER: REFLECT encountered errors, routing to RESOLVE")
 
         return "resolve"
 
@@ -140,10 +139,7 @@ def route_after_reflect(state: SupportState) -> str:
     # --------------------------------------------------------
 
     if sufficient_evidence and not replan_required:
-        logger.info(
-            "ROUTER: Evidence sufficient, "
-            "routing to RESOLVE"
-        )
+        logger.info("ROUTER: Evidence sufficient, routing to RESOLVE")
 
         return "resolve"
 
@@ -153,8 +149,7 @@ def route_after_reflect(state: SupportState) -> str:
 
     if iteration >= MAX_ITERATIONS:
         logger.warning(
-            "ROUTER: Maximum iterations reached "
-            "(%s), routing to RESOLVE",
+            "ROUTER: Maximum iterations reached (%s), routing to RESOLVE",
             MAX_ITERATIONS,
         )
 
@@ -165,10 +160,7 @@ def route_after_reflect(state: SupportState) -> str:
     # --------------------------------------------------------
 
     if replan_required or not sufficient_evidence:
-        logger.info(
-            "ROUTER: Evidence insufficient, "
-            "routing to REPLAN"
-        )
+        logger.info("ROUTER: Evidence insufficient, routing to REPLAN")
 
         return "replan"
 
@@ -176,9 +168,7 @@ def route_after_reflect(state: SupportState) -> str:
     # Safe fallback
     # --------------------------------------------------------
 
-    logger.info(
-        "ROUTER: Defaulting to RESOLVE"
-    )
+    logger.info("ROUTER: Defaulting to RESOLVE")
 
     return "resolve"
 
@@ -186,6 +176,7 @@ def route_after_reflect(state: SupportState) -> str:
 # ============================================================
 # REPLAN ROUTER
 # ============================================================
+
 
 def route_after_replan(state: SupportState) -> str:
     """
@@ -208,9 +199,7 @@ def route_after_replan(state: SupportState) -> str:
     """
 
     if state.get("errors"):
-        logger.warning(
-            "ROUTER: REPLAN encountered errors"
-        )
+        logger.warning("ROUTER: REPLAN encountered errors")
         return "resolve"
 
     iteration = state.get(
@@ -219,15 +208,11 @@ def route_after_replan(state: SupportState) -> str:
     )
 
     if iteration >= MAX_ITERATIONS:
-        logger.warning(
-            "ROUTER: Maximum iterations reached "
-            "after REPLAN"
-        )
+        logger.warning("ROUTER: Maximum iterations reached after REPLAN")
         return "resolve"
 
     logger.info(
-        "ROUTER: REPLAN completed | "
-        "iteration=%s/%s | routing to PLAN",
+        "ROUTER: REPLAN completed | iteration=%s/%s | routing to PLAN",
         iteration,
         MAX_ITERATIONS,
     )
@@ -238,6 +223,7 @@ def route_after_replan(state: SupportState) -> str:
 # ============================================================
 # RESOLVE ROUTER
 # ============================================================
+
 
 def route_after_resolve(state: SupportState) -> str:
     """
@@ -259,6 +245,7 @@ def route_after_resolve(state: SupportState) -> str:
 # SEVERITY ROUTER
 # ============================================================
 
+
 def route_after_severity(state: SupportState) -> str:
     """
     Decide whether human escalation is required.
@@ -276,9 +263,7 @@ def route_after_severity(state: SupportState) -> str:
     )
 
     logger.info(
-        "ROUTER: SEVERITY | "
-        "severity=%s | "
-        "escalation_required=%s",
+        "ROUTER: SEVERITY | severity=%s | escalation_required=%s",
         severity,
         escalation_required,
     )

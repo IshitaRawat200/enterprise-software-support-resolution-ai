@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.database.connection import get_db_session
 from app.observability.logging import logger
@@ -72,10 +73,7 @@ async def mcp_check_incident_status(
                     "success": True,
                     "incident_active": False,
                     "service_name": service_name,
-                    "reason": (
-                        "No active incident was found "
-                        "for this service."
-                    ),
+                    "reason": ("No active incident was found for this service."),
                 }
 
             return {
@@ -88,21 +86,11 @@ async def mcp_check_incident_status(
                 "service_name": row["service_name"],
                 "severity": row["severity"],
                 "status": row["status"],
-                "affected_customers_count": (
-                    row["affected_customers_count"]
-                ),
-                "affects_production": (
-                    row["affects_production"]
-                ),
-                "unresolved_critical_alert": (
-                    row["unresolved_critical_alert"]
-                ),
-                "security_related": (
-                    row["security_related"]
-                ),
-                "data_loss_reported": (
-                    row["data_loss_reported"]
-                ),
+                "affected_customers_count": (row["affected_customers_count"]),
+                "affects_production": (row["affects_production"]),
+                "unresolved_critical_alert": (row["unresolved_critical_alert"]),
+                "security_related": (row["security_related"]),
+                "data_loss_reported": (row["data_loss_reported"]),
                 "started_at": (
                     row["started_at"].isoformat()
                     if row["started_at"] is not None
@@ -115,10 +103,8 @@ async def mcp_check_incident_status(
                 ),
             }
 
-    except Exception:
-        logger.exception(
-            "MCP incident status check failed."
-        )
+    except SQLAlchemyError:
+        logger.exception("MCP incident status check failed.")
 
         return {
             "success": False,

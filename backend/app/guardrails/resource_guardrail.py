@@ -58,9 +58,7 @@ def can_access_customer(
             code="CUSTOMER_ID_MISSING",
         )
 
-    role = _normalize_role(
-        getattr(current_user, "role", None)
-    )
+    role = _normalize_role(getattr(current_user, "role", None))
 
     # --------------------------------------------------------
     # Privileged support access

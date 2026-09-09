@@ -6,7 +6,6 @@ from typing import Any
 from app.guardrails.guardrail_result import GuardrailResult
 from app.mcp.mcp_permissions import MCP_TOOL_PERMISSIONS
 
-
 GUARDRAIL_NAME = "tool_guardrail"
 
 
@@ -14,9 +13,7 @@ GUARDRAIL_NAME = "tool_guardrail"
 # TOOL LIMITS
 # ============================================================
 
-ALLOWED_TOOL_NAMES = frozenset(
-    MCP_TOOL_PERMISSIONS.keys()
-)
+ALLOWED_TOOL_NAMES = frozenset(MCP_TOOL_PERMISSIONS.keys())
 
 
 # Explicit argument schema for every MCP tool.
@@ -101,6 +98,7 @@ def _contains_dangerous_sql(
 # MCP ARGUMENT VALUE VALIDATION
 # ============================================================
 
+
 def _validate_argument_values(
     value: Any,
     *,
@@ -144,7 +142,6 @@ def _validate_argument_values(
 
     if isinstance(value, dict):
         for key, nested_value in value.items():
-
             if not isinstance(key, str):
                 return (
                     False,
@@ -172,7 +169,6 @@ def _validate_argument_values(
     # --------------------------------------------------------
 
     if isinstance(value, (list, tuple)):
-
         if len(value) > MAX_ARGUMENT_LIST_LENGTH:
             return (
                 False,
@@ -206,16 +202,14 @@ def _validate_argument_values(
 
     return (
         False,
-        (
-            "Unsupported tool argument type: "
-            f"{type(value).__name__}"
-        ),
+        (f"Unsupported tool argument type: {type(value).__name__}"),
     )
 
 
 # ============================================================
 # MCP TOOL CALL GUARDRAIL
 # ============================================================
+
 
 def validate_tool_call(
     *,
@@ -255,10 +249,7 @@ def validate_tool_call(
     if tool_name not in ALLOWED_TOOL_NAMES:
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                f"MCP tool '{tool_name}' "
-                "is not allow-listed."
-            ),
+            reason=(f"MCP tool '{tool_name}' is not allow-listed."),
             code="TOOL_NOT_ALLOWED",
             risk_level="high",
             metadata={
@@ -289,18 +280,13 @@ def validate_tool_call(
     if role not in allowed_roles:
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                f"Role '{role}' is not authorized "
-                f"to call MCP tool '{tool_name}'."
-            ),
+            reason=(f"Role '{role}' is not authorized to call MCP tool '{tool_name}'."),
             code="TOOL_ROLE_FORBIDDEN",
             risk_level="high",
             metadata={
                 "tool_name": tool_name,
                 "role": role,
-                "allowed_roles": sorted(
-                    allowed_roles
-                ),
+                "allowed_roles": sorted(allowed_roles),
             },
         )
 
@@ -316,17 +302,12 @@ def validate_tool_call(
     if not isinstance(tool_arguments, dict):
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                "MCP tool arguments must be "
-                "a dictionary."
-            ),
+            reason=("MCP tool arguments must be a dictionary."),
             code="INVALID_TOOL_ARGUMENTS",
             risk_level="high",
             metadata={
                 "tool_name": tool_name,
-                "argument_type": type(
-                    tool_arguments
-                ).__name__,
+                "argument_type": type(tool_arguments).__name__,
             },
         )
 
@@ -339,10 +320,7 @@ def validate_tool_call(
         frozenset(),
     )
 
-    unexpected_arguments = (
-        set(tool_arguments.keys())
-        - set(allowed_arguments)
-    )
+    unexpected_arguments = set(tool_arguments.keys()) - set(allowed_arguments)
 
     if unexpected_arguments:
         return GuardrailResult.block(
@@ -355,12 +333,8 @@ def validate_tool_call(
             risk_level="high",
             metadata={
                 "tool_name": tool_name,
-                "unexpected_arguments": sorted(
-                    unexpected_arguments
-                ),
-                "allowed_arguments": sorted(
-                    allowed_arguments
-                ),
+                "unexpected_arguments": sorted(unexpected_arguments),
+                "allowed_arguments": sorted(allowed_arguments),
             },
         )
 
@@ -369,19 +343,12 @@ def validate_tool_call(
     # ========================================================
 
     for key, value in tool_arguments.items():
-
-        valid, reason = _validate_argument_values(
-            value
-        )
+        valid, reason = _validate_argument_values(value)
 
         if not valid:
             return GuardrailResult.block(
                 GUARDRAIL_NAME,
-                reason=(
-                    f"Invalid value detected for "
-                    f"MCP argument '{key}': "
-                    f"{reason}"
-                ),
+                reason=(f"Invalid value detected for MCP argument '{key}': {reason}"),
                 code="INVALID_TOOL_ARGUMENTS",
                 risk_level="high",
                 metadata={
@@ -397,16 +364,11 @@ def validate_tool_call(
 
     return GuardrailResult.allow(
         GUARDRAIL_NAME,
-        reason=(
-            "MCP tool call passed all "
-            "guardrail checks."
-        ),
+        reason=("MCP tool call passed all guardrail checks."),
         metadata={
             "tool_name": tool_name,
             "role": role,
-            "validated_arguments": sorted(
-                tool_arguments.keys()
-            ),
+            "validated_arguments": sorted(tool_arguments.keys()),
         },
     )
 
@@ -414,6 +376,7 @@ def validate_tool_call(
 # ============================================================
 # SQL GUARDRAIL
 # ============================================================
+
 
 def validate_sql_query(
     query: str,
@@ -478,10 +441,7 @@ def validate_sql_query(
     if ";" in normalized.rstrip(";"):
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                "Multiple SQL statements "
-                "are not allowed."
-            ),
+            reason=("Multiple SQL statements are not allowed."),
             risk_level="high",
             code="MULTI_STATEMENT_SQL",
         )
@@ -493,10 +453,7 @@ def validate_sql_query(
     if _contains_dangerous_sql(normalized):
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                "Potentially unsafe SQL "
-                "operation detected."
-            ),
+            reason=("Potentially unsafe SQL operation detected."),
             risk_level="high",
             code="DANGEROUS_SQL",
         )
@@ -512,10 +469,7 @@ def validate_sql_query(
     ):
         return GuardrailResult.block(
             GUARDRAIL_NAME,
-            reason=(
-                "Only read-only SELECT/WITH "
-                "SQL is permitted."
-            ),
+            reason=("Only read-only SELECT/WITH SQL is permitted."),
             risk_level="high",
             code="NON_READ_ONLY_SQL",
         )
@@ -526,10 +480,7 @@ def validate_sql_query(
 
     return GuardrailResult.allow(
         GUARDRAIL_NAME,
-        reason=(
-            "SQL passed the basic "
-            "read-only safety guardrail."
-        ),
+        reason=("SQL passed the basic read-only safety guardrail."),
         metadata={
             "read_only": True,
             "statement_type": (

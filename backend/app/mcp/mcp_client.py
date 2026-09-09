@@ -35,24 +35,14 @@ class MCPClient:
         """
 
         if server_script is None and server_module is None:
-            server_script = (
-                "app/mcp/mcp_server.py"
-            )
+            server_script = "app/mcp/mcp_server.py"
 
-        self.server_script = (
-            Path(server_script)
-            if server_script is not None
-            else None
-        )
+        self.server_script = Path(server_script) if server_script is not None else None
 
         self.server_module = server_module
 
         # backend/
-        self.backend_dir = (
-            Path(__file__)
-            .resolve()
-            .parents[2]
-        )
+        self.backend_dir = Path(__file__).resolve().parents[2]
 
     # ============================================================
     # SERVER PARAMETERS
@@ -76,9 +66,7 @@ class MCPClient:
                     "-m",
                     self.server_module,
                 ],
-                cwd=str(
-                    self.backend_dir
-                ),
+                cwd=str(self.backend_dir),
             )
 
         # --------------------------------------------------------
@@ -86,34 +74,24 @@ class MCPClient:
         # --------------------------------------------------------
 
         if self.server_script is None:
-            raise RuntimeError(
-                "MCP server script/module is not configured."
-            )
+            raise RuntimeError("MCP server script/module is not configured.")
 
         script_path = self.server_script
 
         if not script_path.is_absolute():
-            script_path = (
-                self.backend_dir
-                / script_path
-            )
+            script_path = self.backend_dir / script_path
 
         script_path = script_path.resolve()
 
         if not script_path.exists():
-            raise FileNotFoundError(
-                f"MCP server script not found: "
-                f"{script_path}"
-            )
+            raise FileNotFoundError(f"MCP server script not found: {script_path}")
 
         return StdioServerParameters(
             command=sys.executable,
             args=[
                 str(script_path),
             ],
-            cwd=str(
-                self.backend_dir
-            ),
+            cwd=str(self.backend_dir),
         )
 
     # ============================================================
@@ -125,45 +103,33 @@ class MCPClient:
         Discover tools exposed by the MCP server.
         """
 
-        server = (
-            self._server_parameters()
-        )
+        server = self._server_parameters()
 
-        logger.info(
-            "MCP CLIENT: starting server"
-        )
+        logger.info("MCP CLIENT: starting server")
 
-        async with stdio_client(
-            server
-        ) as (
-            read_stream,
-            write_stream,
-        ):
-            async with ClientSession(
+        async with (
+            stdio_client(server) as (
                 read_stream,
                 write_stream,
-            ) as session:
+            ),
+            ClientSession(
+                read_stream,
+                write_stream,
+            ) as session,
+        ):
+            await session.initialize()
 
-                await session.initialize()
+            result = await session.list_tools()
 
-                result = (
-                    await session.list_tools()
-                )
+            tools = list(result.tools)
 
-                tools = list(
-                    result.tools
-                )
+            logger.info(
+                "MCP CLIENT: discovered %d tools: %s",
+                len(tools),
+                [tool.name for tool in tools],
+            )
 
-                logger.info(
-                    "MCP CLIENT: discovered %d tools: %s",
-                    len(tools),
-                    [
-                        tool.name
-                        for tool in tools
-                    ],
-                )
-
-                return tools
+            return tools
 
     # ============================================================
     # CALL TOOL
@@ -180,38 +146,31 @@ class MCPClient:
 
         arguments = arguments or {}
 
-        server = (
-            self._server_parameters()
-        )
+        server = self._server_parameters()
 
         logger.info(
             "MCP CLIENT: calling %s",
             tool_name,
         )
 
-        async with stdio_client(
-            server
-        ) as (
-            read_stream,
-            write_stream,
-        ):
-            async with ClientSession(
+        async with (
+            stdio_client(server) as (
                 read_stream,
                 write_stream,
-            ) as session:
+            ),
+            ClientSession(
+                read_stream,
+                write_stream,
+            ) as session,
+        ):
+            await session.initialize()
 
-                await session.initialize()
+            result = await session.call_tool(
+                tool_name,
+                arguments=arguments,
+            )
 
-                result = (
-                    await session.call_tool(
-                        tool_name,
-                        arguments=arguments,
-                    )
-                )
-
-                return self._normalize_result(
-                    result
-                )
+            return self._normalize_result(result)
 
     # ============================================================
     # NORMALIZE RESULT
@@ -262,19 +221,13 @@ class MCPClient:
                 )
 
                 if text_value:
-                    text_parts.append(
-                        text_value
-                    )
+                    text_parts.append(text_value)
 
-            combined = "\n".join(
-                text_parts
-            ).strip()
+            combined = "\n".join(text_parts).strip()
 
             if combined:
                 try:
-                    parsed = json.loads(
-                        combined
-                    )
+                    parsed = json.loads(combined)
 
                     if isinstance(
                         parsed,
@@ -282,22 +235,16 @@ class MCPClient:
                     ):
                         return parsed
 
-                    return {
-                        "result": parsed
-                    }
+                    return {"result": parsed}
 
                 except json.JSONDecodeError:
-                    return {
-                        "result": combined
-                    }
+                    return {"result": combined}
 
         # --------------------------------------------------------
         # Fallback
         # --------------------------------------------------------
 
-        return {
-            "result": str(result)
-        }
+        return {"result": str(result)}
 
     # ============================================================
     # TOOL CHECK
@@ -311,14 +258,9 @@ class MCPClient:
         Check whether an MCP tool exists.
         """
 
-        tools = (
-            await self.list_tools()
-        )
+        tools = await self.list_tools()
 
-        return any(
-            tool.name == tool_name
-            for tool in tools
-        )
+        return any(tool.name == tool_name for tool in tools)
 
     # ============================================================
     # SAFE TOOL CALL
@@ -335,19 +277,12 @@ class MCPClient:
         """
 
         try:
-            available = (
-                await self.has_tool(
-                    tool_name
-                )
-            )
+            available = await self.has_tool(tool_name)
 
             if not available:
                 return {
                     "success": False,
-                    "error": (
-                        f"MCP tool '{tool_name}' "
-                        "is not available."
-                    ),
+                    "error": (f"MCP tool '{tool_name}' is not available."),
                 }
 
             return await self.call_tool(
@@ -355,7 +290,7 @@ class MCPClient:
                 arguments,
             )
 
-        except Exception as exc:
+        except (RuntimeError, ValueError, ConnectionError) as exc:
             logger.exception(
                 "MCP CLIENT: tool call failed: %s",
                 tool_name,
@@ -363,8 +298,5 @@ class MCPClient:
 
             return {
                 "success": False,
-                "error": (
-                    f"MCP tool '{tool_name}' "
-                    f"failed: {exc}"
-                ),
+                "error": (f"MCP tool '{tool_name}' failed: {exc}"),
             }

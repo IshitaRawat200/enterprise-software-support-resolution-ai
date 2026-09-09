@@ -18,10 +18,7 @@ def test_mcp_server_lists_expected_tools() -> None:
 
         tools = await client.list_tools()
 
-        tool_names = {
-            tool.name
-            for tool in tools
-        }
+        tool_names = {tool.name for tool in tools}
 
         assert "mcp_validate_customer_account" in tool_names
         assert "mcp_check_incident_status" in tool_names
@@ -45,9 +42,7 @@ def test_mcp_account_validation_integration() -> None:
 
         assert result is not None
         assert result.get("success") is True
-        assert result.get("customer_id") == (
-            "68c5f980-6de5-4303-bedc-8c8ec65532c2"
-        )
+        assert result.get("customer_id") == ("68c5f980-6de5-4303-bedc-8c8ec65532c2")
 
     run_async(scenario())
 

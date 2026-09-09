@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import secrets
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -29,12 +29,10 @@ class HandoffContextService:
             HO-20260904-103015-A1B2C3
         """
 
-        timestamp = now or datetime.now(timezone.utc)
+        timestamp = now or datetime.now(UTC)
 
         return (
-            f"HO-"
-            f"{timestamp.strftime('%Y%m%d-%H%M%S')}-"
-            f"{secrets.token_hex(3).upper()}"
+            f"HO-{timestamp.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(3).upper()}"
         )
 
     @staticmethod
@@ -90,126 +88,54 @@ class HandoffContextService:
         """
 
         if not message or not message.strip():
-            raise ValueError(
-                "Handoff message cannot be empty."
-            )
+            raise ValueError("Handoff message cannot be empty.")
 
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
 
-        reference_id = (
-            HandoffContextService.generate_reference_id(
-                timestamp
-            )
-        )
+        reference_id = HandoffContextService.generate_reference_id(timestamp)
 
         normalized_severity_confidence = (
-            HandoffContextService._normalize_confidence(
-                severity_confidence
-            )
-            or 0.0
+            HandoffContextService._normalize_confidence(severity_confidence) or 0.0
         )
 
         normalized_sql_confidence = (
-            HandoffContextService._normalize_confidence(
-                sql_confidence
-            )
-            or 0.0
+            HandoffContextService._normalize_confidence(sql_confidence) or 0.0
         )
 
         evaluation_scores = {
-            "faithfulness": (
-                HandoffContextService._normalize_confidence(
-                    faithfulness
-                )
-            ),
-            "relevance": (
-                HandoffContextService._normalize_confidence(
-                    relevance
-                )
-            ),
-            "confidence": (
-                HandoffContextService._normalize_confidence(
-                    confidence
-                )
-            ),
+            "faithfulness": (HandoffContextService._normalize_confidence(faithfulness)),
+            "relevance": (HandoffContextService._normalize_confidence(relevance)),
+            "confidence": (HandoffContextService._normalize_confidence(confidence)),
         }
 
-        safe_retrieval_results = list(
-            retrieval_results or []
-        )
+        safe_retrieval_results = list(retrieval_results or [])
 
-        safe_sql_rows = list(
-            sql_rows or []
-        )
+        safe_sql_rows = list(sql_rows or [])
 
-        safe_conversation_flow = list(
-            conversation_flow or []
-        )
+        safe_conversation_flow = list(conversation_flow or [])
 
         return {
             "reference_id": reference_id,
-
-            "timestamp_utc": (
-                timestamp.isoformat()
-            ),
-
+            "timestamp_utc": (timestamp.isoformat()),
             "conversation_id": conversation_id,
-
             "customer_id": customer_id,
-
             "message": message.strip(),
-
             "intent": intent,
-
             "route": route,
-
             "severity": severity,
-
-            "severity_confidence": (
-                normalized_severity_confidence
-            ),
-
-            "trigger_reason": (
-                escalation_reason
-            ),
-
-            "priority": (
-                escalation_priority
-            ),
-
-            "escalation_type": (
-                escalation_type
-            ),
-
-            "generated_answer": (
-                generated_answer
-            ),
-
-            "investigation_summary": (
-                investigation_summary
-            ),
-
-            "retrieved_chunks": (
-                safe_retrieval_results
-            ),
-
+            "severity_confidence": (normalized_severity_confidence),
+            "trigger_reason": (escalation_reason),
+            "priority": (escalation_priority),
+            "escalation_type": (escalation_type),
+            "generated_answer": (generated_answer),
+            "investigation_summary": (investigation_summary),
+            "retrieved_chunks": (safe_retrieval_results),
             "sql_evidence": {
                 "sql_query": sql_query,
                 "rows": safe_sql_rows,
-                "confidence": (
-                    normalized_sql_confidence
-                ),
+                "confidence": (normalized_sql_confidence),
             },
-
-            "evaluation_scores": (
-                evaluation_scores
-            ),
-
-            "conversation_flow": (
-                safe_conversation_flow
-            ),
-
-            "recommended_action": (
-                recommended_action
-            ),
+            "evaluation_scores": (evaluation_scores),
+            "conversation_flow": (safe_conversation_flow),
+            "recommended_action": (recommended_action),
         }

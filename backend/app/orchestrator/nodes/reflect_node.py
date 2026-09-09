@@ -54,8 +54,7 @@ def reflect_node(
         return {
             "reflection_decision": "resolve",
             "reflection_reason": (
-                "The current investigation produced "
-                "sufficient evidence to proceed."
+                "The current investigation produced sufficient evidence to proceed."
             ),
             "replan_required": False,
             "sufficient_evidence": True,

@@ -9,8 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
-
-import app.database.model_registry  # noqa: F401
 from app.database.models.user import User
 
 load_dotenv()
@@ -30,9 +28,7 @@ async def seed_support_agent(
     email: str,
     password: str,
 ) -> None:
-    result = await session.execute(
-        select(User).where(User.email == email)
-    )
+    result = await session.execute(select(User).where(User.email == email))
 
     user = result.scalar_one_or_none()
 

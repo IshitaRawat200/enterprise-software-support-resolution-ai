@@ -19,9 +19,7 @@ class IncidentRepository:
         incident_id: UUID,
     ) -> IncidentLog | None:
         result = await self.session.execute(
-            select(IncidentLog).where(
-                IncidentLog.id == incident_id
-            )
+            select(IncidentLog).where(IncidentLog.id == incident_id)
         )
         return result.scalar_one_or_none()
 
@@ -30,18 +28,14 @@ class IncidentRepository:
         incident_code: str,
     ) -> IncidentLog | None:
         result = await self.session.execute(
-            select(IncidentLog).where(
-                IncidentLog.incident_code == incident_code
-            )
+            select(IncidentLog).where(IncidentLog.incident_code == incident_code)
         )
         return result.scalar_one_or_none()
 
     async def get_active_incidents(self) -> list[IncidentLog]:
         result = await self.session.execute(
             select(IncidentLog)
-            .where(
-                IncidentLog.status.not_in(["resolved", "closed"])
-            )
+            .where(IncidentLog.status.not_in(["resolved", "closed"]))
             .order_by(IncidentLog.started_at.desc())
         )
         return list(result.scalars().all())
@@ -49,9 +43,7 @@ class IncidentRepository:
     async def get_critical_incidents(self) -> list[IncidentLog]:
         result = await self.session.execute(
             select(IncidentLog)
-            .where(
-                IncidentLog.severity == "critical"
-            )
+            .where(IncidentLog.severity == "critical")
             .order_by(IncidentLog.started_at.desc())
         )
         return list(result.scalars().all())

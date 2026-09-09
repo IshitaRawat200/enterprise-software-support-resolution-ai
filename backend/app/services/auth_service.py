@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import bcrypt
@@ -13,7 +13,6 @@ from app.database.models.customer import Customer
 from app.database.models.user import User
 from app.database.repositories.customers import CustomerRepository
 from app.database.repositories.users import UserRepository
-
 
 settings = get_settings()
 
@@ -45,10 +44,8 @@ def verify_password(
 def create_access_token(user: User) -> tuple[str, int]:
     expires_in = settings.access_token_expire_minutes * 60
 
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(
-        minutes=settings.access_token_expire_minutes
-    )
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(minutes=settings.access_token_expire_minutes)
 
     payload = {
         "sub": str(user.id),
@@ -88,9 +85,7 @@ async def register_customer(
 
     normalized_email = normalize_email(email)
 
-    existing_user = await user_repository.get_by_email(
-        normalized_email
-    )
+    existing_user = await user_repository.get_by_email(normalized_email)
 
     if existing_user is not None:
         raise HTTPException(
@@ -143,9 +138,7 @@ async def authenticate_user(
 
     normalized_email = normalize_email(email)
 
-    user = await repository.get_by_email(
-        normalized_email
-    )
+    user = await repository.get_by_email(normalized_email)
 
     if user is None:
         raise HTTPException(

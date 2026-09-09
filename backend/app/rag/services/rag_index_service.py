@@ -26,18 +26,14 @@ class RAGIndexService:
         index_directory: str | Path,
     ) -> None:
 
-        self.index_directory = Path(
-            index_directory
-        )
+        self.index_directory = Path(index_directory)
 
         self._configure_embeddings()
 
     @staticmethod
     def _configure_embeddings() -> None:
 
-        Settings.embed_model = (
-            create_embedding_model()
-        )
+        Settings.embed_model = create_embedding_model()
 
     def build(
         self,
@@ -46,26 +42,17 @@ class RAGIndexService:
 
         if not documents:
             raise ValueError(
-                "At least one document is required "
-                "to build the RAG index."
+                "At least one document is required to build the RAG index."
             )
 
-        index = (
-            VectorStoreIndex.from_documents(
-                documents
-            )
-        )
+        index = VectorStoreIndex.from_documents(documents)
 
         self.index_directory.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        index.storage_context.persist(
-            persist_dir=str(
-                self.index_directory
-            )
-        )
+        index.storage_context.persist(persist_dir=str(self.index_directory))
 
         return index
 
@@ -73,21 +60,14 @@ class RAGIndexService:
 
         if not self.index_directory.exists():
             raise FileNotFoundError(
-                "RAG index directory does not exist: "
-                f"{self.index_directory}"
+                f"RAG index directory does not exist: {self.index_directory}"
             )
 
-        storage_context = (
-            StorageContext.from_defaults(
-                persist_dir=str(
-                    self.index_directory
-                )
-            )
+        storage_context = StorageContext.from_defaults(
+            persist_dir=str(self.index_directory)
         )
 
-        return load_index_from_storage(
-            storage_context
-        )
+        return load_index_from_storage(storage_context)
 
     def exists(self) -> bool:
         return self.index_directory.exists()

@@ -23,21 +23,15 @@ async def plan_node(
         REPLAN increments the iteration to 2, 3, etc.
     """
 
-    message = (
-        state.get("message") or ""
-    ).strip()
+    message = (state.get("message") or "").strip()
 
     if not message:
         return {
             "plan": [],
             "plan_step": 0,
-            "plan_reason": (
-                "Customer message is empty."
-            ),
+            "plan_reason": ("Customer message is empty."),
             "current_node": "plan",
-            "errors": [
-                "Customer message is empty."
-            ],
+            "errors": ["Customer message is empty."],
         }
 
     current_iteration = state.get(
@@ -65,9 +59,7 @@ async def plan_node(
             "reflect_on_result",
         ]
 
-        reason = (
-            "Initial support-resolution plan created."
-        )
+        reason = "Initial support-resolution plan created."
 
     # --------------------------------------------------------
     # RE-PLAN
@@ -76,9 +68,7 @@ async def plan_node(
     else:
         iteration = current_iteration
 
-        previous_route = state.get(
-            "route"
-        )
+        previous_route = state.get("route")
 
         previous_confidence = float(
             state.get(

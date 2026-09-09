@@ -17,9 +17,7 @@ class CustomerRepository:
         customer_id: UUID,
     ) -> Customer | None:
         result = await self.session.execute(
-            select(Customer).where(
-                Customer.id == customer_id
-            )
+            select(Customer).where(Customer.id == customer_id)
         )
 
         return result.scalar_one_or_none()
@@ -29,9 +27,7 @@ class CustomerRepository:
         user_id: UUID,
     ) -> Customer | None:
         result = await self.session.execute(
-            select(Customer).where(
-                Customer.user_id == user_id
-            )
+            select(Customer).where(Customer.user_id == user_id)
         )
 
         return result.scalar_one_or_none()
@@ -41,9 +37,7 @@ class CustomerRepository:
         customer_code: str,
     ) -> Customer | None:
         result = await self.session.execute(
-            select(Customer).where(
-                Customer.customer_code == customer_code
-            )
+            select(Customer).where(Customer.customer_code == customer_code)
         )
 
         return result.scalar_one_or_none()

@@ -7,7 +7,7 @@ from app.guardrails.guardrails_service import guardrails_service
 from app.mcp.mcp_client import MCPClient
 from app.observability.logging import logger
 
- 
+
 class MCPService:
     """
     Application service for the Enterprise Software Support MCP layer.
@@ -71,9 +71,7 @@ class MCPService:
             logger.info("MCP SERVICE: already initialized")
             return
 
-        logger.info(
-            "MCP SERVICE: initializing MCP connection"
-        )
+        logger.info("MCP SERVICE: initializing MCP connection")
 
         tools = await self.client.list_tools()
 
@@ -81,10 +79,7 @@ class MCPService:
         # MCP v2 Tool objects
         # --------------------------------------------------------
 
-        self.available_tools = {
-            tool.name: tool
-            for tool in tools
-        }
+        self.available_tools = {tool.name: tool for tool in tools}
 
         logger.info(
             "MCP SERVICE: discovered %d tools: %s",
@@ -96,13 +91,9 @@ class MCPService:
         # Verify approved tools
         # --------------------------------------------------------
 
-        discovered_names = set(
-            self.available_tools.keys()
-        )
+        discovered_names = set(self.available_tools.keys())
 
-        missing_tools = (
-            self.ALLOWED_TOOLS - discovered_names
-        )
+        missing_tools = self.ALLOWED_TOOLS - discovered_names
 
         if missing_tools:
             logger.warning(
@@ -110,9 +101,7 @@ class MCPService:
                 sorted(missing_tools),
             )
 
-        unexpected_tools = (
-            discovered_names - self.ALLOWED_TOOLS
-        )
+        unexpected_tools = discovered_names - self.ALLOWED_TOOLS
 
         if unexpected_tools:
             logger.warning(
@@ -147,9 +136,7 @@ class MCPService:
 
         await self.initialize()
 
-        return list(
-            self.available_tools.values()
-        )
+        return list(self.available_tools.values())
 
     # ============================================================
     # GET TOOLS
@@ -162,9 +149,7 @@ class MCPService:
         initialize() should be called before accessing this method.
         """
 
-        return list(
-            self.available_tools.values()
-        )
+        return list(self.available_tools.values())
 
     # ============================================================
     # TOOL AVAILABILITY
@@ -231,10 +216,7 @@ class MCPService:
 
             return {
                 "success": False,
-                "error": (
-                    f"MCP tool '{tool_name}' "
-                    "is not allow-listed."
-                ),
+                "error": (f"MCP tool '{tool_name}' is not allow-listed."),
             }
 
         # --------------------------------------------------------
@@ -243,16 +225,14 @@ class MCPService:
 
         if not self.has_tool(tool_name):
             logger.error(
-                "MCP SERVICE: requested tool is not exposed "
-                "by the server: %s",
+                "MCP SERVICE: requested tool is not exposed by the server: %s",
                 tool_name,
             )
 
             return {
                 "success": False,
                 "error": (
-                    f"MCP tool '{tool_name}' "
-                    "is not available on the MCP server."
+                    f"MCP tool '{tool_name}' is not available on the MCP server."
                 ),
             }
 
@@ -260,12 +240,10 @@ class MCPService:
         # TOOL GUARDRAIL
         # --------------------------------------------------------
 
-        guardrail_result = (
-            guardrails_service.validate_mcp_call(
-                tool_name=tool_name,
-                role=role,
-                arguments=tool_arguments,
-            )
+        guardrail_result = guardrails_service.validate_mcp_call(
+            tool_name=tool_name,
+            role=role,
+            arguments=tool_arguments,
         )
 
         if not guardrail_result.allowed:
@@ -284,9 +262,7 @@ class MCPService:
             return {
                 "success": False,
                 "blocked_by_guardrail": True,
-                "guardrail": (
-                    guardrail_result.guardrail_name
-                ),
+                "guardrail": (guardrail_result.guardrail_name),
                 "code": guardrail_result.code,
                 "error": guardrail_result.reason,
             }
@@ -366,10 +342,7 @@ class MCPService:
                 "success": False,
                 "incident_active": False,
                 "service_name": service_name,
-                "error": (
-                    "Role is not permitted to call "
-                    "the incident MCP tool."
-                ),
+                "error": ("Role is not permitted to call the incident MCP tool."),
             }
 
         if not service_name:
@@ -421,10 +394,7 @@ class MCPService:
                 "success": False,
                 "supported": False,
                 "service_name": service_name,
-                "error": (
-                    "Role is not permitted to call "
-                    "the live status MCP tool."
-                ),
+                "error": ("Role is not permitted to call the live status MCP tool."),
             }
 
         if not service_name:
@@ -436,8 +406,7 @@ class MCPService:
             }
 
         logger.info(
-            "MCP SERVICE: requesting live external status "
-            "for service=%s",
+            "MCP SERVICE: requesting live external status for service=%s",
             service_name,
         )
 
@@ -475,10 +444,7 @@ class MCPService:
             return {
                 "success": False,
                 "policy_type": policy_type,
-                "error": (
-                    "Role is not permitted to call "
-                    "the policy MCP tool."
-                ),
+                "error": ("Role is not permitted to call the policy MCP tool."),
             }
 
         if not policy_type:

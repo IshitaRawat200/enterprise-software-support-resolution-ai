@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -19,6 +20,7 @@ from app.database.models.customer import Customer
 from app.guardrails.auth import get_current_user
 from app.guardrails.guardrails_service import guardrails_service
 from app.observability.logging import logger
+from app.observability.slo_evaluator import SLOEvaluator
 from app.observability.tracing import support_trace
 from app.services.conversation_service import ConversationService
 
@@ -36,6 +38,7 @@ router = APIRouter(
 # REQUEST
 # ============================================================
 
+
 class ChatRequest(BaseModel):
     message: str = Field(
         min_length=1,
@@ -48,6 +51,7 @@ class ChatRequest(BaseModel):
 # ============================================================
 # RESPONSE
 # ============================================================
+
 
 class ChatResponse(BaseModel):
     message: str
@@ -167,6 +171,7 @@ class ChatResponse(BaseModel):
 # ORM → DICT
 # ============================================================
 
+
 def serialize_history(
     history: list[Any],
 ) -> list[dict[str, Any]]:
@@ -181,33 +186,14 @@ def serialize_history(
         serialized.append(
             {
                 "id": str(item.id),
-
-                "session_id": str(
-                    item.session_id
-                ),
-
-                "user_id": str(
-                    item.user_id
-                ),
-
-                "ticket_id": (
-                    str(item.ticket_id)
-                    if item.ticket_id
-                    else None
-                ),
-
+                "session_id": str(item.session_id),
+                "user_id": str(item.user_id),
+                "ticket_id": (str(item.ticket_id) if item.ticket_id else None),
                 "role": item.role,
-
                 "content": item.content,
-
-                "metadata": (
-                    item.metadata or {}
-                ),
-
+                "metadata": (item.metadata or {}),
                 "created_at": (
-                    item.created_at.isoformat()
-                    if item.created_at
-                    else None
+                    item.created_at.isoformat() if item.created_at else None
                 ),
             }
         )
@@ -218,6 +204,7 @@ def serialize_history(
 # ============================================================
 # CONVERSATION CONTEXT
 # ============================================================
+
 
 def build_conversation_context(
     history: list[dict[str, Any]],
@@ -263,9 +250,7 @@ def build_conversation_context(
         else:
             label = role.title()
 
-        lines.append(
-            f"{label}: {content}"
-        )
+        lines.append(f"{label}: {content}")
 
     return "\n".join(lines)
 
@@ -273,6 +258,7 @@ def build_conversation_context(
 # ============================================================
 # CHAT
 # ============================================================
+
 
 @router.post(
     "",
@@ -322,13 +308,10 @@ async def chat(
     # REQUEST ID
     # ========================================================
 
-    request_id = str(
-        uuid4()
-    )
+    request_id = str(uuid4())
 
     logger.info(
-        "Chat request received "
-        "request_id=%s",
+        "Chat request received request_id=%s",
         request_id,
     )
 
@@ -344,9 +327,7 @@ async def chat(
 
     if user_id_value is None:
         logger.warning(
-            "Chat request rejected: "
-            "authenticated user ID missing "
-            "request_id=%s",
+            "Chat request rejected: authenticated user ID missing request_id=%s",
             request_id,
         )
 
@@ -362,16 +343,12 @@ async def chat(
                 user_id_value,
                 UUID,
             )
-            else UUID(
-                str(user_id_value)
-            )
+            else UUID(str(user_id_value))
         )
 
     except ValueError as exc:
         logger.warning(
-            "Chat request rejected: "
-            "invalid authenticated user ID "
-            "request_id=%s",
+            "Chat request rejected: invalid authenticated user ID request_id=%s",
             request_id,
         )
 
@@ -396,17 +373,10 @@ async def chat(
     ):
         user_role = user_role.value
 
-    user_role = (
-        str(user_role)
-        if user_role is not None
-        else None
-    )
+    user_role = str(user_role) if user_role is not None else None
 
     logger.info(
-        "Authenticated chat user "
-        "request_id=%s "
-        "user_id=%s "
-        "role=%s",
+        "Authenticated chat user request_id=%s user_id=%s role=%s",
         request_id,
         user_id,
         user_role,
@@ -417,25 +387,17 @@ async def chat(
     # ========================================================
 
     async for db_session in get_db_session():
-
-        conversation_service = (
-            ConversationService(
-                db_session
-            )
-        )
+        conversation_service = ConversationService(db_session)
 
         session_id: UUID | None = None
 
         try:
-
             # =================================================
             # CUSTOMER LOOKUP
             # =================================================
 
             customer = await db_session.scalar(
-                select(Customer).where(
-                    Customer.user_id == user_id
-                )
+                select(Customer).where(Customer.user_id == user_id)
             )
 
             if customer is None:
@@ -451,8 +413,7 @@ async def chat(
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=(
-                        "Authenticated user is not associated "
-                        "with a customer account."
+                        "Authenticated user is not associated with a customer account."
                     ),
                 )
 
@@ -463,54 +424,35 @@ async def chat(
             # =================================================
 
             if body.conversation_id:
-
                 try:
-                    session_id = UUID(
-                        body.conversation_id
-                    )
+                    session_id = UUID(body.conversation_id)
 
                 except ValueError as exc:
-
                     logger.warning(
-                        "Invalid conversation ID "
-                        "request_id=%s",
+                        "Invalid conversation ID request_id=%s",
                         request_id,
                     )
 
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=(
-                            "conversation_id must be "
-                            "a valid UUID."
-                        ),
+                        detail=("conversation_id must be a valid UUID."),
                     ) from exc
 
             else:
-
-                session_id = (
-                    conversation_service.create_session_id()
-                )
+                session_id = conversation_service.create_session_id()
 
             # =================================================
             # LOAD HISTORY
             # =================================================
 
-            history_entities = (
-                await conversation_service.get_history(
-                    session_id=session_id,
-                    user_id=user_id,
-                )
+            history_entities = await conversation_service.get_history(
+                session_id=session_id,
+                user_id=user_id,
             )
 
-            history = serialize_history(
-                history_entities
-            )
+            history = serialize_history(history_entities)
 
-            conversation_context = (
-                build_conversation_context(
-                    history
-                )
-            )
+            conversation_context = build_conversation_context(history)
 
             logger.info(
                 "Conversation history loaded "
@@ -526,9 +468,7 @@ async def chat(
             # INPUT GUARDRAILS
             # =================================================
 
-            guardrail_result = guardrails_service.validate_request(
-                body.message
-            )
+            guardrail_result = guardrails_service.validate_request(body.message)
 
             if not guardrail_result.allowed:
                 logger.warning(
@@ -557,9 +497,7 @@ async def chat(
             # Extract the PII-safe version.
             guardrail_metadata = guardrail_result.metadata or {}
 
-            sanitized_message = guardrail_metadata.get(
-                "sanitized_message"
-            )
+            sanitized_message = guardrail_metadata.get("sanitized_message")
 
             if not isinstance(sanitized_message, str):
                 sanitized_message = body.message
@@ -570,10 +508,7 @@ async def chat(
             )
 
             logger.info(
-                "Input guardrails passed "
-                "request_id=%s "
-                "pii_detected=%s "
-                "pii_types=%s",
+                "Input guardrails passed request_id=%s pii_detected=%s pii_types=%s",
                 request_id,
                 pii_metadata.get("contains_pii", False),
                 pii_metadata.get("pii_types", []),
@@ -591,9 +526,7 @@ async def chat(
             await db_session.commit()
 
             logger.info(
-                "Customer message saved "
-                "request_id=%s "
-                "conversation_id=%s",
+                "Customer message saved request_id=%s conversation_id=%s",
                 request_id,
                 session_id,
             )
@@ -604,35 +537,16 @@ async def chat(
 
             initial_state = {
                 "message": sanitized_message,
-
-                "conversation_id": str(
-                    session_id
-                ),
-
-                "user_id": str(
-                    user_id
-                ),
-
+                "conversation_id": str(session_id),
+                "user_id": str(user_id),
                 "user_role": user_role,
-
-                "customer_id": str(
-                    customer_id
-                ),
-
+                "customer_id": str(customer_id),
                 "conversation_history": history,
-
-                "conversation_context": (
-                    conversation_context
-                ),
-
+                "conversation_context": (conversation_context),
                 "errors": [],
-
                 "iteration": 0,
-
                 "max_iterations": 2,
-
                 "replan_required": False,
-
                 "sufficient_evidence": False,
             }
 
@@ -647,16 +561,12 @@ async def chat(
             )
 
             if support_graph is None:
-
                 logger.error(
-                    "LangGraph support graph is not initialized "
-                    "request_id=%s",
+                    "LangGraph support graph is not initialized request_id=%s",
                     request_id,
                 )
 
-                raise RuntimeError(
-                    "LangGraph support graph has not been initialized."
-                )
+                raise RuntimeError("LangGraph support graph has not been initialized.")
 
             # =================================================
             # THREAD ID
@@ -671,9 +581,7 @@ async def chat(
             #
             # =================================================
 
-            thread_id = str(
-                session_id
-            )
+            thread_id = str(session_id)
 
             logger.info(
                 "Starting support workflow "
@@ -699,28 +607,14 @@ async def chat(
                 "callbacks": [
                     langfuse_handler,
                 ],
-
                 "configurable": {
                     "thread_id": thread_id,
                 },
-
                 "metadata": {
-                    "langfuse_user_id": str(
-                        user_id
-                    ),
-
-                    "langfuse_session_id": (
-                        thread_id
-                    ),
-
-                    "conversation_id": (
-                        thread_id
-                    ),
-
-                    "customer_id": str(
-                        customer_id
-                    ),
-
+                    "langfuse_user_id": str(user_id),
+                    "langfuse_session_id": (thread_id),
+                    "conversation_id": (thread_id),
+                    "customer_id": str(customer_id),
                     "langfuse_tags": [
                         "enterprise-support",
                         "langgraph",
@@ -739,14 +633,42 @@ async def chat(
                 customer_id=str(customer_id),
                 request_id=request_id,
             ) as chat_span:
-
                 # =============================================
                 # EXECUTE LANGGRAPH
                 # =============================================
 
+                workflow_start = time.perf_counter()
                 result = await support_graph.ainvoke(
                     initial_state,
                     config=config,
+                )
+                # =============================================
+                # REQUEST-LEVEL SLO METRICS
+                # =============================================
+
+                request_latency_ms = (time.perf_counter() - workflow_start) * 1000
+
+                slo_evaluator = SLOEvaluator()
+
+                request_metrics = slo_evaluator.build_request_metrics(
+                    result,
+                    latency_ms=request_latency_ms,
+                )
+
+                logger.info(
+                    "SLO request metrics "
+                    "request_id=%s "
+                    "latency_ms=%.2f "
+                    "intent=%s "
+                    "route=%s "
+                    "severity=%s "
+                    "escalation_required=%s",
+                    request_id,
+                    request_metrics["latency_ms"],
+                    request_metrics["intent"],
+                    request_metrics["route"],
+                    request_metrics["severity"],
+                    request_metrics["escalation_required"],
                 )
 
                 # =============================================
@@ -755,60 +677,46 @@ async def chat(
 
                 chat_span.update(
                     output={
-                        "response": result.get(
-                            "response"
-                        ),
+                        "response": result.get("response"),
                     },
-
                     metadata={
                         "request_id": request_id,
-
-                        "user_id": str(
-                            user_id
-                        ),
-
-                        "customer_id": str(
-                            customer_id
-                        ),
-
+                        "user_id": str(user_id),
+                        "customer_id": str(customer_id),
                         "user_role": user_role,
-
                         "conversation_id": thread_id,
-
                         "thread_id": thread_id,
-
-                        "intent": result.get(
-                            "intent"
-                        ),
-
-                        "route": result.get(
-                            "route"
-                        ),
-
-                        "severity": result.get(
-                            "severity"
-                        ),
-
+                        "intent": result.get("intent"),
+                        "route": result.get("route"),
+                        "severity": result.get("severity"),
                         "escalation_required": (
                             result.get(
                                 "escalation_required",
                                 False,
                             )
                         ),
-
-                        "current_node": result.get(
-                            "current_node"
-                        ),
-
+                        "current_node": result.get("current_node"),
                         "iteration": result.get(
                             "iteration",
                             0,
                         ),
-
                         "mcp_tool_calls": result.get(
                             "mcp_tool_calls",
                             [],
                         ),
+                        "slo_latency_ms": request_metrics["latency_ms"],
+                        "slo_intent_confidence": request_metrics["intent_confidence"],
+                        "slo_retrieval_confidence": request_metrics[
+                            "retrieval_confidence"
+                        ],
+                        "slo_sql_confidence": request_metrics["sql_confidence"],
+                        "slo_severity_confidence": request_metrics[
+                            "severity_confidence"
+                        ],
+                        "slo_status": request_metrics["status"],
+                        "slo_escalation_required": request_metrics[
+                            "escalation_required"
+                        ],
                     },
                 )
 
@@ -848,20 +756,15 @@ async def chat(
                 result.get("response")
                 or result.get("generated_answer")
                 or result.get("message")
-                or (
-                    "I’m sorry, but I could not "
-                    "generate a resolution."
-                )
+                or ("I’m sorry, but I could not generate a resolution.")
             )
 
             # =================================================
             # FINAL OUTPUT GUARDRAILS
             # =================================================
 
-            response_guardrail_result = (
-                guardrails_service.validate_output(
-                    response_message
-                )
+            response_guardrail_result = guardrails_service.validate_output(
+                response_message
             )
 
             if not response_guardrail_result.allowed:
@@ -883,28 +786,21 @@ async def chat(
                     "may need to review this request."
                 )
             else:
-                response_message, _ = (
-                    guardrails_service.sanitize_output(
-                        response_message
-                    )
+                response_message, _ = guardrails_service.sanitize_output(
+                    response_message
                 )
 
             # =================================================
             # SAVE AI MESSAGE
             # =================================================
 
-            ticket_id = result.get(
-                "ticket_id"
-            )
+            ticket_id = result.get("ticket_id")
 
             ticket_uuid: UUID | None = None
 
             if ticket_id:
-
                 try:
-                    ticket_uuid = UUID(
-                        str(ticket_id)
-                    )
+                    ticket_uuid = UUID(str(ticket_id))
 
                 except ValueError:
                     ticket_uuid = None
@@ -916,39 +812,23 @@ async def chat(
                 ticket_id=ticket_uuid,
                 metadata={
                     "request_id": request_id,
-
-                    "intent": result.get(
-                        "intent"
-                    ),
-
-                    "route": result.get(
-                        "route"
-                    ),
-
-                    "severity": result.get(
-                        "severity"
-                    ),
-
+                    "intent": result.get("intent"),
+                    "route": result.get("route"),
+                    "severity": result.get("severity"),
                     "escalation_required": (
                         result.get(
                             "escalation_required",
                             False,
                         )
                     ),
-
-                    "langgraph_thread_id": (
-                        thread_id
-                    ),
+                    "langgraph_thread_id": (thread_id),
                 },
             )
 
             await db_session.commit()
 
             logger.info(
-                "AI response saved "
-                "request_id=%s "
-                "conversation_id=%s "
-                "ticket_id=%s",
+                "AI response saved request_id=%s conversation_id=%s ticket_id=%s",
                 request_id,
                 thread_id,
                 ticket_id,
@@ -960,165 +840,95 @@ async def chat(
 
             return ChatResponse(
                 message=response_message,
-
-                conversation_id=str(
-                    session_id
-                ),
-
+                conversation_id=str(session_id),
                 # Intent
-                intent=result.get(
-                    "intent"
-                ),
-
+                intent=result.get("intent"),
                 intent_confidence=result.get(
                     "intent_confidence",
                     0.0,
                 ),
-
-                intent_reason=result.get(
-                    "intent_reason"
-                ),
-
+                intent_reason=result.get("intent_reason"),
                 # Routing
-                route=result.get(
-                    "route"
-                ),
-
+                route=result.get("route"),
                 # RAG
                 retrieval_confidence=result.get(
                     "retrieval_confidence",
                     0.0,
                 ),
-
                 sufficient_evidence=result.get(
                     "sufficient_evidence",
                     False,
                 ),
-
                 retrieval_results=result.get(
                     "retrieval_results",
                     [],
                 ),
-
                 # SQL
-                sql_query=result.get(
-                    "sql_query"
-                ),
-
+                sql_query=result.get("sql_query"),
                 sql_rows=result.get(
                     "sql_rows",
                     [],
                 ),
-
                 sql_confidence=result.get(
                     "sql_confidence",
                     0.0,
                 ),
-
                 sql_success=result.get(
                     "sql_success",
                     False,
                 ),
-
                 # Hybrid
                 hybrid_results=result.get(
                     "hybrid_results",
                     [],
                 ),
-
                 hybrid_confidence=result.get(
                     "hybrid_confidence",
                     0.0,
                 ),
-
                 # Incident / MCP
                 incident_active=result.get(
                     "incident_active",
                     False,
                 ),
-
-                incident_status=result.get(
-                    "incident_status"
-                ),
-
-                incident_code=result.get(
-                    "incident_code"
-                ),
-
-                incident_severity=result.get(
-                    "incident_severity"
-                ),
-
+                incident_status=result.get("incident_status"),
+                incident_code=result.get("incident_code"),
+                incident_severity=result.get("incident_severity"),
                 mcp_tool_calls=result.get(
                     "mcp_tool_calls",
                     [],
                 ),
-
                 # Severity
-                severity=result.get(
-                    "severity"
-                ),
-
+                severity=result.get("severity"),
                 severity_confidence=result.get(
                     "severity_confidence",
                     0.0,
                 ),
-
-                severity_reason=result.get(
-                    "severity_reason"
-                ),
-
+                severity_reason=result.get("severity_reason"),
                 # Escalation
                 escalation_required=result.get(
                     "escalation_required",
                     False,
                 ),
-
-                escalation_reason=result.get(
-                    "escalation_reason"
-                ),
-
-                escalation_priority=result.get(
-                    "escalation_priority"
-                ),
-
-                escalation_type=result.get(
-                    "escalation_type"
-                ),
-
-                escalation_reference_id=result.get(
-                    "escalation_reference_id"
-                ),
-
+                escalation_reason=result.get("escalation_reason"),
+                escalation_priority=result.get("escalation_priority"),
+                escalation_type=result.get("escalation_type"),
+                escalation_reference_id=result.get("escalation_reference_id"),
                 # Human handoff
-                handoff_context=result.get(
-                    "handoff_context"
-                ),
-
+                handoff_context=result.get("handoff_context"),
                 human_handoff_required=result.get(
                     "human_handoff_required",
                     False,
                 ),
-
-                handoff_summary=result.get(
-                    "handoff_summary"
-                ),
-
+                handoff_summary=result.get("handoff_summary"),
                 # Resolution
-                recommended_action=result.get(
-                    "recommended_action"
-                ),
-
+                recommended_action=result.get("recommended_action"),
                 # Workflow
                 iteration=result.get(
                     "iteration",
                     0,
                 ),
-
-                current_node=result.get(
-                    "current_node"
-                ),
-
+                current_node=result.get("current_node"),
                 # Errors
                 errors=result.get(
                     "errors",
@@ -1130,9 +940,7 @@ async def chat(
             await db_session.rollback()
 
             logger.warning(
-                "Chat request failed with HTTP error "
-                "request_id=%s "
-                "conversation_id=%s",
+                "Chat request failed with HTTP error request_id=%s conversation_id=%s",
                 request_id,
                 session_id,
             )
@@ -1143,10 +951,7 @@ async def chat(
             await db_session.rollback()
 
             logger.exception(
-                "Support workflow failed "
-                "request_id=%s "
-                "conversation_id=%s "
-                "error=%s",
+                "Support workflow failed request_id=%s conversation_id=%s error=%s",
                 request_id,
                 session_id,
                 str(exc),
@@ -1154,18 +959,10 @@ async def chat(
 
             return ChatResponse(
                 message=(
-                    "I’m sorry, but I was unable "
-                    "to complete the support "
-                    "investigation."
+                    "I’m sorry, but I was unable to complete the support investigation."
                 ),
-                conversation_id=(
-                    str(session_id)
-                    if session_id is not None
-                    else None
-                ),
-                errors=[
-                    f"Support workflow failed: {exc}"
-                ],
+                conversation_id=(str(session_id) if session_id is not None else None),
+                errors=[f"Support workflow failed: {exc}"],
             )
 
     # ========================================================
@@ -1173,14 +970,11 @@ async def chat(
     # ========================================================
 
     logger.error(
-        "Unable to initialize database session "
-        "request_id=%s",
+        "Unable to initialize database session request_id=%s",
         request_id,
     )
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=(
-            "Unable to initialize database session."
-        ),
+        detail=("Unable to initialize database session."),
     )

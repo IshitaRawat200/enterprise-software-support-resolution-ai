@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from typing import Any
 
-from app.agents.severity.severity_assessment_prompt import (
-    SEVERITY_ASSESSMENT_SYSTEM_PROMPT,
-    build_severity_prompt,
-)
+from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from app.agents.severity.severity_assessment_schema import (
     SeverityAssessmentResult,
 )
 from app.llm.gateway import get_llm
-from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
+from app.llm.static_prompts.severity_prompt import (
+    SEVERITY_SYSTEM_PROMPT,
+    build_severity_prompt,
+)
 
 load_dotenv()
 
@@ -97,10 +97,7 @@ class SeverityAssessmentAgent:
                 "success": False,
                 "severity": "medium",
                 "confidence": 0.0,
-                "reason": (
-                    "Severity assessment requires "
-                    "a customer message."
-                ),
+                "reason": ("Severity assessment requires a customer message."),
                 "escalation_recommended": False,
                 "escalation_reason": None,
             }
@@ -142,8 +139,7 @@ class SeverityAssessmentAgent:
                     ),
                     "escalation_recommended": True,
                     "escalation_reason": (
-                        "Critical security incident "
-                        "requires human escalation."
+                        "Critical security incident requires human escalation."
                     ),
                 }
 
@@ -151,10 +147,7 @@ class SeverityAssessmentAgent:
         # VALIDATED PRODUCTION INCIDENT
         # ========================================================
 
-        if (
-            incident_active
-            and incident_affects_production
-        ):
+        if incident_active and incident_affects_production:
             return {
                 "success": True,
                 "severity": "critical",
@@ -166,8 +159,7 @@ class SeverityAssessmentAgent:
                 ),
                 "escalation_recommended": True,
                 "escalation_reason": (
-                    "Active production incident requires "
-                    "human escalation."
+                    "Active production incident requires human escalation."
                 ),
             }
 
@@ -205,8 +197,7 @@ class SeverityAssessmentAgent:
                     ),
                     "escalation_recommended": True,
                     "escalation_reason": (
-                        "Major production outage requires "
-                        "human escalation."
+                        "Major production outage requires human escalation."
                     ),
                 }
 
@@ -223,18 +214,10 @@ class SeverityAssessmentAgent:
             sql_confidence=sql_confidence,
             conversation_context=conversation_context,
             incident_active=incident_active,
-            incident_affects_production=(
-                incident_affects_production
-            ),
-            incident_unresolved_critical_alert=(
-                incident_unresolved_critical_alert
-            ),
-            incident_security_related=(
-                incident_security_related
-            ),
-            incident_data_loss_reported=(
-                incident_data_loss_reported
-            ),
+            incident_affects_production=incident_affects_production,
+            incident_unresolved_critical_alert=(incident_unresolved_critical_alert),
+            incident_security_related=(incident_security_related),
+            incident_data_loss_reported=(incident_data_loss_reported),
         )
 
         # ========================================================
@@ -246,7 +229,7 @@ class SeverityAssessmentAgent:
                 [
                     SystemMessage(
                         content=(
-                            SEVERITY_ASSESSMENT_SYSTEM_PROMPT
+                            SEVERITY_SYSTEM_PROMPT
                             + """
 
 Return ONLY valid JSON.
@@ -264,9 +247,7 @@ Use exactly these fields:
 """
                         )
                     ),
-                    HumanMessage(
-                        content=prompt
-                    ),
+                    HumanMessage(content=prompt),
                 ]
             )
 
@@ -284,11 +265,7 @@ Use exactly these fields:
                 result,
                 dict,
             ):
-                assessment = (
-                    SeverityAssessmentResult.model_validate(
-                        result
-                    )
-                )
+                assessment = SeverityAssessmentResult.model_validate(result)
 
             else:
                 raw_content = getattr(
@@ -298,28 +275,17 @@ Use exactly these fields:
                 )
 
                 if not raw_content:
-                    raise ValueError(
-                        "Severity model returned no content."
-                    )
+                    raise ValueError("Severity model returned no content.")
 
                 if isinstance(
                     raw_content,
                     list,
                 ):
-                    raw_content = "".join(
-                        str(item)
-                        for item in raw_content
-                    )
+                    raw_content = "".join(str(item) for item in raw_content)
 
-                parsed = json.loads(
-                    str(raw_content)
-                )
+                parsed = json.loads(str(raw_content))
 
-                assessment = (
-                    SeverityAssessmentResult.model_validate(
-                        parsed
-                    )
-                )
+                assessment = SeverityAssessmentResult.model_validate(parsed)
 
             # ====================================================
             # FINAL SAFETY RULES
@@ -327,26 +293,17 @@ Use exactly these fields:
 
             severity = assessment.severity
 
-            escalation_recommended = (
-                assessment.escalation_recommended
-            )
+            escalation_recommended = assessment.escalation_recommended
 
-            escalation_reason = (
-                assessment.escalation_reason
-            )
+            escalation_reason = assessment.escalation_reason
 
             if severity == "critical":
-
                 escalation_recommended = True
 
                 if not escalation_reason:
-                    escalation_reason = (
-                        "Critical severity requires "
-                        "human escalation."
-                    )
+                    escalation_reason = "Critical severity requires human escalation."
 
             elif severity == "high":
-
                 escalation_recommended = True
 
                 if not escalation_reason:
@@ -392,9 +349,7 @@ Use exactly these fields:
                     "success": True,
                     "severity": "medium",
                     "confidence": min(
-                        float(
-                            assessment.confidence
-                        ),
+                        float(assessment.confidence),
                         0.95,
                     ),
                     "reason": (
@@ -411,26 +366,18 @@ Use exactly these fields:
             return {
                 "success": True,
                 "severity": severity,
-                "confidence": float(
-                    assessment.confidence
-                ),
+                "confidence": float(assessment.confidence),
                 "reason": assessment.reason,
-                "escalation_recommended": (
-                    escalation_recommended
-                ),
-                "escalation_reason": (
-                    escalation_reason
-                ),
+                "escalation_recommended": (escalation_recommended),
+                "escalation_reason": (escalation_reason),
             }
 
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return {
                 "success": False,
                 "severity": "medium",
                 "confidence": 0.0,
-                "reason": (
-                    f"Severity assessment failed: {exc}"
-                ),
+                "reason": (f"Severity assessment failed: {exc}"),
                 "escalation_recommended": False,
                 "escalation_reason": None,
             }

@@ -19,39 +19,32 @@ async def mcp_get_live_service_status(
 
     if service_name is None:
         logger.warning(
-            "MCP live status check requested without "
-            "an external dependency name."
+            "MCP live status check requested without an external dependency name."
         )
 
         return {
             "success": False,
             "source": "external_status_service",
             "service_name": None,
-            "error": (
-                "External dependency name is required."
-            ),
+            "error": ("External dependency name is required."),
         }
 
     service_name = service_name.strip().lower()
 
     if not service_name:
         logger.warning(
-            "MCP live status check requested with "
-            "an empty external dependency name."
+            "MCP live status check requested with an empty external dependency name."
         )
 
         return {
             "success": False,
             "source": "external_status_service",
             "service_name": None,
-            "error": (
-                "External dependency name is required."
-            ),
+            "error": ("External dependency name is required."),
         }
 
     logger.info(
-        "MCP live status check requested. "
-        "dependency=%s",
+        "MCP live status check requested. dependency=%s",
         service_name,
     )
 

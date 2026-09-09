@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.sql.sql_validator import (
@@ -22,31 +23,19 @@ class SQLExecutor:
 
         self.session = session
 
-        self.validator = (
-            SQLValidator()
-        )
+        self.validator = SQLValidator()
 
     async def execute(
         self,
         sql: str,
     ) -> dict[str, Any]:
 
-        validated_sql = (
-            self.validator.validate(
-                sql
-            )
-        )
+        validated_sql = self.validator.validate(sql)
 
         try:
+            result = await self.session.execute(text(validated_sql))
 
-            result = await self.session.execute(
-                text(validated_sql)
-            )
-
-            rows = [
-                dict(row)
-                for row in result.mappings().all()
-            ]
+            rows = [dict(row) for row in result.mappings().all()]
 
             return {
                 "success": True,
@@ -56,8 +45,7 @@ class SQLExecutor:
                 "error": None,
             }
 
-        except Exception as exc:
-
+        except SQLAlchemyError as exc:
             return {
                 "success": False,
                 "sql": validated_sql,

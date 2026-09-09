@@ -4,11 +4,12 @@ import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.rag.services.db_rag_ingestion_service import DBRAGIngestionService
 from app.database.connection import get_db_session
 from app.guardrails.rbac import require_admin
+from app.rag.services.db_rag_ingestion_service import DBRAGIngestionService
 
 router = APIRouter(
     prefix="/knowledge-base",
@@ -32,11 +33,16 @@ ALLOWED_CONTENT_TYPES = {
     "text/markdown",
 }
 
+# Module-level dependency/file objects to avoid calling these factories
+# in argument defaults (satisfies ruff B008).
+upload_file_dep = File(...)
+require_admin_dep = Depends(require_admin)
+
 
 @router.post("/upload")
 async def upload_knowledge_document(
-    file: UploadFile = File(...),
-    current_user=Depends(require_admin),
+    file: UploadFile = upload_file_dep,
+    current_user=require_admin_dep,
 ):
     """
     Upload a knowledge-base document and ingest it into Supabase.
@@ -83,7 +89,6 @@ async def upload_knowledge_document(
             delete=False,
             suffix=extension,
         ) as temporary_file:
-
             temporary_path = Path(temporary_file.name)
 
             shutil.copyfileobj(
@@ -93,7 +98,6 @@ async def upload_knowledge_document(
 
         # Use the existing DB-backed ingestion pipeline.
         async for session in get_db_session():
-
             service = DBRAGIngestionService(session)
 
             result = await service.ingest_file(
@@ -113,7 +117,7 @@ async def upload_knowledge_document(
             detail=str(exc),
         ) from exc
 
-    except Exception as exc:
+    except (RuntimeError, OSError, SQLAlchemyError) as exc:
         raise HTTPException(
             status_code=500,
             detail=f"Knowledge document ingestion failed: {exc}",

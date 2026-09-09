@@ -38,7 +38,6 @@ class EscalationManagerAgent:
         Escalation manager uses deterministic guardrails.
         No LLM initialization is required.
         """
-        pass
 
     async def run(
         self,
@@ -75,24 +74,17 @@ class EscalationManagerAgent:
                 "escalation_required": False,
                 "priority": None,
                 "escalation_type": None,
-                "reason": (
-                    "Escalation assessment requires "
-                    "a customer message."
-                ),
+                "reason": ("Escalation assessment requires a customer message."),
                 "human_handoff_required": False,
                 "handoff_summary": None,
                 "handoff_reference_id": None,
                 "handoff_context": None,
-                "recommended_action": (
-                    "Request a valid customer message."
-                ),
+                "recommended_action": ("Request a valid customer message."),
             }
 
         message = message.strip()
 
-        normalized_severity = (
-            severity.strip().lower()
-        )
+        normalized_severity = severity.strip().lower()
 
         normalized_message = message.lower()
 
@@ -133,102 +125,65 @@ class EscalationManagerAgent:
             faithfulness=faithfulness,
             relevance=relevance,
             confidence=confidence,
-            no_chunks=(
-                route == "rag"
-                and not retrieval_results
-            ),
+            no_chunks=(route == "rag" and not retrieval_results),
             production_incident=production_incident,
             security_incident=security_incident,
         )
 
         if guardrail_result["trigger"]:
+            priority = guardrail_result.get("priority")
 
-            priority = guardrail_result.get(
-                "priority"
-            )
-
-            escalation_type = (
-                guardrail_result.get(
-                    "escalation_type"
-                )
-            )
+            escalation_type = guardrail_result.get("escalation_type")
 
             reason = (
                 escalation_reason
-                or guardrail_result.get(
-                    "reason"
-                )
+                or guardrail_result.get("reason")
                 or "Human intervention required."
             )
 
             recommended_action = (
-                "Escalate to human support "
-                "for investigation and resolution."
+                "Escalate to human support for investigation and resolution."
             )
 
             # ----------------------------------------------------
             # Build complete handoff context
             # ----------------------------------------------------
 
-            handoff_context = (
-                HandoffContextService.build_context(
-                    message=message,
-                    intent=intent,
-                    route=route,
-                    severity=normalized_severity,
-                    severity_confidence=(
-                        severity_confidence
-                    ),
-                    escalation_reason=reason,
-                    escalation_priority=priority,
-                    escalation_type=escalation_type,
-                    conversation_id=conversation_id,
-                    customer_id=customer_id,
-                    generated_answer=generated_answer,
-                    retrieval_results=(
-                        retrieval_results
-                    ),
-                    sql_query=sql_query,
-                    sql_rows=sql_rows,
-                    sql_confidence=sql_confidence,
-                    faithfulness=faithfulness,
-                    relevance=relevance,
-                    confidence=confidence,
-                    conversation_flow=(
-                        conversation_flow
-                    ),
-                    investigation_summary=(
-                        investigation_summary
-                    ),
-                    recommended_action=(
-                        recommended_action
-                    ),
-                )
+            handoff_context = HandoffContextService.build_context(
+                message=message,
+                intent=intent,
+                route=route,
+                severity=normalized_severity,
+                severity_confidence=(severity_confidence),
+                escalation_reason=reason,
+                escalation_priority=priority,
+                escalation_type=escalation_type,
+                conversation_id=conversation_id,
+                customer_id=customer_id,
+                generated_answer=generated_answer,
+                retrieval_results=(retrieval_results),
+                sql_query=sql_query,
+                sql_rows=sql_rows,
+                sql_confidence=sql_confidence,
+                faithfulness=faithfulness,
+                relevance=relevance,
+                confidence=confidence,
+                conversation_flow=(conversation_flow),
+                investigation_summary=(investigation_summary),
+                recommended_action=(recommended_action),
             )
 
             return {
                 "success": True,
                 "escalation_required": True,
                 "priority": priority,
-                "escalation_type": (
-                    escalation_type
-                ),
+                "escalation_type": (escalation_type),
                 "reason": reason,
                 "human_handoff_required": True,
-                "handoff_summary": (
-                    f"Customer reports: {message}"
-                ),
-                "handoff_reference_id": (
-                    handoff_context[
-                        "reference_id"
-                    ]
-                ),
-                "handoff_context": (
-                    handoff_context
-                ),
-                "recommended_action": (
-                    recommended_action
-                ),
+                "handoff_summary": (f"Customer reports: {message}"),
+                "handoff_reference_id": (handoff_context["reference_id"]),
+                "handoff_context": (handoff_context),
+                "recommended_action": (recommended_action),
             }
 
         # ========================================================
@@ -240,15 +195,10 @@ class EscalationManagerAgent:
             "escalation_required": False,
             "priority": None,
             "escalation_type": None,
-            "reason": (
-                "No human escalation criteria "
-                "were detected."
-            ),
+            "reason": ("No human escalation criteria were detected."),
             "human_handoff_required": False,
             "handoff_summary": None,
             "handoff_reference_id": None,
             "handoff_context": None,
-            "recommended_action": (
-                "Continue automated resolution."
-            ),
+            "recommended_action": ("Continue automated resolution."),
         }

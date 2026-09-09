@@ -5,19 +5,20 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, String, Text, text
-from sqlalchemy.dialects.postgresql import ENUM, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .customer import Customer
-    from .ticket_message import TicketMessage
-    from .conversation import ConversationHistory
-    from .memory import MemoryFact
-    from .escalation import Escalation
-    from .audit import AuditEvent
     from .agent_state import AgentState
+    from .audit import AuditEvent
+    from .conversation import ConversationHistory
+    from .customer import Customer
+    from .escalation import Escalation
+    from .memory import MemoryFact
+    from .ticket_message import TicketMessage
 
 
 user_role_enum = ENUM(
@@ -74,38 +75,38 @@ class User(Base):
         server_default=text("now()"),
     )
 
-    customer: Mapped["Customer | None"] = relationship(
+    customer: Mapped[Customer | None] = relationship(
         "Customer",
         back_populates="user",
         uselist=False,
     )
 
-    ticket_messages: Mapped[list["TicketMessage"]] = relationship(
+    ticket_messages: Mapped[list[TicketMessage]] = relationship(
         "TicketMessage",
         back_populates="sender_user",
     )
 
-    conversation_history: Mapped[list["ConversationHistory"]] = relationship(
+    conversation_history: Mapped[list[ConversationHistory]] = relationship(
         "ConversationHistory",
         back_populates="user",
     )
 
-    memory_facts: Mapped[list["MemoryFact"]] = relationship(
+    memory_facts: Mapped[list[MemoryFact]] = relationship(
         "MemoryFact",
         back_populates="user",
     )
 
-    escalations: Mapped[list["Escalation"]] = relationship(
+    escalations: Mapped[list[Escalation]] = relationship(
         "Escalation",
         back_populates="support_agent",
     )
 
-    audit_events: Mapped[list["AuditEvent"]] = relationship(
+    audit_events: Mapped[list[AuditEvent]] = relationship(
         "AuditEvent",
         back_populates="user",
     )
 
-    agent_states: Mapped[list["AgentState"]] = relationship(
+    agent_states: Mapped[list[AgentState]] = relationship(
         "AgentState",
         back_populates="user",
     )

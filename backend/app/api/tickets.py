@@ -22,11 +22,15 @@ from app.schemas.ticket import (
 )
 from app.services.ticket_service import TicketService
 
-
 router = APIRouter(
     prefix="/tickets",
     tags=["Tickets"],
 )
+
+# Module-level dependency objects to avoid calling Depends() in
+# argument defaults (satisfies ruff B008).
+require_customer_dep = Depends(require_customer)
+get_db_session_dep = Depends(get_db_session)
 
 
 async def get_current_customer(
@@ -35,9 +39,7 @@ async def get_current_customer(
 ):
     customer_repository = CustomerRepository(session)
 
-    customer = await customer_repository.get_by_user_id(
-        current_user.id
-    )
+    customer = await customer_repository.get_by_user_id(current_user.id)
 
     if customer is None:
         raise HTTPException(
@@ -55,8 +57,8 @@ async def get_current_customer(
 )
 async def create_ticket(
     request: TicketCreateRequest,
-    current_user: User = Depends(require_customer),
-    session: AsyncSession = Depends(get_db_session),
+    current_user: User = require_customer_dep,
+    session: AsyncSession = get_db_session_dep,
 ) -> TicketResponse:
     customer = await get_current_customer(
         current_user,
@@ -81,8 +83,8 @@ async def create_ticket(
     response_model=list[TicketResponse],
 )
 async def list_my_tickets(
-    current_user: User = Depends(require_customer),
-    session: AsyncSession = Depends(get_db_session),
+    current_user: User = require_customer_dep,
+    session: AsyncSession = get_db_session_dep,
 ) -> list[TicketResponse]:
     customer = await get_current_customer(
         current_user,
@@ -95,10 +97,7 @@ async def list_my_tickets(
         customer_id=customer.id,
     )
 
-    return [
-        TicketResponse.model_validate(ticket)
-        for ticket in tickets
-    ]
+    return [TicketResponse.model_validate(ticket) for ticket in tickets]
 
 
 @router.get(
@@ -107,8 +106,8 @@ async def list_my_tickets(
 )
 async def get_my_ticket(
     ticket_id: UUID,
-    current_user: User = Depends(require_customer),
-    session: AsyncSession = Depends(get_db_session),
+    current_user: User = require_customer_dep,
+    session: AsyncSession = get_db_session_dep,
 ) -> TicketResponse:
     customer = await get_current_customer(
         current_user,
@@ -144,8 +143,8 @@ async def get_my_ticket(
 async def add_ticket_message(
     ticket_id: UUID,
     request: TicketMessageCreateRequest,
-    current_user: User = Depends(require_customer),
-    session: AsyncSession = Depends(get_db_session),
+    current_user: User = require_customer_dep,
+    session: AsyncSession = get_db_session_dep,
 ) -> TicketMessageResponse:
     customer = await get_current_customer(
         current_user,

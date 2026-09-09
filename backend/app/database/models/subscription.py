@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
@@ -83,7 +84,7 @@ class Subscription(Base):
         server_default=text("now()"),
     )
 
-    customer: Mapped["Customer"] = relationship(
+    customer: Mapped[Customer] = relationship(
         "Customer",
         back_populates="subscriptions",
     )

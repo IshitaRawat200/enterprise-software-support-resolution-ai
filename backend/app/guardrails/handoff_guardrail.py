@@ -108,11 +108,7 @@ def evaluate_resolution_quality(
             "reason": "retrieval returned no context",
         }
 
-    if (
-        faithfulness is None
-        or relevance is None
-        or confidence is None
-    ):
+    if faithfulness is None or relevance is None or confidence is None:
         return {
             "trigger": True,
             "reason": "evaluation scores unavailable",
@@ -121,28 +117,19 @@ def evaluate_resolution_quality(
     if faithfulness < FAITHFULNESS_THRESHOLD:
         return {
             "trigger": True,
-            "reason": (
-                "faithfulness below "
-                f"{FAITHFULNESS_THRESHOLD}"
-            ),
+            "reason": (f"faithfulness below {FAITHFULNESS_THRESHOLD}"),
         }
 
     if relevance < RELEVANCE_THRESHOLD:
         return {
             "trigger": True,
-            "reason": (
-                "answer relevance below "
-                f"{RELEVANCE_THRESHOLD}"
-            ),
+            "reason": (f"answer relevance below {RELEVANCE_THRESHOLD}"),
         }
 
     if confidence < CONFIDENCE_THRESHOLD:
         return {
             "trigger": True,
-            "reason": (
-                "LLM confidence below "
-                f"{CONFIDENCE_THRESHOLD}"
-            ),
+            "reason": (f"LLM confidence below {CONFIDENCE_THRESHOLD}"),
         }
 
     return {
@@ -181,11 +168,7 @@ def evaluate_handoff_conditions(
     7. Existing escalation decision
     """
 
-    normalized_severity = (
-        (severity or "")
-        .strip()
-        .lower()
-    )
+    normalized_severity = (severity or "").strip().lower()
 
     # ------------------------------------------------------------
     # CRITICAL
@@ -195,10 +178,7 @@ def evaluate_handoff_conditions(
         return {
             "trigger": True,
             "priority": "critical",
-            "reason": (
-                "critical severity requires immediate "
-                "human intervention"
-            ),
+            "reason": ("critical severity requires immediate human intervention"),
             "escalation_type": (
                 "production_incident"
                 if production_incident
@@ -227,15 +207,8 @@ def evaluate_handoff_conditions(
     if production_incident:
         return {
             "trigger": True,
-            "priority": (
-                "high"
-                if normalized_severity != "critical"
-                else "critical"
-            ),
-            "reason": (
-                "production incident requires human "
-                "support investigation"
-            ),
+            "priority": ("high" if normalized_severity != "critical" else "critical"),
+            "reason": ("production incident requires human support investigation"),
             "escalation_type": "production_incident",
         }
 
@@ -243,17 +216,14 @@ def evaluate_handoff_conditions(
     # EXPLICIT HUMAN REQUEST
     # ------------------------------------------------------------
 
-    explicit_request = detect_explicit_human_request(
-        message
-    )
+    explicit_request = detect_explicit_human_request(message)
 
     if explicit_request["trigger"]:
         return {
             "trigger": True,
             "priority": (
                 "high"
-                if normalized_severity
-                in {"high", "medium", "low"}
+                if normalized_severity in {"high", "medium", "low"}
                 else "critical"
             ),
             "reason": explicit_request["reason"],
@@ -268,9 +238,7 @@ def evaluate_handoff_conditions(
         return {
             "trigger": True,
             "priority": "high",
-            "reason": (
-                "high severity requires human support review"
-            ),
+            "reason": ("high severity requires human support review"),
             "escalation_type": "business_impact",
         }
 
@@ -287,19 +255,19 @@ def evaluate_handoff_conditions(
 
     # Only apply quality-based escalation when evaluation
     # information was actually supplied.
-    evaluation_was_supplied = any(
-        value is not None
-        for value in (
-            faithfulness,
-            relevance,
-            confidence,
+    evaluation_was_supplied = (
+        any(
+            value is not None
+            for value in (
+                faithfulness,
+                relevance,
+                confidence,
+            )
         )
-    ) or no_chunks
+        or no_chunks
+    )
 
-    if (
-        evaluation_was_supplied
-        and quality_result["trigger"]
-    ):
+    if evaluation_was_supplied and quality_result["trigger"]:
         return {
             "trigger": True,
             "priority": "high",
@@ -314,15 +282,8 @@ def evaluate_handoff_conditions(
     if escalation_required:
         return {
             "trigger": True,
-            "priority": (
-                "high"
-                if normalized_severity != "critical"
-                else "critical"
-            ),
-            "reason": (
-                "Escalation Manager recommended "
-                "human intervention."
-            ),
+            "priority": ("high" if normalized_severity != "critical" else "critical"),
+            "reason": ("Escalation Manager recommended human intervention."),
             "escalation_type": "other",
         }
 

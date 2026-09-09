@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .user import User
     from .ticket import SupportTicket
 
 
@@ -85,13 +85,13 @@ class KnowledgeArticle(Base):
         server_default=text("now()"),
     )
 
-    documents: Mapped[list["Document"]] = relationship(
+    documents: Mapped[list[Document]] = relationship(
         "Document",
         back_populates="knowledge_article",
         cascade="all, delete-orphan",
     )
 
-    article_usage: Mapped[list["KnowledgeArticleUsage"]] = relationship(
+    article_usage: Mapped[list[KnowledgeArticleUsage]] = relationship(
         "KnowledgeArticleUsage",
         back_populates="article",
         cascade="all, delete-orphan",
@@ -163,12 +163,12 @@ class Document(Base):
         server_default=text("now()"),
     )
 
-    knowledge_article: Mapped["KnowledgeArticle | None"] = relationship(
+    knowledge_article: Mapped[KnowledgeArticle | None] = relationship(
         "KnowledgeArticle",
         back_populates="documents",
     )
 
-    chunks: Mapped[list["DocumentChunk"]] = relationship(
+    chunks: Mapped[list[DocumentChunk]] = relationship(
         "DocumentChunk",
         back_populates="document",
         cascade="all, delete-orphan",
@@ -226,7 +226,7 @@ class DocumentChunk(Base):
         server_default=text("now()"),
     )
 
-    document: Mapped["Document"] = relationship(
+    document: Mapped[Document] = relationship(
         "Document",
         back_populates="chunks",
     )
@@ -278,12 +278,12 @@ class KnowledgeArticleUsage(Base):
         server_default=text("now()"),
     )
 
-    article: Mapped["KnowledgeArticle"] = relationship(
+    article: Mapped[KnowledgeArticle] = relationship(
         "KnowledgeArticle",
         back_populates="article_usage",
     )
 
-    ticket: Mapped["SupportTicket | None"] = relationship(
+    ticket: Mapped[SupportTicket | None] = relationship(
         "SupportTicket",
         back_populates="article_usage",
     )

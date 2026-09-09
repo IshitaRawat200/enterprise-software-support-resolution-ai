@@ -22,15 +22,12 @@ class DocumentProcessingService:
         processed_documents: list[Document] = []
 
         for document in documents:
-
             content = document.page_content.strip()
 
             if not content:
                 continue
 
-            metadata = dict(
-                document.metadata
-            )
+            metadata = dict(document.metadata)
 
             metadata.setdefault(
                 "document_name",

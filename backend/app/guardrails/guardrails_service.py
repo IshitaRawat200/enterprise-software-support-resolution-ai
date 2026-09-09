@@ -385,16 +385,12 @@ class GuardrailsService:
         This method is intended to run before LangGraph.
         """
 
-        input_result = self.validate_customer_input(
-            message
-        )
+        input_result = self.validate_customer_input(message)
 
         if not input_result.allowed:
             return input_result
 
-        security_result = self.inspect_security(
-            message
-        )
+        security_result = self.inspect_security(message)
 
         if not security_result.allowed:
             return security_result
@@ -436,18 +432,14 @@ class GuardrailsService:
         the response to the customer.
         """
 
-        response_result = self.validate_response(
-            response
-        )
+        response_result = self.validate_response(response)
 
         if not response_result.allowed:
             return response_result
 
         answer = response.get("answer")
 
-        output_result = self.validate_output(
-            answer
-        )
+        output_result = self.validate_output(answer)
 
         if not output_result.allowed:
             return output_result
