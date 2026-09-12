@@ -57,6 +57,14 @@ def route_after_intent(state: SupportState) -> str:
     if state.get("errors"):
         return "complete"
 
+    if state.get("intent") == "human_handoff":
+        logger.info("ROUTER: INTENT explicit human handoff, routing to SEVERITY")
+        return "severity"
+
+    if state.get("human_handoff_required") or state.get("escalation_required"):
+        logger.info("ROUTER: INTENT explicit human escalation requested, routing to SEVERITY")
+        return "severity"
+
     if state.get("requires_clarification", False):
         return "complete"
 
@@ -68,17 +76,63 @@ def route_after_intent(state: SupportState) -> str:
 # ============================================================
 
 
+def _is_low_risk_rag_request(state: SupportState) -> bool:
+    """
+    Low-risk informational documentation questions can be answered from
+    retrieval evidence without running the expensive severity assessment.
+
+    Keep the strict severity path for active incidents, security concerns,
+    data-loss allegations, or explicit escalation requirements.
+    """
+
+    if (state.get("route") or "").lower() != "rag":
+        return False
+
+    if state.get("human_handoff_required") or state.get("escalation_required"):
+        return False
+
+    if bool(state.get("incident_active", False)):
+        return False
+
+    if bool(state.get("incident_security_related", False)):
+        return False
+
+    if bool(state.get("incident_data_loss_reported", False)):
+        return False
+
+    if bool(state.get("incident_affects_production", False)):
+        return False
+
+    if bool(state.get("incident_unresolved_critical_alert", False)):
+        return False
+
+    if not bool(state.get("sufficient_evidence", False)):
+        return False
+
+    intent = (state.get("intent") or "").lower()
+    if intent not in {"usage_configuration", "integration_api", "performance_latency"}:
+        return False
+
+    severity = (state.get("severity") or "").lower()
+    return severity in {"", "low", "medium"}
+
+
 def route_after_check(state: SupportState) -> str:
     """
-    CHECK always proceeds to REFLECT.
-
-    REFLECT is the central decision point.
+    Safe informational RAG requests bypass the extra reflection step when
+    retrieval evidence is already sufficient.
     """
 
     logger.info(
         "ROUTER: CHECK | errors=%s",
         bool(state.get("errors")),
     )
+
+    if _is_low_risk_rag_request(state):
+        logger.info(
+            "ROUTER: CHECK | low-risk documentation request, routing directly to RESOLVE"
+        )
+        return "resolve"
 
     return "reflect"
 
@@ -132,6 +186,12 @@ def route_after_reflect(state: SupportState) -> str:
     if state.get("errors"):
         logger.warning("ROUTER: REFLECT encountered errors, routing to RESOLVE")
 
+        return "resolve"
+
+    if state.get("human_handoff_required") or state.get("escalation_required"):
+        logger.info(
+            "ROUTER: Explicit human escalation requested, routing to RESOLVE"
+        )
         return "resolve"
 
     # --------------------------------------------------------
@@ -227,7 +287,8 @@ def route_after_replan(state: SupportState) -> str:
 
 def route_after_resolve(state: SupportState) -> str:
     """
-    RESOLVE → SEVERITY
+    Informational low-risk RAG answers complete immediately after resolution.
+    Risky or incident-driven workflows still receive a severity assessment.
     """
 
     logger.info(
@@ -236,6 +297,12 @@ def route_after_resolve(state: SupportState) -> str:
     )
 
     if state.get("errors"):
+        return "complete"
+
+    if _is_low_risk_rag_request(state):
+        logger.info(
+            "ROUTER: RESOLVE | low-risk documentation answer, skipping severity escalation"
+        )
         return "complete"
 
     return "severity"

@@ -331,6 +331,20 @@ async def resolve_node(
         # RECOMMENDED ACTION
         # ========================================================
 
+        low_risk_rag_response = (
+            (state.get("route") or "").lower() == "rag"
+            and (state.get("intent") or "").lower()
+            in {"usage_configuration", "integration_api", "performance_latency"}
+            and bool(state.get("sufficient_evidence", False))
+            and not bool(state.get("incident_active", False))
+            and not bool(state.get("incident_security_related", False))
+            and not bool(state.get("incident_data_loss_reported", False))
+            and not bool(state.get("incident_affects_production", False))
+            and not bool(state.get("incident_unresolved_critical_alert", False))
+            and not bool(state.get("escalation_required", False))
+            and not bool(state.get("human_handoff_required", False))
+        )
+
         recommended_action = (
             "Escalate to human support."
             if state.get(
@@ -348,6 +362,16 @@ async def resolve_node(
             "current_node": "resolve",
             "response": answer,
             "recommended_action": (recommended_action),
+            "severity": "low" if low_risk_rag_response else state.get("severity"),
+            "severity_confidence": 0.0 if low_risk_rag_response else state.get("severity_confidence", 0.0),
+            "severity_reason": (
+                "Low-risk informational documentation request; default severity is low."
+                if low_risk_rag_response
+                else state.get("severity_reason")
+            ),
+            "escalation_required": False if low_risk_rag_response else state.get("escalation_required", False),
+            "escalation_reason": None if low_risk_rag_response else state.get("escalation_reason"),
+            "human_handoff_required": False if low_risk_rag_response else state.get("human_handoff_required", False),
             "errors": [],
         }
 

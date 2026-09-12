@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from time import perf_counter
 from typing import Any
 
 from llama_index.core import (
@@ -17,6 +19,7 @@ from pydantic import PrivateAttr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.observability.logging import logger
 from app.rag.database.rag_database_repository import (
     RAGDatabaseRepository,
 )
@@ -103,6 +106,55 @@ class FusionRetrievalService:
     source of truth.
     """
 
+    _cache_lock: asyncio.Lock = asyncio.Lock()
+    _cached_top_k: int | None = None
+    _cached_vector_index: Any | None = None
+    _cached_vector_retriever: Any | None = None
+    _cached_bm25_retriever: Any | None = None
+    _cached_fusion_retriever: Any | None = None
+
+    @classmethod
+    async def invalidate_cache(
+        cls,
+        reason: str = "knowledge_base_changed",
+    ) -> None:
+        """
+        Clear shared retrieval cache.
+
+        The next retrieval request will rebuild the cached
+        Vector/BM25/RRF artifacts once under the async lock.
+        """
+
+        async with cls._cache_lock:
+            cls._cached_top_k = None
+            cls._cached_vector_index = None
+            cls._cached_vector_retriever = None
+            cls._cached_bm25_retriever = None
+            cls._cached_fusion_retriever = None
+
+        logger.info(
+            "RAG: retrieval cache invalidated reason=%s",
+            reason,
+        )
+
+    @classmethod
+    async def prewarm_cache(
+        cls,
+        session: AsyncSession,
+        similarity_top_k: int,
+    ) -> None:
+        """
+        Build and cache retrieval artifacts ahead of traffic.
+        """
+
+        service = cls(
+            session=session,
+            similarity_top_k=similarity_top_k,
+            minimum_similarity=0.0,
+        )
+
+        await service._build_retrieval_index()
+
     def __init__(
         self,
         session: AsyncSession,
@@ -146,92 +198,135 @@ class FusionRetrievalService:
                 RRF
         """
 
-        chunks = await self.repository.list_chunks()
+        if (
+            self.__class__._cached_top_k == self.similarity_top_k
+            and self.__class__._cached_vector_retriever is not None
+            and self.__class__._cached_bm25_retriever is not None
+            and self.__class__._cached_fusion_retriever is not None
+            and self.__class__._cached_vector_index is not None
+        ):
+            self.vector_index = self.__class__._cached_vector_index
+            self.vector_retriever = self.__class__._cached_vector_retriever
+            self.bm25_retriever = self.__class__._cached_bm25_retriever
+            self.fusion_retriever = self.__class__._cached_fusion_retriever
+            return
 
-        if not chunks:
-            raise ValueError("No knowledge-base chunks are available for retrieval.")
+        async with self.__class__._cache_lock:
+            if (
+                self.__class__._cached_top_k == self.similarity_top_k
+                and self.__class__._cached_vector_retriever is not None
+                and self.__class__._cached_bm25_retriever is not None
+                and self.__class__._cached_fusion_retriever is not None
+                and self.__class__._cached_vector_index is not None
+            ):
+                self.vector_index = self.__class__._cached_vector_index
+                self.vector_retriever = self.__class__._cached_vector_retriever
+                self.bm25_retriever = self.__class__._cached_bm25_retriever
+                self.fusion_retriever = self.__class__._cached_fusion_retriever
+                return
 
-        documents: list[Document] = []
+            build_start = perf_counter()
 
-        for chunk in chunks:
-            content = (chunk.get("content") or "").strip()
+            chunks = await self.repository.list_chunks()
 
-            if not content:
-                continue
+            if not chunks:
+                raise ValueError("No knowledge-base chunks are available for retrieval.")
 
-            metadata = dict(
-                chunk.get(
-                    "metadata",
-                    {},
+            documents: list[Document] = []
+
+            for chunk in chunks:
+                content = (chunk.get("content") or "").strip()
+
+                if not content:
+                    continue
+
+                metadata = dict(
+                    chunk.get(
+                        "metadata",
+                        {},
+                    )
                 )
+
+                documents.append(
+                    Document(
+                        text=content,
+                        metadata=metadata,
+                    )
+                )
+
+            if not documents:
+                raise ValueError("No usable knowledge-base documents were found.")
+
+            # --------------------------------------------------------
+            # Configure local embedding model
+            # --------------------------------------------------------
+
+            Settings.embed_model = RAGLlamaIndexEmbedding()
+
+            # --------------------------------------------------------
+            # Vector index
+            # --------------------------------------------------------
+
+            self.vector_index = VectorStoreIndex.from_documents(documents)
+
+            self.vector_retriever = self.vector_index.as_retriever(
+                similarity_top_k=(self.similarity_top_k)
             )
 
-            documents.append(
-                Document(
-                    text=content,
-                    metadata=metadata,
-                )
+            # --------------------------------------------------------
+            # BM25
+            # --------------------------------------------------------
+
+            nodes = list(self.vector_index.docstore.docs.values())
+
+            if not nodes:
+                raise ValueError("No nodes were created for BM25 retrieval.")
+
+            self.bm25_retriever = BM25Retriever.from_defaults(
+                nodes=nodes,
+                similarity_top_k=(
+                    min(
+                        self.similarity_top_k,
+                        len(nodes),
+                    )
+                ),
             )
 
-        if not documents:
-            raise ValueError("No usable knowledge-base documents were found.")
+            # --------------------------------------------------------
+            # QueryFusionRetriever
+            # --------------------------------------------------------
 
-        # --------------------------------------------------------
-        # Configure local embedding model
-        # --------------------------------------------------------
+            self.fusion_retriever = QueryFusionRetriever(
+                retrievers=[
+                    self.vector_retriever,
+                    self.bm25_retriever,
+                ],
+                llm=self._create_fusion_llm(),
+                similarity_top_k=(
+                    min(
+                        self.similarity_top_k,
+                        len(nodes),
+                    )
+                ),
+                num_queries=1,
+                mode="reciprocal_rerank",
+                use_async=True,
+                verbose=False,
+            )
 
-        Settings.embed_model = RAGLlamaIndexEmbedding()
+            self.__class__._cached_top_k = self.similarity_top_k
+            self.__class__._cached_vector_index = self.vector_index
+            self.__class__._cached_vector_retriever = self.vector_retriever
+            self.__class__._cached_bm25_retriever = self.bm25_retriever
+            self.__class__._cached_fusion_retriever = self.fusion_retriever
 
-        # --------------------------------------------------------
-        # Vector index
-        # --------------------------------------------------------
-
-        self.vector_index = VectorStoreIndex.from_documents(documents)
-
-        self.vector_retriever = self.vector_index.as_retriever(
-            similarity_top_k=(self.similarity_top_k)
-        )
-
-        # --------------------------------------------------------
-        # BM25
-        # --------------------------------------------------------
-
-        nodes = list(self.vector_index.docstore.docs.values())
-
-        if not nodes:
-            raise ValueError("No nodes were created for BM25 retrieval.")
-
-        self.bm25_retriever = BM25Retriever.from_defaults(
-            nodes=nodes,
-            similarity_top_k=(
-                min(
-                    self.similarity_top_k,
-                    len(nodes),
-                )
-            ),
-        )
-
-        # --------------------------------------------------------
-        # QueryFusionRetriever
-        # --------------------------------------------------------
-
-        self.fusion_retriever = QueryFusionRetriever(
-            retrievers=[
-                self.vector_retriever,
-                self.bm25_retriever,
-            ],
-            llm=self._create_fusion_llm(),
-            similarity_top_k=(
-                min(
-                    self.similarity_top_k,
-                    len(nodes),
-                )
-            ),
-            num_queries=1,
-            mode="reciprocal_rerank",
-            use_async=True,
-            verbose=False,
-        )
+            logger.info(
+                "RAG: retrieval index cache built top_k=%s chunks=%s documents=%s build_time_s=%.3f",
+                self.similarity_top_k,
+                len(chunks),
+                len(documents),
+                perf_counter() - build_start,
+            )
 
     # ============================================================
     # FUSION LLM

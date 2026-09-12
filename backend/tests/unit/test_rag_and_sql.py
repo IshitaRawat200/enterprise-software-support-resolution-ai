@@ -83,7 +83,7 @@ def test_sql_service_execute(monkeypatch):
     async def fake_generate(self, question, customer_id=None):
         return FakeGeneration()
 
-    async def fake_execute(self, sql):
+    async def fake_execute(self, sql, parameters=None):
         return {
             "success": True,
             "sql": sql,

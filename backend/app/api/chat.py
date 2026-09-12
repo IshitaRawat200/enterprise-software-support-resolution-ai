@@ -23,6 +23,7 @@ from app.observability.logging import logger
 from app.observability.slo_evaluator import SLOEvaluator
 from app.observability.tracing import support_trace
 from app.services.conversation_service import ConversationService
+from app.services.ticket_service import TicketService
 
 # ============================================================
 # ROUTER
@@ -136,6 +137,9 @@ class ChatResponse(BaseModel):
     escalation_priority: str | None = None
     escalation_type: str | None = None
     escalation_reference_id: str | None = None
+    ticket_id: str | None = None
+    escalation_id: str | None = None
+    ticket_number: str | None = None
 
     # --------------------------------------------------------
     # Human handoff
@@ -186,12 +190,12 @@ def serialize_history(
         serialized.append(
             {
                 "id": str(item.id),
-                "session_id": str(item.session_id),
-                "user_id": str(item.user_id),
+                "session_id": (str(item.session_id) if item.session_id else None),
+                "user_id": (str(item.user_id) if item.user_id else None),
                 "ticket_id": (str(item.ticket_id) if item.ticket_id else None),
                 "role": item.role,
                 "content": item.content,
-                "metadata": (item.metadata or {}),
+                "metadata": (item.metadata_ or {}),
                 "created_at": (
                     item.created_at.isoformat() if item.created_at else None
                 ),
@@ -749,22 +753,185 @@ async def chat(
             )
 
             # =================================================
+            # PERSIST TICKET / ESCALATION
+            # =================================================
+
+            persisted_ticket_id: str | None = None
+            persisted_escalation_id: str | None = None
+            persisted_ticket_number: str | None = None
+            escalation_success = False
+            persistent_escalation_values: dict[str, Any] = {}
+
+            ticket_required = bool(result.get("ticket_required", False))
+            escalate_now = bool(
+                result.get("escalation_required", False)
+                or result.get("human_handoff_required", False)
+                or ticket_required
+            )
+
+            if escalate_now:
+                try:
+                    ticket_service = TicketService(db_session)
+                    persistence = await ticket_service.persist_ticket_and_escalation(
+                        customer_id=customer_id,
+                        message=sanitized_message,
+                        intent=result.get("intent"),
+                        route=result.get("route"),
+                        severity=result.get("severity") or "low",
+                        confidence=result.get("severity_confidence"),
+                        escalation_required=bool(
+                            result.get("escalation_required", False)
+                            or result.get("human_handoff_required", False)
+                        ),
+                        escalation_reason=result.get("escalation_reason"),
+                        ai_investigation_summary=(
+                            result.get("handoff_summary")
+                            or result.get("resolution_reason")
+                            or result.get("recommended_action")
+                        ),
+                        request_id=UUID(str(request_id)),
+                        session_id=session_id,
+                        user_id=user_id,
+                        handoff_context=result.get("handoff_context") or {},
+                        handoff_summary=result.get("handoff_summary"),
+                        recommended_action=result.get("recommended_action"),
+                    )
+
+                    persisted_ticket_id = str(persistence.get("ticket_id"))
+                    persisted_escalation_id = (
+                        str(persistence.get("escalation_id"))
+                        if persistence.get("escalation_id")
+                        else None
+                    )
+                    persisted_ticket_number = str(persistence.get("ticket_number"))
+                    persistent_escalation_values = persistence
+                    escalation_success = True
+
+                    result["ticket_id"] = persisted_ticket_id
+                    result["ticket_number"] = persisted_ticket_number
+                    result["escalation_reference_id"] = persisted_escalation_id
+                    result["escalation_required"] = bool(
+                        result.get("escalation_required", False)
+                        or result.get("human_handoff_required", False)
+                        or persistence.get("escalation_required", False)
+                    )
+                    result["human_handoff_required"] = bool(
+                        result.get("human_handoff_required", False)
+                        or result.get("escalation_required", False)
+                        or persistence.get("escalation_required", False)
+                    )
+                    result["escalation_reason"] = (
+                        persistence.get("escalation_reason")
+                        or result.get("escalation_reason")
+                        or "Customer explicitly requested human support intervention."
+                    )
+                    result["escalation_priority"] = (
+                        persistence.get("escalation_priority")
+                        or result.get("escalation_priority")
+                        or (
+                            "high"
+                            if result.get("human_handoff_required")
+                            or result.get("escalation_required")
+                            else None
+                        )
+                    )
+                    result["escalation_type"] = (
+                        persistence.get("escalation_type")
+                        or result.get("escalation_type")
+                        or "human_requested"
+                    )
+                    result["handoff_context"] = {
+                        **(persistence.get("handoff_context") or result.get("handoff_context") or {}),
+                        "priority": (
+                            persistence.get("escalation_priority")
+                            or result.get("escalation_priority")
+                            or "high"
+                        ),
+                        "type": (
+                            persistence.get("escalation_type")
+                            or result.get("escalation_type")
+                            or "human_requested"
+                        ),
+                        "escalation_type": (
+                            persistence.get("escalation_type")
+                            or result.get("escalation_type")
+                            or "human_requested"
+                        ),
+                    }
+                    result["handoff_summary"] = (
+                        persistence.get("handoff_summary")
+                        or result.get("handoff_summary")
+                    )
+                    result["recommended_action"] = (
+                        persistence.get("recommended_action")
+                        or result.get("recommended_action")
+                    )
+
+                    logger.info(
+                        "Persistent escalation ticket created request_id=%s conversation_id=%s ticket_id=%s escalation_id=%s",
+                        request_id,
+                        session_id,
+                        persisted_ticket_id,
+                        persisted_escalation_id,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    await db_session.rollback()
+                    logger.exception(
+                        "Support ticket/escalation persistence failed request_id=%s conversation_id=%s error=%s",
+                        request_id,
+                        session_id,
+                        str(exc),
+                    )
+                    escalation_success = False
+                    persisted_ticket_id = None
+                    persisted_escalation_id = None
+                    persisted_ticket_number = None
+                    response_message = (
+                        "I’m sorry, but I could not complete your escalation request. "
+                        "Please try again or contact support directly."
+                    )
+                    result["escalation_required"] = False
+                    result["human_handoff_required"] = False
+                    result["recommended_action"] = "Contact support directly."
+
+            # =================================================
             # FINAL ANSWER
             # =================================================
 
-            response_message = (
-                result.get("response")
-                or result.get("generated_answer")
-                or result.get("message")
-                or ("I’m sorry, but I could not generate a resolution.")
-            )
+            if escalation_success and persisted_ticket_number and persisted_ticket_id:
+                priority_value = (
+                    persistent_escalation_values.get("escalation_priority")
+                    or result.get("escalation_priority")
+                    or "medium"
+                )
+                response_message = (
+                    f"Your support request has been escalated to our support team. "
+                    f"Ticket #{persisted_ticket_number} has been created with {priority_value} priority. "
+                    f"Escalation reference: {persisted_escalation_id or persisted_ticket_id}."
+                )
+            else:
+                response_message = (
+                    result.get("response")
+                    or result.get("generated_answer")
+                    or result.get("message")
+                    or "I’m sorry, but I could not generate a resolution."
+                )
 
-            # =================================================
-            # FINAL OUTPUT GUARDRAILS
-            # =================================================
+            logger.info(
+                "Generated AI response before output guardrail: %r",
+                response_message,
+            )
 
             response_guardrail_result = guardrails_service.validate_output(
                 response_message
+            )
+
+            logger.info(
+                "Output guardrail result: allowed=%s code=%s reason=%s metadata=%s",
+                response_guardrail_result.allowed,
+                response_guardrail_result.code,
+                response_guardrail_result.reason,
+                response_guardrail_result.metadata,
             )
 
             if not response_guardrail_result.allowed:
@@ -914,6 +1081,17 @@ async def chat(
                 escalation_priority=result.get("escalation_priority"),
                 escalation_type=result.get("escalation_type"),
                 escalation_reference_id=result.get("escalation_reference_id"),
+                ticket_id=(
+                    str(result.get("ticket_id"))
+                    if result.get("ticket_id")
+                    else None
+                ),
+                escalation_id=(
+                    str(result.get("escalation_reference_id"))
+                    if result.get("escalation_reference_id")
+                    else None
+                ),
+                ticket_number=result.get("ticket_number"),
                 # Human handoff
                 handoff_context=result.get("handoff_context"),
                 human_handoff_required=result.get(

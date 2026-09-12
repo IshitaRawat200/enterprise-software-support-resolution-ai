@@ -46,6 +46,12 @@ class BenchmarkCase:
     expected_resolution: bool | None = None
 
     expected_sql_tables: list[str] | None = None
+    expected_relevant_chunks: list[str] | None = None
+    expected_claims: list[str] | None = None
+    expected_answer_relevance: float | None = None
+    expected_guardrail_action: str | None = None
+    expected_authorization_result: bool | None = None
+    judge_rubric: dict[str, Any] | None = None
 
 
 @dataclass
@@ -77,6 +83,19 @@ class EvaluationResult:
     expected_resolution: bool | None = None
     resolution_correct: bool | None = None
 
+    actual_response: str | None = None
+    retrieval_results: list[dict[str, Any]] | None = None
+    expected_relevant_chunks: list[str] | None = None
+    expected_claims: list[str] | None = None
+    expected_answer_relevance: float | None = None
+    actual_guardrail_action: str | None = None
+    expected_guardrail_action: str | None = None
+    guardrail_correct: bool | None = None
+    actual_authorization_result: bool | None = None
+    expected_authorization_result: bool | None = None
+    authorization_correct: bool | None = None
+
+    judge_score: float | None = None
     sql_correct: bool | None = None
 
     latency_ms: float | None = None
@@ -125,12 +144,15 @@ def load_benchmark_cases(
             raise ValueError(f"Benchmark case {case_id} is missing message.")
 
         expected_sql_tables = raw_case.get("expected_sql_tables")
+        expected_relevant_chunks = raw_case.get("expected_relevant_chunks")
+        expected_claims = raw_case.get("expected_claims")
 
-        if expected_sql_tables is not None and not isinstance(
-            expected_sql_tables,
-            list,
-        ):
+        if expected_sql_tables is not None and not isinstance(expected_sql_tables, list):
             raise TypeError(f"{case_id}: expected_sql_tables must be a list.")
+        if expected_relevant_chunks is not None and not isinstance(expected_relevant_chunks, list):
+            raise TypeError(f"{case_id}: expected_relevant_chunks must be a list.")
+        if expected_claims is not None and not isinstance(expected_claims, list):
+            raise TypeError(f"{case_id}: expected_claims must be a list.")
 
         cases.append(
             BenchmarkCase(
@@ -142,6 +164,12 @@ def load_benchmark_cases(
                 expected_escalation=raw_case.get("expected_escalation"),
                 expected_resolution=raw_case.get("expected_resolution"),
                 expected_sql_tables=(expected_sql_tables),
+                expected_relevant_chunks=(expected_relevant_chunks),
+                expected_claims=(expected_claims),
+                expected_answer_relevance=raw_case.get("expected_answer_relevance"),
+                expected_guardrail_action=raw_case.get("expected_guardrail_action"),
+                expected_authorization_result=raw_case.get("expected_authorization_result"),
+                judge_rubric=raw_case.get("judge_rubric"),
             )
         )
 
@@ -237,54 +265,48 @@ def evaluate_case(
     """
 
     actual_intent = result.get("intent")
-
     actual_route = result.get("route")
-
     actual_severity = result.get("severity")
-
     actual_escalation = result.get("escalation_required")
+    actual_response = result.get("response") or result.get("generated_answer") or result.get("message")
+    retrieval_results = result.get("retrieval_results") or []
+    actual_guardrail_action = result.get("guardrail_action") or result.get("guardrail_decision") or None
+    actual_authorization_result = result.get("authorization_allowed")
+    if actual_authorization_result is None and "authorized" in result:
+        actual_authorization_result = result.get("authorized")
 
-    actual_resolution = result.get("status") in {
-        "resolved",
-        "closed",
-    } and not bool(actual_escalation)
+    actual_resolution = result.get("status") in {"resolved", "closed"} and not bool(actual_escalation)
 
     return EvaluationResult(
         case_id=case.case_id,
         actual_intent=actual_intent,
         expected_intent=case.expected_intent,
-        intent_correct=_compare_string(
-            actual_intent,
-            case.expected_intent,
-        ),
+        intent_correct=_compare_string(actual_intent, case.expected_intent),
         actual_route=actual_route,
         expected_route=case.expected_route,
-        route_correct=_compare_string(
-            actual_route,
-            case.expected_route,
-        ),
+        route_correct=_compare_string(actual_route, case.expected_route),
         actual_severity=actual_severity,
         expected_severity=case.expected_severity,
-        severity_correct=_compare_string(
-            actual_severity,
-            case.expected_severity,
-        ),
+        severity_correct=_compare_string(actual_severity, case.expected_severity),
         actual_escalation=actual_escalation,
         expected_escalation=case.expected_escalation,
-        escalation_correct=_compare_bool(
-            actual_escalation,
-            case.expected_escalation,
-        ),
+        escalation_correct=_compare_bool(actual_escalation, case.expected_escalation),
         actual_resolution=actual_resolution,
         expected_resolution=case.expected_resolution,
-        resolution_correct=_compare_bool(
-            actual_resolution,
-            case.expected_resolution,
-        ),
-        sql_correct=_compare_sql_tables(
-            result,
-            case.expected_sql_tables,
-        ),
+        resolution_correct=_compare_bool(actual_resolution, case.expected_resolution),
+        actual_response=actual_response,
+        retrieval_results=retrieval_results,
+        expected_relevant_chunks=case.expected_relevant_chunks,
+        expected_claims=case.expected_claims,
+        expected_answer_relevance=case.expected_answer_relevance,
+        actual_guardrail_action=actual_guardrail_action,
+        expected_guardrail_action=case.expected_guardrail_action,
+        guardrail_correct=_compare_string(str(actual_guardrail_action or "").lower(), str(case.expected_guardrail_action or "").lower()) if case.expected_guardrail_action is not None else None,
+        actual_authorization_result=actual_authorization_result,
+        expected_authorization_result=case.expected_authorization_result,
+        authorization_correct=_compare_bool(actual_authorization_result, case.expected_authorization_result) if case.expected_authorization_result is not None else None,
+        judge_score=None,
+        sql_correct=_compare_sql_tables(result, case.expected_sql_tables),
         latency_ms=latency_ms,
         cost_usd=cost_usd,
     )
@@ -514,6 +536,13 @@ def build_slo_inputs(
 
     cost_results: list[dict[str, Any]] = []
 
+    route_results: list[dict[str, Any]] = []
+    escalation_results: list[dict[str, Any]] = []
+    retrieval_results: list[dict[str, Any]] = []
+    guardrail_results: list[dict[str, Any]] = []
+    authorization_results: list[dict[str, Any]] = []
+    judge_results: list[dict[str, Any]] = []
+
     for item in evaluation_results:
         if item.error:
             continue
@@ -524,6 +553,22 @@ def build_slo_inputs(
                 "escalation_required": bool(item.actual_escalation),
             }
         )
+
+        if item.actual_route is not None or item.expected_route is not None:
+            route_results.append(
+                {
+                    "actual_route": item.actual_route,
+                    "expected_route": item.expected_route,
+                }
+            )
+
+        if item.expected_escalation is not None or item.actual_escalation is not None:
+            escalation_results.append(
+                {
+                    "expected_escalation": item.expected_escalation,
+                    "actual_escalation": item.actual_escalation,
+                }
+            )
 
         if item.latency_ms is not None:
             latencies_ms.append(float(item.latency_ms))
@@ -542,12 +587,58 @@ def build_slo_inputs(
         if item.cost_usd is not None:
             cost_results.append(SLOEvaluator.build_cost_result(cost_usd=item.cost_usd))
 
+        if item.actual_response is not None or item.expected_claims is not None or item.expected_relevant_chunks is not None:
+            retrieval_results.append(
+                {
+                    "message": item.case_id,
+                    "response": item.actual_response,
+                    "retrieval_results": item.retrieval_results or [],
+                    "expected_claims": item.expected_claims or [],
+                    "expected_relevant_chunks": item.expected_relevant_chunks or [],
+                    "expected_answer_relevance": item.expected_answer_relevance,
+                }
+            )
+
+        if item.expected_guardrail_action is not None or item.actual_guardrail_action is not None:
+            guardrail_results.append(
+                {
+                    "expected_guardrail_action": item.expected_guardrail_action,
+                    "actual_guardrail_action": item.actual_guardrail_action,
+                }
+            )
+
+        if item.expected_authorization_result is not None or item.actual_authorization_result is not None:
+            authorization_results.append(
+                {
+                    "expected_authorization_result": item.expected_authorization_result,
+                    "actual_authorization_result": item.actual_authorization_result,
+                }
+            )
+
+        if item.judge_score is not None or item.expected_answer_relevance is not None or item.actual_response is not None:
+            judge_results.append(
+                {
+                    "judge_score": item.judge_score,
+                    "response": item.actual_response,
+                    "source_attribution_rate": None,
+                    "faithfulness_score": None,
+                    "answer_relevance": item.expected_answer_relevance,
+                    "context_precision": None,
+                }
+            )
+
     return {
         "support_results": support_results,
         "latencies_ms": latencies_ms,
         "sql_results": sql_results,
         "severity_results": severity_results,
         "cost_results": cost_results,
+        "route_results": route_results,
+        "escalation_results": escalation_results,
+        "retrieval_results": retrieval_results,
+        "guardrail_results": guardrail_results,
+        "authorization_results": authorization_results,
+        "judge_results": judge_results,
     }
 
 

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .subscription import Subscription
     from .ticket import SupportTicket
     from .user import User
 
@@ -62,6 +62,21 @@ class Customer(Base):
         default="active",
     )
 
+    subscription_tier: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    sla_level: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    renewal_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
     user: Mapped[User] = relationship(
         "User",
         back_populates="customer",
@@ -69,12 +84,6 @@ class Customer(Base):
 
     tickets: Mapped[list[SupportTicket]] = relationship(
         "SupportTicket",
-        back_populates="customer",
-        cascade="all, delete-orphan",
-    )
-
-    subscriptions: Mapped[list[Subscription]] = relationship(
-        "Subscription",
         back_populates="customer",
         cascade="all, delete-orphan",
     )

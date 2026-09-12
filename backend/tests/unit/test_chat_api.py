@@ -105,6 +105,8 @@ def test_chat_response_accepts_workflow_metadata() -> None:
         escalation_required=True,
         escalation_reason=("Production service outage."),
         human_handoff_required=True,
+        ticket_id="11111111-1111-4111-8111-111111111111",
+        escalation_id="22222222-2222-4222-8222-222222222222",
     )
 
     assert response.intent == ("production_incident")
@@ -118,3 +120,6 @@ def test_chat_response_accepts_workflow_metadata() -> None:
     assert response.escalation_reason == ("Production service outage.")
 
     assert response.human_handoff_required is True
+
+    assert response.ticket_id == "11111111-1111-4111-8111-111111111111"
+    assert response.escalation_id == "22222222-2222-4222-8222-222222222222"

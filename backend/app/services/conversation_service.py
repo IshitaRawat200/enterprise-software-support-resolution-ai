@@ -62,3 +62,16 @@ class ConversationService:
             session_id=session_id,
             user_id=user_id,
         )
+
+    async def link_session_to_ticket(
+        self,
+        *,
+        session_id: UUID,
+        user_id: UUID,
+        ticket_id: UUID,
+    ) -> int:
+        return await self.repository.link_session_to_ticket(
+            session_id=session_id,
+            user_id=user_id,
+            ticket_id=ticket_id,
+        )

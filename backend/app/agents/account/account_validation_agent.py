@@ -7,9 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.account.account_validation_schema import (
     AccountValidationResult,
 )
-from app.database.repositories.customers import (
-    CustomerRepository,
-)
+from app.database.repositories.customers import CustomerRepository
 
 
 class AccountValidationAgent:

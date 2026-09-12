@@ -105,16 +105,16 @@ def test_complete_slo_evaluation():
     ]
 
     latencies = [
-        2100,
-        2300,
-        2500,
-        2700,
-        2900,
-        3100,
-        3300,
-        3500,
-        3700,
-        3900,
+        900,
+        1050,
+        1150,
+        1200,
+        1300,
+        1450,
+        1550,
+        1675,
+        1750,
+        1900,
     ]
 
     sql_results = [
@@ -162,11 +162,35 @@ def test_complete_slo_evaluation():
         sql_results=sql_results,
         severity_results=severity_results,
         cost_results=cost_results,
+        route_results=[{"expected_route": "RAG", "actual_route": "RAG"} for _ in range(10)],
+        escalation_results=[
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": True, "actual_escalation": True},
+            {"expected_escalation": True, "actual_escalation": True},
+            {"expected_escalation": False, "actual_escalation": False},
+            {"expected_escalation": False, "actual_escalation": False},
+        ],
+        retrieval_results=[{
+            "message": "How do I reset my password?",
+            "response": "You can reset your password in account settings.",
+            "retrieval_results": [{"content": "password reset instructions"}],
+            "expected_claims": ["You can reset your password in account settings."],
+            "expected_relevant_chunks": ["password reset"],
+            "expected_answer_relevance": 1.0,
+        } for _ in range(10)],
+        guardrail_results=[{"expected_guardrail_action": "allow", "actual_guardrail_action": "allow"} for _ in range(10)],
+        authorization_results=[{"expected_authorization_result": True, "actual_authorization_result": True} for _ in range(10)],
+        judge_results=[{"judge_score": 100.0} for _ in range(10)],
     )
 
     assert report.tsr_percent == 100.0
 
-    assert report.p95_latency_ms <= 6000.0
+    assert report.p95_latency_ms <= 2000.0
 
     assert report.sql_correctness_percent == 100.0
 
@@ -179,6 +203,17 @@ def test_complete_slo_evaluation():
     assert report.sql_correctness_passed is True
     assert report.critical_misclassification_passed is True
     assert report.cost_passed is True
+    assert report.query_routing_accuracy_passed is True
+    assert report.risk_classification_accuracy_passed is True
+    assert report.escalation_recall_passed is True
+    assert report.source_attribution_rate_passed is True
+    assert report.faithfulness_score_passed is True
+    assert report.answer_relevance_passed is True
+    assert report.context_precision_passed is True
+    assert report.context_recall_passed is True
+    assert report.guardrail_effectiveness_passed is True
+    assert report.unauthorized_access_violations_passed is True
+    assert report.llm_judge_score_passed is True
 
     assert report.overall_passed is True
 

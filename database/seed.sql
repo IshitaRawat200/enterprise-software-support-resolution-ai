@@ -51,7 +51,10 @@ INSERT INTO customers (
     contact_name,
     region,
     industry,
-    account_status
+    account_status,
+    subscription_tier,
+    sla_level,
+    renewal_date
 )
 VALUES
 (
@@ -62,7 +65,10 @@ VALUES
     'Aarav Sharma',
     'Asia-Pacific',
     'Technology',
-    'active'
+    'active',
+    'Enterprise',
+    'Priority',
+    '2026-03-01'
 ),
 (
     '20000000-0000-0000-0000-000000000002',
@@ -72,103 +78,12 @@ VALUES
     'Priya Nair',
     'Asia-Pacific',
     'Financial Services',
-    'active'
+    'active',
+    'Premium',
+    'Enhanced',
+    '2025-11-15'
 )
 ON CONFLICT (customer_code) DO NOTHING;
-
-
--- ============================================================
--- SUBSCRIPTIONS
--- ============================================================
-
-INSERT INTO subscriptions (
-    id,
-    customer_id,
-    plan_name,
-    status,
-    start_date,
-    seats,
-    is_premium,
-    entitlements
-)
-VALUES
-(
-    '30000000-0000-0000-0000-000000000001',
-    '20000000-0000-0000-0000-000000000001',
-    'Professional',
-    'active',
-    '2026-01-01',
-    50,
-    FALSE,
-    '{"api_access": true, "support_level": "standard"}'
-),
-(
-    '30000000-0000-0000-0000-000000000002',
-    '20000000-0000-0000-0000-000000000002',
-    'Enterprise Premium',
-    'active',
-    '2026-01-01',
-    500,
-    TRUE,
-    '{"api_access": true, "priority_support": true, "incident_support": true}'
-)
-ON CONFLICT DO NOTHING;
-
-
--- ============================================================
--- KNOWLEDGE ARTICLES
--- ============================================================
-
-INSERT INTO knowledge_articles (
-    id,
-    article_code,
-    title,
-    description,
-    product_name,
-    product_version,
-    source_url,
-    version,
-    published_at,
-    is_active
-)
-VALUES
-(
-    '40000000-0000-0000-0000-000000000001',
-    'KB-API-001',
-    'API Key Rotation Guide',
-    'Instructions for safely rotating an API key.',
-    'Enterprise API Platform',
-    'v3',
-    'https://example.com/docs/api-key-rotation',
-    '3.0',
-    '2026-06-01T00:00:00Z',
-    TRUE
-),
-(
-    '40000000-0000-0000-0000-000000000002',
-    'KB-API-002',
-    'Troubleshooting API 404 Errors',
-    'Troubleshooting steps for API endpoint 404 errors.',
-    'Enterprise API Platform',
-    'v3',
-    'https://example.com/docs/api-404',
-    '3.0',
-    '2026-06-01T00:00:00Z',
-    TRUE
-),
-(
-    '40000000-0000-0000-0000-000000000003',
-    'KB-SEC-001',
-    'API Security Incident Response',
-    'Procedure for suspected API security vulnerabilities.',
-    'Enterprise API Platform',
-    'v3',
-    'https://example.com/docs/security-incident',
-    '3.0',
-    '2026-06-15T00:00:00Z',
-    TRUE
-)
-ON CONFLICT (article_code) DO NOTHING;
 
 
 -- ============================================================
@@ -177,7 +92,6 @@ ON CONFLICT (article_code) DO NOTHING;
 
 INSERT INTO documents (
     id,
-    knowledge_article_id,
     document_name,
     document_type,
     source_url,
@@ -190,7 +104,6 @@ INSERT INTO documents (
 VALUES
 (
     '50000000-0000-0000-0000-000000000001',
-    '40000000-0000-0000-0000-000000000001',
     'API Key Rotation Guide',
     'documentation',
     'https://example.com/docs/api-key-rotation',
@@ -202,7 +115,6 @@ VALUES
 ),
 (
     '50000000-0000-0000-0000-000000000002',
-    '40000000-0000-0000-0000-000000000002',
     'Troubleshooting API 404 Errors',
     'troubleshooting',
     'https://example.com/docs/api-404',
@@ -214,7 +126,6 @@ VALUES
 ),
 (
     '50000000-0000-0000-0000-000000000003',
-    '40000000-0000-0000-0000-000000000003',
     'API Security Incident Response',
     'security',
     'https://example.com/docs/security-incident',
@@ -435,35 +346,42 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================
--- KNOWLEDGE ARTICLE USAGE
+-- KNOWLEDGE ARTICLE USAGE (NIIT STRUCTURED REGISTRY)
 -- ============================================================
 
-INSERT INTO knowlege_article_usage (
-    id,
-    article_id,
-    user_id,
-    ticket_id,
-    query,
-    usage_type
+INSERT INTO knowledge_article_usage (
+    article_title,
+    product_version,
+    category,
+    last_updated,
+    known_issue_flag,
+    internal_confidence_score
 )
 VALUES
 (
-    '82000000-0000-0000-0000-000000000001',
-    '40000000-0000-0000-0000-000000000001',
-    '10000000-0000-0000-0000-000000000001',
-    '80000000-0000-0000-0000-000000000001',
-    'How do I rotate my API key?',
-    'rag_retrieval'
+    'API Authentication Troubleshooting',
+    'v3.2',
+    'API',
+    '2025-02-10',
+    FALSE,
+    0.94
 ),
 (
-    '82000000-0000-0000-0000-000000000002',
-    '40000000-0000-0000-0000-000000000002',
-    '10000000-0000-0000-0000-000000000002',
-    '80000000-0000-0000-0000-000000000002',
-    'Our premium customer API integration is failing.',
-    'hybrid_retrieval'
-)
-ON CONFLICT DO NOTHING;
+    'Resolving High Latency in EU Region',
+    'v3.0',
+    'Performance',
+    '2025-01-25',
+    TRUE,
+    0.88
+),
+(
+    'Handling Security Alert Notifications',
+    'v3.2',
+    'Security',
+    '2025-02-15',
+    FALSE,
+    0.97
+);
 
 
 -- ============================================================

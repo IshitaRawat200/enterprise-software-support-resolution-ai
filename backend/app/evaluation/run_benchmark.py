@@ -8,6 +8,8 @@ from typing import Any
 
 from fastapi import FastAPI
 
+from app.database.connection import get_db_session
+from app.database.repositories.evaluation_runs import EvaluationRunRepository
 from app.evaluation.langfuse_slo import (
     publish_p95_to_langfuse,
 )
@@ -79,6 +81,35 @@ def save_report(
         )
 
     return REPORT_PATH
+
+
+async def _store_evaluation_run(
+    *,
+    report: dict[str, Any],
+    total_cases: int,
+) -> None:
+    async for db_session in get_db_session():
+        repository = EvaluationRunRepository(db_session)
+
+        await repository.create_run(
+            status="completed",
+            total_cases=total_cases,
+            report=report,
+        )
+
+        await db_session.commit()
+        break
+
+
+def _should_persist_evaluation_run(
+    evaluation_results,
+    *,
+    expected_case_count: int,
+) -> bool:
+    if len(evaluation_results) != expected_case_count:
+        return False
+
+    return all(result.error is None for result in evaluation_results)
 
 
 # ============================================================
@@ -200,6 +231,19 @@ async def run_benchmark() -> None:
         report["p95_langfuse"] = p95_result
 
         report_path = save_report(report)
+
+        if _should_persist_evaluation_run(
+            evaluation_results,
+            expected_case_count=len(cases),
+        ):
+            await _store_evaluation_run(
+                report=report,
+                total_cases=len(evaluation_results),
+            )
+        else:
+            print(
+                "Evaluation run was not persisted because it was incomplete or contained case errors.",
+            )
 
         print_report(report)
 

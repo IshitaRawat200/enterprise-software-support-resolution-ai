@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -26,6 +28,8 @@ class SQLGenerationResult(BaseModel):
         ge=0.0,
         le=1.0,
     )
+
+    parameters: list[Any] | None = None
 
 
 class SQLExecutionResult(BaseModel):

@@ -577,6 +577,56 @@ def test_password_leakage_is_blocked():
     assert result.code == "SECRET_LEAKAGE"
 
 
+def test_default_password_documentation_is_allowed():
+    result = validate_output_text("Default administrator password: changeme")
+
+    assert result.allowed is True
+
+
+def test_default_password_documentation_in_markdown_is_allowed():
+    result = validate_output_text("* Password: `changeme` (must be changed on first login)")
+
+    assert result.allowed is True
+
+
+def test_placeholder_password_is_allowed():
+    result = validate_output_text("Password: <your-password>")
+
+    assert result.allowed is True
+
+
+def test_placeholder_password_in_markdown_is_allowed():
+    result = validate_output_text("Password: `<your-password>`")
+
+    assert result.allowed is True
+
+
+def test_example_password_is_allowed():
+    result = validate_output_text("Password: example123")
+
+    assert result.allowed is True
+
+
+def test_example_password_in_markdown_is_allowed():
+    result = validate_output_text("Password: `example123`")
+
+    assert result.allowed is True
+
+
+def test_realistic_password_assignment_is_blocked():
+    result = validate_output_text("Password: S3cur3P@ssw0rd!2026")
+
+    assert result.allowed is False
+    assert result.code == "SECRET_LEAKAGE"
+
+
+def test_realistic_password_assignment_in_markdown_is_blocked():
+    result = validate_output_text("Password: `S3cur3P@ssw0rd!2026`")
+
+    assert result.allowed is False
+    assert result.code == "SECRET_LEAKAGE"
+
+
 def test_internal_system_prompt_is_blocked():
     result = validate_output_text(
         "SYSTEM PROMPT: You are an internal enterprise agent."
@@ -837,7 +887,7 @@ def test_explicit_human_request_is_detected():
     result = detect_explicit_human_request("Please speak to a human.")
 
     assert result["trigger"] is True
-    assert result["reason"] == "explicit user request"
+    assert result["reason"] == "Customer explicitly requested human support intervention."
 
 
 def test_normal_message_does_not_trigger_human_request():

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.guardrails.handoff_guardrail import detect_explicit_human_request
 from app.orchestrator.state import SupportState
 from app.services.intent_service import IntentService
 
@@ -196,6 +197,38 @@ async def intent_node(
         )
         or ""
     ).strip()
+
+    explicit_human_request = detect_explicit_human_request(message)
+
+    if explicit_human_request["trigger"]:
+        # The current workflow does not have a dedicated handoff route.
+        # The incident branch is the existing escalation-oriented path for
+        # support operations, so we route explicit human requests there while
+        # preserving the explicit handoff flags for persistence and API output.
+        return {
+            "intent": "human_handoff",
+            "intent_confidence": 1.0,
+            "intent_reason": explicit_human_request["reason"],
+            "requires_clarification": False,
+            "suggested_route": "incident",
+            "route": "incident",
+            "initial_action": "escalate_to_human_support",
+            "route_was_corrected": False,
+            "route_reason": (
+                "Explicit human-request guardrail overrides normal intent "
+                "classification and routes to human escalation."
+            ),
+            "llm_usage": [],
+            "human_handoff_required": True,
+            "escalation_required": True,
+            "escalation_priority": "high",
+            "escalation_type": "human_requested",
+            "escalation_reason": explicit_human_request["reason"],
+            "handoff_summary": "Customer explicitly requested a human support agent.",
+            "recommended_action": "Escalate to a human support agent.",
+            "current_node": "intent",
+            "errors": [],
+        }
 
     try:
         # ====================================================

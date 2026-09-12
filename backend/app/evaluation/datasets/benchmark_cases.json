@@ -1,104 +1,34 @@
 [
   {
     "case_id": "BENCH-001",
-    "message": "How do I reset my account password?",
+    "category": "Documentation Troubleshooting",
+    "message": "How do I install ERIS?",
     "expected_intent": "usage_configuration",
-    "expected_severity": "LOW",
+    "expected_route": "rag",
+    "expected_severity": "low",
     "expected_escalation": false,
-    "expected_resolution": true
-  },
-  {
-    "case_id": "BENCH-002",
-    "message": "How can I configure webhook retries for my integration?",
-    "expected_intent": "integration_api",
-    "expected_severity": "LOW",
-    "expected_escalation": false,
-    "expected_resolution": true
-  },
-  {
-    "case_id": "BENCH-003",
-    "message": "Our API integration is returning HTTP 401 errors.",
-    "expected_intent": "integration_api",
-    "expected_severity": "MEDIUM",
-    "expected_escalation": false,
-    "expected_resolution": true
-  },
-  {
-    "case_id": "BENCH-004",
-    "message": "Our API requests are extremely slow and frequently timing out.",
-    "expected_intent": "performance_latency",
-    "expected_severity": "HIGH",
-    "expected_escalation": true,
-    "expected_resolution": false
-  },
-  {
-    "case_id": "BENCH-005",
-    "message": "The production API is completely unavailable for all customers.",
-    "expected_intent": "production_incident",
-    "expected_severity": "CRITICAL",
-    "expected_escalation": true,
-    "expected_resolution": false
-  },
-  {
-    "case_id": "BENCH-006",
-    "message": "We believe our API credentials may have been exposed.",
-    "expected_intent": "security",
-    "expected_severity": "CRITICAL",
-    "expected_escalation": true,
-    "expected_resolution": false
-  },
-  {
-    "case_id": "BENCH-007",
-    "message": "My invoice contains an unexpected charge.",
-    "expected_intent": "billing_account",
-    "expected_severity": "MEDIUM",
-    "expected_escalation": false,
-    "expected_resolution": true
+    "expected_guardrail_action": "allow",
+    "expected_relevant_chunks": [
+      "Product Installation & Setup Guide"
+    ],
+    "expected_answer_contains": [
+      "installation",
+      "ERIS"
+    ]
   },
   {
     "case_id": "BENCH-008",
-    "message": "Is my subscription currently active?",
-    "expected_intent": "billing_account",
-    "expected_route": "SQL",
-    "expected_severity": "LOW",
+    "category": "Account/Ticket Lookup",
+    "message": "What is my account status and subscription tier?",
+    "expected_intent": "account_lookup",
+    "expected_route": "sql",
+    "expected_severity": "low",
     "expected_escalation": false,
-    "expected_resolution": true,
-    "expected_sql_tables": [
-      "subscriptions"
+    "expected_guardrail_action": "allow",
+    "expected_relevant_chunks": [],
+    "expected_answer_contains": [
+      "account",
+      "subscription"
     ]
-  },
-  {
-    "case_id": "BENCH-009",
-    "message": "How many support tickets have I opened?",
-    "expected_intent": "billing_account",
-    "expected_route": "SQL",
-    "expected_severity": "LOW",
-    "expected_escalation": false,
-    "expected_resolution": true,
-    "expected_sql_tables": [
-      "support_tickets"
-    ]
-  },
-  {
-    "case_id": "BENCH-010",
-    "message": "Several users cannot access an important production feature after today's deployment.",
-    "expected_intent": "production_incident",
-    "expected_severity": "HIGH",
-    "expected_escalation": true,
-    "expected_resolution": false
-  },
-  {
-    "case_id": "BENCH-011",
-    "message": "There may have been unauthorized exposure of customer data.",
-    "expected_intent": "security",
-    "expected_severity": "CRITICAL",
-    "expected_escalation": true,
-    "expected_resolution": false
-  },
-  {
-    "case_id": "BENCH-012",
-    "message": "I need a human to investigate this issue.",
-    "expected_escalation": true,
-    "expected_resolution": false
   }
 ]

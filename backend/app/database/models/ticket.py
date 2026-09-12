@@ -11,13 +11,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .agent_state import AgentState
     from .audit import AuditEvent
     from .conversation import ConversationHistory
     from .customer import Customer
     from .escalation import Escalation
-    from .knowledge import KnowledgeArticleUsage
-    from .ticket_message import TicketMessage
 
 
 ticket_status_enum = ENUM(
@@ -118,21 +115,10 @@ class SupportTicket(Base):
         back_populates="tickets",
     )
 
-    messages: Mapped[list[TicketMessage]] = relationship(
-        "TicketMessage",
-        back_populates="ticket",
-        cascade="all, delete-orphan",
-    )
-
-    article_usage: Mapped[list[KnowledgeArticleUsage]] = relationship(
-        "KnowledgeArticleUsage",
-        back_populates="ticket",
-        cascade="all, delete-orphan",
-    )
-
     conversation_history: Mapped[list[ConversationHistory]] = relationship(
         "ConversationHistory",
         back_populates="ticket",
+        cascade="all, delete-orphan",
     )
 
     escalation: Mapped[Escalation | None] = relationship(
@@ -146,7 +132,6 @@ class SupportTicket(Base):
         back_populates="ticket",
     )
 
-    agent_states: Mapped[list[AgentState]] = relationship(
-        "AgentState",
-        back_populates="ticket",
-    )
+    @property
+    def messages(self) -> list[ConversationHistory]:
+        return self.conversation_history

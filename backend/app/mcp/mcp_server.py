@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
+# MCP package versions differ between environments:
+# - v1 exposes FastMCP under mcp.server.fastmcp
+# - v2 exposes MCPServer from mcp.server (or mcp.server.mcpserver)
+# Support all of them without changing the workflow logic.
+try:
+    from mcp.server import MCPServer
+except ImportError:  # pragma: no cover
+    try:
+        from mcp.server.mcpserver import MCPServer
+    except ImportError:  # pragma: no cover
+        from mcp.server.fastmcp import FastMCP as MCPServer
 
 from app.mcp.tools.mcp_account_tool import (
     mcp_validate_customer_account as account_tool,

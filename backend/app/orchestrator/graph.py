@@ -19,7 +19,9 @@ from app.orchestrator.nodes.replan_node import replan_node
 from app.orchestrator.nodes.resolve_node import resolve_node
 from app.orchestrator.nodes.severity_node import severity_node
 from app.orchestrator.routing import (
+    route_after_check,
     route_after_reflect,
+    route_after_resolve,
     route_after_severity,
 )
 from app.orchestrator.state import SupportState
@@ -129,6 +131,12 @@ def route_after_intent(
 
     message = (state.get("message") or "").strip()
 
+    if state.get("intent") == "human_handoff":
+        return "severity"
+
+    if state.get("human_handoff_required") or state.get("escalation_required"):
+        return "severity"
+
     if is_simple_conversation(message):
         return "conversation"
 
@@ -140,6 +148,7 @@ builder.add_conditional_edges(
     route_after_intent,
     {
         "conversation": "conversation",
+        "severity": "severity",
         "act": "act",
     },
 )
@@ -164,9 +173,13 @@ builder.add_edge(
     "check",
 )
 
-builder.add_edge(
+builder.add_conditional_edges(
     "check",
-    "reflect",
+    route_after_check,
+    {
+        "resolve": "resolve",
+        "reflect": "reflect",
+    },
 )
 
 
@@ -195,12 +208,16 @@ builder.add_edge(
 
 
 # ============================================================
-# RESOLVE → SEVERITY
+# RESOLVE → SEVERITY / COMPLETE
 # ============================================================
 
-builder.add_edge(
+builder.add_conditional_edges(
     "resolve",
-    "severity",
+    route_after_resolve,
+    {
+        "complete": END,
+        "severity": "severity",
+    },
 )
 
 

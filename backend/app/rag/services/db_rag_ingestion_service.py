@@ -11,6 +11,7 @@ from app.rag.database.rag_database_repository import (
 )
 from app.rag.embeddings import RAGEmbeddingService
 from app.rag.ingestion import RAGDocumentIngestionService
+from app.rag.services.fusion_retrieval_service import FusionRetrievalService
 
 
 class DBRAGIngestionService:
@@ -234,6 +235,16 @@ class DBRAGIngestionService:
             # -------------------------------------------------
 
             await self.session.commit()
+
+            # -------------------------------------------------
+            # Knowledge-base content changed.
+            # Invalidate retrieval cache so the next query
+            # rebuilds vector/BM25/RRF artifacts once.
+            # -------------------------------------------------
+
+            await FusionRetrievalService.invalidate_cache(
+                reason="document_upload_or_ingestion",
+            )
 
         except Exception:
             await self.session.rollback()

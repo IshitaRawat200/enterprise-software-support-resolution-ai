@@ -71,7 +71,7 @@ def detect_explicit_human_request(
         ):
             return {
                 "trigger": True,
-                "reason": "explicit user request",
+                "reason": "Customer explicitly requested human support intervention.",
             }
 
     return {
@@ -226,7 +226,7 @@ def evaluate_handoff_conditions(
                 if normalized_severity in {"high", "medium", "low"}
                 else "critical"
             ),
-            "reason": explicit_request["reason"],
+            "reason": "Customer explicitly requested human support intervention.",
             "escalation_type": "human_requested",
         }
 

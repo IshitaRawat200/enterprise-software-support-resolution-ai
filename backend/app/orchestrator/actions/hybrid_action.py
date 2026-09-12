@@ -4,11 +4,14 @@ from time import perf_counter
 from typing import Any
 
 from app.agents.retrieval.retrieval_agent import RetrievalAgent
+from app.config import get_settings
 from app.database.connection import get_db_session
 from app.hybrid.hybrid_retrieval_service import HybridRetrievalService
 from app.observability.logging import logger
 from app.orchestrator.state import SupportState
 from app.sql.sql_service import SQLService
+
+settings = get_settings()
 
 
 async def run_hybrid(state: SupportState) -> dict[str, Any]:
@@ -29,7 +32,7 @@ async def run_hybrid(state: SupportState) -> dict[str, Any]:
             )
 
             retrieval_agent = RetrievalAgent(
-                similarity_top_k=5,
+                similarity_top_k=settings.rag_final_top_k,
             )
 
             sql_service = SQLService(db_session)

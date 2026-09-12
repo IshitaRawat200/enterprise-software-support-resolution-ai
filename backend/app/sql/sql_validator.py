@@ -28,17 +28,12 @@ class SQLValidator:
     ALLOWED_TABLES: ClassVar[set[str]] = {
         "users",
         "customers",
-        "subscriptions",
         "support_tickets",
-        "ticket_messages",
         "conversation_history",
         "incident_logs",
-        "knowledge_articles",
         "documents",
         "document_chunks",
         "escalations",
-        "memory_facts",
-        "agent_state",
         "audit_events",
         "knowledge_article_usage",
     }

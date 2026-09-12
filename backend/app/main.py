@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -20,7 +21,7 @@ from app.api.tickets import router as tickets_router
 # APPLICATION SERVICES
 # ============================================================
 from app.config import get_settings
-from app.database.connection import check_database_connection
+from app.database.connection import check_database_connection, get_db_session
 
 # ============================================================
 # DATABASE MODEL REGISTRATION
@@ -28,19 +29,59 @@ from app.database.connection import check_database_connection
 #
 # Import the registry before routers or ORM queries are used.
 # The registry imports all SQLAlchemy models so relationship
-# targets such as Customer, Subscription, SupportTicket, etc.
+# targets such as Customer, SupportTicket, etc.
 # are known to SQLAlchemy.
 #
 from app.database.models import registry  # noqa: F401
+from app.evaluation.report_api import router as evaluation_router
 from app.observability.logging import logger
 from app.orchestrator.graph import build_support_graph
 from app.rag.embeddings import get_embedding_model
+from app.rag.services.fusion_retrieval_service import FusionRetrievalService
 
 # ============================================================
 # SETTINGS
 # ============================================================
 
 settings = get_settings()
+
+
+async def _prewarm_retrieval_cache() -> None:
+    """
+    Warm the shared RAG retrieval cache in the background.
+
+    This avoids first-request latency spikes while keeping
+    startup responsive. First concurrent requests remain
+    safe because FusionRetrievalService uses an async lock
+    around cache builds.
+    """
+
+    similarity_top_k = settings.rag_final_top_k
+
+    logger.info(
+        "RAG: background retrieval prewarm started top_k=%s",
+        similarity_top_k,
+    )
+
+    try:
+        async for db_session in get_db_session():
+            await FusionRetrievalService.prewarm_cache(
+                session=db_session,
+                similarity_top_k=similarity_top_k,
+            )
+            break
+
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "RAG: background retrieval prewarm failed: %s",
+            exc,
+        )
+
+    else:
+        logger.info(
+            "RAG: background retrieval prewarm completed top_k=%s",
+            similarity_top_k,
+        )
 
 
 # ============================================================
@@ -137,6 +178,16 @@ async def lifespan(app: FastAPI):
         logger.info("LangGraph: production support graph ready.")
 
         # ----------------------------------------------------
+        # Background prewarm for RAG retrieval cache
+        # ----------------------------------------------------
+
+        prewarm_task = asyncio.create_task(
+            _prewarm_retrieval_cache()
+        )
+
+        app.state.rag_prewarm_task = prewarm_task
+
+        # ----------------------------------------------------
         # Application is ready
         # ----------------------------------------------------
 
@@ -144,6 +195,14 @@ async def lifespan(app: FastAPI):
             yield
 
         finally:
+            if not prewarm_task.done():
+                prewarm_task.cancel()
+
+                try:
+                    await prewarm_task
+                except asyncio.CancelledError:
+                    pass
+
             logger.info("LangGraph: shutting down checkpointer.")
 
             # AsyncPostgresSaver context manager handles the
@@ -191,6 +250,8 @@ app.include_router(tickets_router)
 app.include_router(knowledge_base_router)
 
 app.include_router(chat_router)
+
+app.include_router(evaluation_router)
 
 
 # ============================================================

@@ -65,6 +65,35 @@ INTERNAL_CONTENT_PATTERNS: tuple[str, ...] = (
 )
 
 
+SAFE_PASSWORD_PLACEHOLDERS: set[str] = {
+    "changeme",
+    "<your-password>",
+    "<password>",
+    "example",
+    "example123",
+}
+
+
+def _normalize_password_value(value: str) -> str:
+    normalized = value.strip().strip(",.;")
+
+    # Support markdown/code-style wrappers like `changeme` and quoted examples.
+    for _ in range(2):
+        if (
+            len(normalized) >= 2
+            and normalized[0] == normalized[-1]
+            and normalized[0] in {"`", '"', "'"}
+        ):
+            normalized = normalized[1:-1].strip().strip(",.;")
+
+    return normalized
+
+
+def _is_safe_password_placeholder(value: str) -> bool:
+    normalized_value = _normalize_password_value(value)
+    return normalized_value.lower() in SAFE_PASSWORD_PLACEHOLDERS
+
+
 def _find_secret(
     text: str,
 ) -> tuple[str, str] | None:
@@ -76,6 +105,14 @@ def _find_secret(
         )
 
         if match:
+            if name == "password_assignment":
+                value = match.group(0).split(maxsplit=1)[-1]
+                value = value.split("=", maxsplit=1)[-1]
+                value = value.split(":", maxsplit=1)[-1]
+
+                if _is_safe_password_placeholder(value):
+                    continue
+
             return name, match.group(0)
 
     return None
@@ -102,18 +139,39 @@ def _redact_secrets(
     categories: list[str] = []
 
     for name, pattern in SECRET_PATTERNS:
-        if re.search(
-            pattern,
-            redacted,
-            flags=re.IGNORECASE,
-        ):
-            categories.append(name)
-            redacted = re.sub(
+        matches = list(
+            re.finditer(
                 pattern,
-                "[REDACTED]",
                 redacted,
                 flags=re.IGNORECASE,
             )
+        )
+
+        if not matches:
+            continue
+
+        if name == "password_assignment":
+            unsafe_match_found = False
+
+            for match in matches:
+                value = match.group(0).split(maxsplit=1)[-1]
+                value = value.split("=", maxsplit=1)[-1]
+                value = value.split(":", maxsplit=1)[-1]
+
+                if not _is_safe_password_placeholder(value):
+                    unsafe_match_found = True
+                    break
+
+            if not unsafe_match_found:
+                continue
+
+        categories.append(name)
+        redacted = re.sub(
+            pattern,
+            "[REDACTED]",
+            redacted,
+            flags=re.IGNORECASE,
+        )
 
     return redacted, sorted(set(categories))
 

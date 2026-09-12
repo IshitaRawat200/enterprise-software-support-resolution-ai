@@ -20,7 +20,7 @@ BEGIN
     ) THEN
         CREATE TYPE user_role AS ENUM (
             'customer',
-            'support_agent'
+            'support_agent',
             'admin'
         );
     END IF;
@@ -53,7 +53,8 @@ BEGIN
         CREATE TYPE message_sender AS ENUM (
             'customer',
             'ai',
-            'support_agent'
+            'support_agent',
+            'system'
         );
     END IF;
 
@@ -106,6 +107,10 @@ CREATE TABLE IF NOT EXISTS customers (
 
     account_status VARCHAR(50) NOT NULL DEFAULT 'active',
 
+    subscription_tier VARCHAR(50),
+    sla_level VARCHAR(50),
+    renewal_date DATE,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -113,37 +118,6 @@ CREATE TABLE IF NOT EXISTS customers (
         FOREIGN KEY (user_id)
         REFERENCES users(id)
         ON DELETE SET NULL
-);
-
--- ------------------------------------------------------------
--- SUBSCRIPTIONS
--- ------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    customer_id UUID NOT NULL,
-
-    plan_name VARCHAR(100) NOT NULL,
-
-    status VARCHAR(50) NOT NULL DEFAULT 'active',
-
-    start_date DATE,
-    end_date DATE,
-
-    seats INTEGER,
-
-    is_premium BOOLEAN NOT NULL DEFAULT FALSE,
-
-    entitlements JSONB NOT NULL DEFAULT '{}'::jsonb,
-
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_subscriptions_customer
-        FOREIGN KEY (customer_id)
-        REFERENCES customers(id)
-        ON DELETE CASCADE
 );
 
 -- ------------------------------------------------------------
@@ -194,34 +168,6 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 );
 
 -- ------------------------------------------------------------
--- TICKET MESSAGES
--- ------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS ticket_messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    ticket_id UUID NOT NULL,
-
-    sender_type message_sender NOT NULL,
-
-    sender_user_id UUID,
-
-    message TEXT NOT NULL,
-
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_ticket_messages_ticket
-        FOREIGN KEY (ticket_id)
-        REFERENCES support_tickets(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_ticket_messages_sender
-        FOREIGN KEY (sender_user_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL
-);
-
--- ------------------------------------------------------------
 -- INCIDENT LOGS
 -- ------------------------------------------------------------
 
@@ -258,41 +204,11 @@ CREATE TABLE IF NOT EXISTS incident_logs (
 );
 
 -- ------------------------------------------------------------
--- KNOWLEDGE ARTICLES
--- ------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS knowledge_articles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    article_code VARCHAR(100) NOT NULL UNIQUE,
-
-    title VARCHAR(500) NOT NULL,
-
-    description TEXT,
-
-    product_name VARCHAR(255),
-    product_version VARCHAR(100),
-
-    source_url TEXT,
-
-    version VARCHAR(100),
-
-    published_at TIMESTAMPTZ,
-
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------
 -- DOCUMENTS
 -- ------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    knowledge_article_id UUID,
 
     document_name VARCHAR(500) NOT NULL,
 
@@ -309,12 +225,7 @@ CREATE TABLE IF NOT EXISTS documents (
 
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_documents_article
-        FOREIGN KEY (knowledge_article_id)
-        REFERENCES knowledge_articles(id)
-        ON DELETE SET NULL
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ------------------------------------------------------------
@@ -348,19 +259,40 @@ CREATE TABLE IF NOT EXISTS document_chunks (
 );
 
 -- ------------------------------------------------------------
+-- EVALUATION RUNS
+-- ------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS evaluation_runs (
+    run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    status VARCHAR(50) NOT NULL,
+
+    total_cases INTEGER NOT NULL,
+
+    report JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_evaluation_runs_created_at
+    ON evaluation_runs(created_at DESC);
+
+-- ------------------------------------------------------------
 -- CONVERSATION HISTORY
 -- ------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS conversation_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    session_id UUID NOT NULL,
+    session_id UUID,
 
-    user_id UUID NOT NULL,
+    user_id UUID,
+
+    sender_user_id UUID,
 
     ticket_id UUID,
 
-    role VARCHAR(50) NOT NULL,
+    role message_sender NOT NULL,
 
     content TEXT NOT NULL,
 
@@ -371,78 +303,22 @@ CREATE TABLE IF NOT EXISTS conversation_history (
     CONSTRAINT fk_conversation_user
         FOREIGN KEY (user_id)
         REFERENCES users(id)
-        ON DELETE CASCADE,
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_conversation_sender
+        FOREIGN KEY (sender_user_id)
+        REFERENCES users(id)
+        ON DELETE SET NULL,
 
     CONSTRAINT fk_conversation_ticket
         FOREIGN KEY (ticket_id)
         REFERENCES support_tickets(id)
-        ON DELETE SET NULL
-);
+        ON DELETE SET NULL,
 
--- ------------------------------------------------------------
--- AGENT STATE
--- ------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS agent_state (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    session_id UUID NOT NULL UNIQUE,
-
-    user_id UUID NOT NULL,
-
-    ticket_id UUID,
-
-    state JSONB NOT NULL DEFAULT '{}'::jsonb,
-
-    checkpoint_id VARCHAR(255),
-
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_agent_state_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_agent_state_ticket
-        FOREIGN KEY (ticket_id)
-        REFERENCES support_tickets(id)
-        ON DELETE SET NULL
-);
-
--- ------------------------------------------------------------
--- MEMORY FACTS
--- ------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS memory_facts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-    user_id UUID NOT NULL,
-
-    fact_key VARCHAR(255) NOT NULL,
-    fact_value TEXT NOT NULL,
-
-    source VARCHAR(100),
-
-    confidence NUMERIC(5,4),
-
-    expires_at TIMESTAMPTZ,
-
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT fk_memory_facts_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT chk_memory_confidence
+    CONSTRAINT chk_conversation_anchor
         CHECK (
-            confidence IS NULL
-            OR (
-                confidence >= 0
-                AND confidence <= 1
-            )
+            session_id IS NOT NULL
+            OR ticket_id IS NOT NULL
         )
 );
 
@@ -535,44 +411,25 @@ CREATE TABLE IF NOT EXISTS audit_events (
 -- ------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS knowledge_article_usage (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    article_id SERIAL PRIMARY KEY,
 
-    article_id UUID NOT NULL,
+    article_title VARCHAR(200) NOT NULL,
 
-    user_id UUID,
+    product_version VARCHAR(50),
 
-    ticket_id UUID,
+    category VARCHAR(100),
 
-    query TEXT,
+    last_updated DATE,
 
-    usage_type VARCHAR(100),
+    known_issue_flag BOOLEAN,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    internal_confidence_score FLOAT,
 
-    CONSTRAINT fk_article_usage_article
-        FOREIGN KEY (article_id)
-        REFERENCES knowledge_articles(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_article_usage_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_article_usage_ticket
-        FOREIGN KEY (ticket_id)
-        REFERENCES support_tickets(id)
-        ON DELETE SET NULL
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_article_usage_article
-    ON knowledge_article_usage(article_id);
-
-CREATE INDEX IF NOT EXISTS idx_article_usage_user
-    ON knowledge_article_usage(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_article_usage_ticket
-    ON knowledge_article_usage(ticket_id);
+    ON knowledge_article_usage(article_title);
 
 -- ------------------------------------------------------------
 -- INDEXES
@@ -580,9 +437,6 @@ CREATE INDEX IF NOT EXISTS idx_article_usage_ticket
 
 CREATE INDEX IF NOT EXISTS idx_customers_customer_code
     ON customers(customer_code);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_customer
-    ON subscriptions(customer_id);
 
 CREATE INDEX IF NOT EXISTS idx_support_tickets_customer
     ON support_tickets(customer_id);
@@ -592,9 +446,6 @@ CREATE INDEX IF NOT EXISTS idx_support_tickets_status
 
 CREATE INDEX IF NOT EXISTS idx_support_tickets_severity
     ON support_tickets(severity);
-
-CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket
-    ON ticket_messages(ticket_id);
 
 CREATE INDEX IF NOT EXISTS idx_incident_logs_severity
     ON incident_logs(severity);
@@ -613,6 +464,12 @@ CREATE INDEX IF NOT EXISTS idx_conversation_session
 
 CREATE INDEX IF NOT EXISTS idx_conversation_user
     ON conversation_history(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_ticket
+    ON conversation_history(ticket_id);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_sender
+    ON conversation_history(sender_user_id);
 
 CREATE INDEX IF NOT EXISTS idx_audit_request
     ON audit_events(request_id);

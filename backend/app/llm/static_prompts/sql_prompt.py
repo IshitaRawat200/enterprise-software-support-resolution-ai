@@ -18,27 +18,17 @@ users
 
 customers
 
-subscriptions
-
 support_tickets
-
-ticket_messages
 
 conversation_history
 
 incident_logs
-
-knowledge_articles
 
 documents
 
 document_chunks
 
 escalations
-
-memory_facts
-
-agent_state
 
 audit_events
 
@@ -64,16 +54,9 @@ customers:
     region
     industry
     account_status
-
-subscriptions:
-    id
-    customer_id
-    plan_name
-    status
-    start_date
-    end_date
-    created_at
-    updated_at
+    subscription_tier
+    sla_level
+    renewal_date
 
 support_tickets:
     id
@@ -90,12 +73,15 @@ support_tickets:
     created_at
     updated_at
 
-ticket_messages:
+conversation_history:
     id
-    ticket_id
+    session_id
+    user_id
     sender_user_id
-    sender_type
-    message
+    ticket_id
+    role
+    content
+    metadata
     created_at
 
 incident_logs:
@@ -109,23 +95,8 @@ incident_logs:
     resolved_at
     created_at
 
-knowledge_articles:
-    id
-    article_code
-    title
-    description
-    product_name
-    product_version
-    source_url
-    version
-    published_at
-    is_active
-    created_at
-    updated_at
-
 documents:
     id
-    knowledge_article_id
     document_name
     document_type
     source_url
@@ -154,6 +125,16 @@ escalations:
     status
     created_at
     updated_at
+
+knowledge_article_usage:
+    article_id
+    article_title
+    product_version
+    category
+    last_updated
+    known_issue_flag
+    internal_confidence_score
+    created_at
 """.strip()
 
 

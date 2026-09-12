@@ -12,13 +12,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.connection import Base
 
 if TYPE_CHECKING:
-    from .agent_state import AgentState
     from .audit import AuditEvent
     from .conversation import ConversationHistory
     from .customer import Customer
     from .escalation import Escalation
-    from .memory import MemoryFact
-    from .ticket_message import TicketMessage
 
 
 user_role_enum = ENUM(
@@ -81,19 +78,16 @@ class User(Base):
         uselist=False,
     )
 
-    ticket_messages: Mapped[list[TicketMessage]] = relationship(
-        "TicketMessage",
-        back_populates="sender_user",
-    )
-
     conversation_history: Mapped[list[ConversationHistory]] = relationship(
         "ConversationHistory",
         back_populates="user",
+        foreign_keys="ConversationHistory.user_id",
     )
 
-    memory_facts: Mapped[list[MemoryFact]] = relationship(
-        "MemoryFact",
-        back_populates="user",
+    sent_messages: Mapped[list[ConversationHistory]] = relationship(
+        "ConversationHistory",
+        back_populates="sender_user",
+        foreign_keys="ConversationHistory.sender_user_id",
     )
 
     escalations: Mapped[list[Escalation]] = relationship(
@@ -106,7 +100,6 @@ class User(Base):
         back_populates="user",
     )
 
-    agent_states: Mapped[list[AgentState]] = relationship(
-        "AgentState",
-        back_populates="user",
-    )
+    @property
+    def ticket_messages(self) -> list[ConversationHistory]:
+        return self.sent_messages

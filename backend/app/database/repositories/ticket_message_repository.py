@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models.ticket_message import TicketMessage
+from app.database.models.conversation import ConversationHistory
 
 
 class TicketMessageRepository:
@@ -21,12 +21,15 @@ class TicketMessageRepository:
         sender_type: str,
         sender_user_id: UUID | None,
         message: str,
-    ) -> TicketMessage:
-        ticket_message = TicketMessage(
+    ) -> ConversationHistory:
+        ticket_message = ConversationHistory(
             ticket_id=ticket_id,
-            sender_type=sender_type,
+            session_id=None,
+            user_id=sender_user_id,
             sender_user_id=sender_user_id,
-            message=message,
+            role=sender_type,
+            content=message,
+            metadata_={},
         )
 
         self.session.add(ticket_message)
@@ -37,13 +40,13 @@ class TicketMessageRepository:
     async def list_by_ticket(
         self,
         ticket_id: UUID,
-    ) -> list[TicketMessage]:
+    ) -> list[ConversationHistory]:
         result = await self.session.execute(
-            select(TicketMessage)
+            select(ConversationHistory)
             .where(
-                TicketMessage.ticket_id == ticket_id,
+                ConversationHistory.ticket_id == ticket_id,
             )
-            .order_by(TicketMessage.created_at.asc())
+            .order_by(ConversationHistory.created_at.asc())
         )
 
         return list(result.scalars().all())

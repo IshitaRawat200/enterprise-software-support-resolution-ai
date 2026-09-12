@@ -72,7 +72,6 @@ class RAGDatabaseRepository:
                 """
                 INSERT INTO public.documents (
                     id,
-                    knowledge_article_id,
                     document_name,
                     document_type,
                     source_url,
@@ -85,7 +84,6 @@ class RAGDatabaseRepository:
                 )
                 VALUES (
                     :id,
-                    NULL,
                     :document_name,
                     :document_type,
                     :source_url,
