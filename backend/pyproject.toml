@@ -2,6 +2,7 @@
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+
 [project]
 name = "enterprise-software-support-resolution-ai"
 version = "0.1.0"
@@ -9,46 +10,52 @@ description = "Enterprise Software Support and Resolution Intelligence System"
 requires-python = ">=3.13"
 
 dependencies = [
-    "fastapi",
-    "uvicorn",
-    "pydantic",
-    "pydantic-settings",
-    "python-dotenv",
-    "python-multipart",
+    "fastapi",                              # Web API framework for ERIS REST endpoints.
+    "uvicorn",                             # ASGI server used to run the FastAPI application.
+    "pydantic",                            # Data validation and typed request/response models.
+    "pydantic-settings",                   # Loads and validates application configuration.
+    "python-dotenv",                       # Loads environment variables from .env files.
+    "python-multipart",                    # Supports file uploads and multipart form requests.
 
-    "sqlalchemy",
-    "asyncpg",
-    "psycopg",
-    "pgvector",
+    "sqlalchemy",                           # ORM and database abstraction layer.
+    "asyncpg",                              # Asynchronous PostgreSQL database driver.
+    "psycopg",                              # PostgreSQL driver for database operations.
+    "pgvector",                             # PostgreSQL vector support for embedding storage/search.
 
-    "bcrypt",
-    "PyJWT",
-    "email-validator",
+    "bcrypt",                               # Secure password hashing.
+    "PyJWT",                                # JWT token creation and authentication.
+    "email-validator",                     # Validates email addresses used by user accounts.
 
-    "langgraph",
-    "langchain",
-    "langchain-core",
-    "langchain-community",
-    "langchain-text-splitters",
-    "langchain-openai",
-    "langchain-groq",
+    "langgraph",                            # Orchestrates the ERIS agent workflow and routing.
+    "langgraph-checkpoint-postgres",        # Stores LangGraph checkpoints in PostgreSQL.
+    "langchain",                            # Framework for LLM and agent integrations.
+    "langchain-core",                       # Core LangChain abstractions and interfaces.
+    "langchain-community",                  # Community integrations used by LangChain.
+    "langchain-text-splitters",             # Splits documents into chunks for RAG.  using RecursiveCharacterTextSplitter - recursive character-based chunking strategy
+    "langchain-openai",                     # OpenAI-compatible LLM integration.
+    "langchain-groq",                       # Groq integration for LangChain.
+    "langfuse",                             # LLM tracing, observability, and evaluation.
 
-    "llama-index",
-    "llama-index-core",
-    "llama-index-retrievers-bm25",
-    "llama-index-llms-groq",
+    "llama-index",                          # RAG and document indexing framework.
+    "llama-index-core",                     # Core LlamaIndex components.
+    "llama-index-retrievers-bm25",          # BM25 keyword-based retrieval for hybrid RAG.
+    "llama-index-llms-groq",                # Groq LLM integration for LlamaIndex.
 
-    "pypdf",
-    "beautifulsoup4",
-    "lxml",
+    "pypdf",                                # Extracts text from PDF documents.
+    "beautifulsoup4",                       # Parses HTML/web content during document ingestion.
+    "lxml",                                 # Fast HTML/XML parser used for document processing.
 
-    "sentence-transformers",
-    "einops",
-    "groq",
+    "sentence-transformers==5.1.2",         # Generates embeddings for semantic/vector retrieval.
+    "transformers==4.57.1",                 # Transformer models used by the embedding pipeline.
+    "mcp",                                  # Model Context Protocol support for AI tools.
+    "einops",                               # einops is a supporting dependency for the transformer-based embedding pipeline.
+    "groq",                                 # Groq Python SDK for LLM API access.
 ]
+
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "ruff",
+    "pytest",                               # Testing framework for ERIS.
+    "pytest-asyncio",                       # Supports asynchronous pytest tests.
+    "ruff",                                 # Python linting and code-quality checks.
 ]
