@@ -56,6 +56,41 @@ class ConversationRepository:
 
         return list(result.scalars().all())
 
+    async def list_sessions(
+        self,
+        *,
+        user_id: UUID,
+    ) -> list[dict[str, Any]]:
+        """Return distinct conversation sessions for a user."""
+
+        result = await self.session.execute(
+            select(
+                ConversationHistory.session_id,
+                ConversationHistory.created_at,
+            )
+            .where(
+                ConversationHistory.user_id == user_id,
+                ConversationHistory.session_id.is_not(None),
+            )
+            .order_by(ConversationHistory.created_at.desc())
+        )
+
+        rows = result.all()
+
+        sessions: dict[UUID, Any] = {}
+
+        for row in rows:
+            if row.session_id not in sessions:
+                sessions[row.session_id] = row.created_at
+
+        return [
+            {
+                "session_id": session_id,
+                "created_at": created_at,
+            }
+            for session_id, created_at in sessions.items()
+        ]
+
     async def link_session_to_ticket(
         self,
         *,

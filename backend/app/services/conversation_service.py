@@ -63,6 +63,17 @@ class ConversationService:
             user_id=user_id,
         )
 
+    async def list_sessions(
+        self,
+        *,
+        user_id: UUID,
+    ) -> list[dict[str, Any]]:
+        """Return the user's persisted conversation sessions."""
+
+        return await self.repository.list_sessions(
+            user_id=user_id,
+        )
+
     async def link_session_to_ticket(
         self,
         *,

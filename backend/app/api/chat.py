@@ -170,7 +170,20 @@ class ChatResponse(BaseModel):
         default_factory=list,
     )
 
+class ConversationMessageResponse(BaseModel):
+    id: str
+    role: str
+    content: str
+    created_at: str | None = None
+    ticket_id: str | None = None
 
+
+class ConversationResponse(BaseModel):
+    conversation_id: str
+    created_at: str | None = None
+    messages: list[ConversationMessageResponse] = Field(
+        default_factory=list
+    )
 # ============================================================
 # ORM → DICT
 # ============================================================
@@ -258,6 +271,101 @@ def build_conversation_context(
 
     return "\n".join(lines)
 
+@router.get(
+    "/conversations",
+    response_model=list[ConversationResponse],
+)
+async def list_conversations(
+    current_user: Annotated[
+        Any,
+        Depends(get_current_user),
+    ],
+) -> list[ConversationResponse]:
+    """Return all persisted conversations for the authenticated customer."""
+
+    user_id_value = getattr(current_user, "id", None)
+
+    if user_id_value is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user ID is missing.",
+        )
+
+    try:
+        user_id = (
+            user_id_value
+            if isinstance(user_id_value, UUID)
+            else UUID(str(user_id_value))
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticated user ID.",
+        ) from exc
+
+    async for db_session in get_db_session():
+        try:
+            conversation_service = ConversationService(db_session)
+
+            sessions = await conversation_service.list_sessions(
+                user_id=user_id,
+            )
+
+            conversations: list[ConversationResponse] = []
+
+            for session in sessions:
+                session_id = session["session_id"]
+
+                history = await conversation_service.get_history(
+                    session_id=session_id,
+                    user_id=user_id,
+                )
+
+                messages = [
+                    ConversationMessageResponse(
+                        id=str(item.id),
+                        role=item.role,
+                        content=item.content,
+                        created_at=(
+                            item.created_at.isoformat()
+                            if item.created_at
+                            else None
+                        ),
+                        ticket_id=(
+                            str(item.ticket_id)
+                            if item.ticket_id
+                            else None
+                        ),
+                    )
+                    for item in history
+                ]
+
+                conversations.append(
+                    ConversationResponse(
+                        conversation_id=str(session_id),
+                        created_at=(
+                            session["created_at"].isoformat()
+                            if session["created_at"]
+                            else None
+                        ),
+                        messages=messages,
+                    )
+                )
+
+            return conversations
+
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Failed to list conversations "
+                "user_id=%s error=%s",
+                user_id,
+                str(exc),
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to load conversations.",
+            ) from exc
 
 # ============================================================
 # CHAT

@@ -20,23 +20,23 @@ require_customer_dep = Depends(require_customer)
 get_db_session_dep = Depends(get_db_session)
 
 
-@router.get(
-    "/me",
-    response_model=CustomerProfileResponse,
-)
-async def get_my_customer_profile(
-    current_user: User = require_customer_dep,
-    session: AsyncSession = get_db_session_dep,
-) -> CustomerProfileResponse:
+# @router.get(
+#     "/me",
+#     response_model=CustomerProfileResponse,
+# )
+# async def get_my_customer_profile(
+#     current_user: User = require_customer_dep,
+#     session: AsyncSession = get_db_session_dep,
+# ) -> CustomerProfileResponse:
 
-    repository = CustomerRepository(session)
+#     repository = CustomerRepository(session)
 
-    customer = await repository.get_by_user_id(current_user.id)
+#     customer = await repository.get_by_user_id(current_user.id)
 
-    if customer is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Customer profile not found.",
-        )
+#     if customer is None:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="Customer profile not found.",
+#         )
 
-    return CustomerProfileResponse.model_validate(customer)
+#     return CustomerProfileResponse.model_validate(customer)

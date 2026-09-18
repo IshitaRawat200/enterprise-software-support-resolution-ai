@@ -89,12 +89,12 @@ async def login(
     )
 
 
-@router.get(
-    "/me",
-    response_model=UserResponse,
-)
-async def get_me(
-    current_user: User = get_current_user_dep,
-) -> UserResponse:
+# @router.get(
+#     "/me",
+#     response_model=UserResponse,
+# )
+# async def get_me(
+#     current_user: User = get_current_user_dep,
+# ) -> UserResponse:
 
-    return UserResponse.model_validate(current_user)
+#     return UserResponse.model_validate(current_user)
