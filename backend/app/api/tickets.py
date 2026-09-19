@@ -49,35 +49,6 @@ async def get_current_customer(
 
     return customer
 
-
-@router.post(
-    "",
-    response_model=TicketResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_ticket(
-    request: TicketCreateRequest,
-    current_user: User = require_customer_dep,
-    session: AsyncSession = get_db_session_dep,
-) -> TicketResponse:
-    customer = await get_current_customer(
-        current_user,
-        session,
-    )
-
-    service = TicketService(session)
-
-    ticket = await service.create_customer_ticket(
-        customer_id=customer.id,
-        subject=request.subject,
-        description=request.description,
-        severity=request.severity,
-        request_id=uuid4(),
-    )
-
-    return TicketResponse.model_validate(ticket)
-
-
 @router.get(
     "",
     response_model=list[TicketResponse],
@@ -135,41 +106,3 @@ async def get_my_ticket(
     return TicketResponse.model_validate(ticket)
 
 
-@router.post(
-    "/{ticket_id}/messages",
-    response_model=TicketMessageResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def add_ticket_message(
-    ticket_id: UUID,
-    request: TicketMessageCreateRequest,
-    current_user: User = require_customer_dep,
-    session: AsyncSession = get_db_session_dep,
-) -> TicketMessageResponse:
-    customer = await get_current_customer(
-        current_user,
-        session,
-    )
-
-    service = TicketService(session)
-
-    try:
-        message = await service.add_customer_message(
-            ticket_id=ticket_id,
-            customer_id=customer.id,
-            message=request.message,
-            request_id=uuid4(),
-            user_id=current_user.id,
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except PermissionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        ) from exc
-
-    return TicketMessageResponse.model_validate(message)

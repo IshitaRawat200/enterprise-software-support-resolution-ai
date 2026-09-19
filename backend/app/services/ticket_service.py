@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,9 @@ from app.database.repositories.ticket_repository import TicketRepository
 from app.guardrails.handoff_guardrail import detect_explicit_human_request
 from app.services.conversation_service import ConversationService
 from app.services.escalation_service import EscalationService
+
+if TYPE_CHECKING:
+    from app.database.models.ticket import SupportTicket
 
 
 class TicketService:
@@ -139,6 +143,7 @@ class TicketService:
         )
 
         existing = None
+
         if not explicit_human_handoff:
             existing = await self.find_active_ticket(
                 customer_id=customer_id,
@@ -349,7 +354,10 @@ class TicketService:
         handoff_context = dict(handoff_context or {})
 
         priority = handoff_context.get("priority")
-        escalation_type = handoff_context.get("type") or handoff_context.get(
+
+        escalation_type = handoff_context.get(
+            "type"
+        ) or handoff_context.get(
             "escalation_type"
         )
 
@@ -359,27 +367,60 @@ class TicketService:
         if not escalation_type and escalation_required:
             escalation_type = "human_requested"
 
-        if handoff_context.get("priority") is None and priority is not None:
+        if (
+            handoff_context.get("priority") is None
+            and priority is not None
+        ):
             handoff_context["priority"] = priority
 
-        if handoff_context.get("type") is None and escalation_type is not None:
+        if (
+            handoff_context.get("type") is None
+            and escalation_type is not None
+        ):
             handoff_context["type"] = escalation_type
 
-        if handoff_context.get("escalation_type") is None and escalation_type is not None:
+        if (
+            handoff_context.get("escalation_type") is None
+            and escalation_type is not None
+        ):
             handoff_context["escalation_type"] = escalation_type
 
-        explicit_human_request = detect_explicit_human_request(message)["trigger"]
+        explicit_human_request = detect_explicit_human_request(
+            message
+        )["trigger"]
+
         if (
             escalation_required
             and (
                 explicit_human_request
                 or intent == "human_handoff"
-                or (isinstance(handoff_context, dict) and handoff_context.get("type") == "human_requested")
+                or (
+                    isinstance(handoff_context, dict)
+                    and handoff_context.get("type")
+                    == "human_requested"
+                )
             )
         ):
-            escalation_reason_text = "Customer explicitly requested human support intervention."
+            escalation_reason_text = (
+                "Customer explicitly requested human "
+                "support intervention."
+            )
         else:
-            escalation_reason_text = escalation_reason or "Human intervention required."
+            escalation_reason_text = (
+                escalation_reason
+                or "Human intervention required."
+            )
+
+        # Save the final escalation reason directly
+        # on the support ticket.
+        if escalation_required:
+            await self.tickets.update(
+                ticket,
+                {
+                    "escalation_required": True,
+                    "escalation_reason": escalation_reason_text,
+                },
+            )
 
         escalation_result = {
             "id": None,
@@ -395,10 +436,16 @@ class TicketService:
                 "recommended_action": recommended_action,
                 "context": handoff_context,
                 "customer_id": str(customer_id),
-                "conversation_id": str(session_id) if session_id else None,
+                "conversation_id": (
+                    str(session_id)
+                    if session_id
+                    else None
+                ),
             },
             "investigation_summary": (
-                ai_investigation_summary or handoff_summary or recommended_action
+                ai_investigation_summary
+                or handoff_summary
+                or recommended_action
             ),
         }
 
@@ -409,9 +456,14 @@ class TicketService:
                 reason=escalation_result["reason"],
                 severity=escalation_result["severity"],
                 confidence=confidence,
-                handoff_package=escalation_result["handoff_package"],
-                investigation_summary=escalation_result["investigation_summary"],
+                handoff_package=escalation_result[
+                    "handoff_package"
+                ],
+                investigation_summary=escalation_result[
+                    "investigation_summary"
+                ],
             )
+
             escalation_result["id"] = escalation.id
 
         if session_id is not None and user_id is not None:

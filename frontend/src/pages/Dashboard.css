@@ -573,3 +573,149 @@
   align-items: center;
   justify-content: center;
 }
+.dashboard-recent-tickets {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-ticket-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid #eef2f7;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dashboard-ticket-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-ticket-row:hover {
+  background: #f8fafc;
+}
+
+.dashboard-ticket-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dashboard-ticket-number {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-ticket-main strong {
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-ticket-description {
+  color: #94a3b8;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.dashboard-ticket-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dashboard-ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.dashboard-status-open {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.dashboard-status-progress {
+  background: #fefce8;
+  color: #ca8a04;
+}
+
+.dashboard-status-resolved {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.dashboard-status-closed {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.dashboard-status-default {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.dashboard-severity-critical {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.dashboard-severity-high {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.dashboard-severity-medium {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.dashboard-severity-low {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.dashboard-severity-default {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.dashboard-ticket-date {
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .dashboard-ticket-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-ticket-meta {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-ticket-description {
+    max-width: 100%;
+  }
+}

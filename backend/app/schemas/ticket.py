@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -71,14 +72,23 @@ class TicketResponse(BaseModel):
     id: UUID
     ticket_number: str
     customer_id: UUID
+
+    subject: str
+    description: str
+
     status: TicketStatus
     intent: str | None = None
     route: str | None = None
     severity: TicketSeverity
     confidence: float | None = None
+
     escalation_required: bool
     escalation_reason: str | None = None
     ai_investigation_summary: str | None = None
+
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None = None
 
 
 class TicketListResponse(BaseModel):

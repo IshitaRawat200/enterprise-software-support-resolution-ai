@@ -11,35 +11,12 @@ export interface LoginResponse {
   expires_in: number;
 }
 
-export interface CurrentUser {
-  id: string;
-  email: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export async function login(
   credentials: LoginRequest
 ): Promise<LoginResponse> {
   return apiRequest<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(credentials),
-  });
-}
-
-export async function getCurrentUser(): Promise<CurrentUser> {
-  const token = localStorage.getItem("eris_access_token");
-
-  if (!token) {
-    throw new Error("No authentication token found.");
-  }
-
-  return apiRequest<CurrentUser>("/auth/me", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
   });
 }
 

@@ -1,43 +1,71 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import Chat from "../pages/Chat";
+import Tickets from "../pages/Tickets";
+import TicketDetails from "../pages/TicketDetails";
+import KnowledgeBase from "../pages/KnowledgeBase";
+import Account from "../pages/Account";
 
 function AppRoutes() {
-  const token = localStorage.getItem("eris_access_token");
-
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-          }
-        />
+    <Routes>
+      <Route
+        path="/login"
+        element={<Login />}
+      />
 
-        <Route path="/login" element={<Login />} />
+      <Route
+        path="/dashboard"
+        element={<Dashboard />}
+      />
 
-        <Route
-          path="/dashboard"
-          element={
-            token ? <Dashboard /> : <Navigate to="/login" replace />
-          }
-        />
+      <Route
+        path="/chat"
+        element={<Chat />}
+      />
 
-        <Route
-          path="*"
-          element={<Navigate to="/" replace />}
-        />
+      <Route
+        path="/tickets"
+        element={<Tickets />}
+      />
 
-        <Route
-          path="/chat"
-          element={
-            token ? <Chat /> : <Navigate to="/login" replace />
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+      <Route
+        path="/tickets/:ticketId"
+        element={<TicketDetails />}
+      />
+
+      <Route
+        path="/knowledge-base"
+        element={<KnowledgeBase />}
+      />
+
+      <Route
+        path="/account"
+        element={<Account />}
+      />
+
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to="/dashboard"
+            replace
+          />
+        }
+      />
+
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/dashboard"
+            replace
+          />
+        }
+      />
+    </Routes>
   );
 }
 
