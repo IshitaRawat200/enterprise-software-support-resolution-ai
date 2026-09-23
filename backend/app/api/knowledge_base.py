@@ -324,52 +324,52 @@ async def upload_knowledge_document(
         await file.close()
 
 
-# ============================================================
-# ADMIN DELETE
-# ============================================================
+# # ============================================================
+# # ADMIN DELETE
+# # ============================================================
 
 
-@router.delete("/documents/{document_id}")
-async def delete_knowledge_document(
-    document_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db_session),
-) -> dict[str, Any]:
-    """
-    Delete a knowledge-base document.
+# @router.delete("/documents/{document_id}")
+# async def delete_knowledge_document(
+#     document_id: str,
+#     current_user: User = Depends(get_current_user),
+#     db: AsyncSession = Depends(get_db_session),
+# ) -> dict[str, Any]:
+#     """
+#     Delete a knowledge-base document.
 
-    Only administrators may delete documents.
-    """
+#     Only administrators may delete documents.
+#     """
 
-    require_admin(current_user)
+#     require_admin(current_user)
 
-    result = await db.execute(
-        select(Document).where(
-            Document.id == document_id
-        )
-    )
+#     result = await db.execute(
+#         select(Document).where(
+#             Document.id == document_id
+#         )
+#     )
 
-    document = result.scalars().first()
+#     document = result.scalars().first()
 
-    if document is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Knowledge-base document not found.",
-        )
+#     if document is None:
+#         raise HTTPException(
+#             status_code=404,
+#             detail="Knowledge-base document not found.",
+#         )
 
-    try:
-        await db.delete(document)
-        await db.commit()
+#     try:
+#         await db.delete(document)
+#         await db.commit()
 
-        return {
-            "message": "Knowledge-base document deleted successfully.",
-            "document_id": document_id,
-        }
+#         return {
+#             "message": "Knowledge-base document deleted successfully.",
+#             "document_id": document_id,
+#         }
 
-    except SQLAlchemyError as exc:
-        await db.rollback()
+#     except SQLAlchemyError as exc:
+#         await db.rollback()
 
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to delete knowledge-base document.",
-        ) from exc
+#         raise HTTPException(
+#             status_code=500,
+#             detail="Unable to delete knowledge-base document.",
+#         ) from exc

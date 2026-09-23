@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +12,6 @@ from app.database.repositories.ticket_repository import TicketRepository
 from app.guardrails.handoff_guardrail import detect_explicit_human_request
 from app.services.conversation_service import ConversationService
 from app.services.escalation_service import EscalationService
-
-if TYPE_CHECKING:
-    from app.database.models.ticket import SupportTicket
 
 
 class TicketService:

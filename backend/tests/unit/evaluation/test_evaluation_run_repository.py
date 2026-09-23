@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.database.models.evaluation_run import EvaluationRun
 from app.database.repositories.evaluation_runs import EvaluationRunRepository
@@ -92,8 +92,8 @@ async def _test_get_latest_run_returns_latest_completed_run_only() -> None:
         report={"slo_report": {"overall_passed": True}},
     )
 
-    incomplete_run.created_at = datetime(2026, 9, 11, 12, 0, tzinfo=timezone.utc)
-    completed_run.created_at = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    incomplete_run.created_at = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+    completed_run.created_at = datetime(2026, 9, 10, 12, 0, tzinfo=UTC)
 
     session.runs = [incomplete_run, completed_run]
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -30,7 +30,7 @@ class FakeEvaluationRunRepository:
 def fake_dashboard_data():
     latest_run = SimpleNamespace(
         run_id="00000000-0000-0000-0000-000000000111",
-        created_at=datetime(2026, 9, 11, 12, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 11, 12, 0, tzinfo=UTC),
         status="completed",
         total_cases=2,
         report={
@@ -78,7 +78,7 @@ def fake_dashboard_data():
 
     historical_run = SimpleNamespace(
         run_id="00000000-0000-0000-0000-000000000110",
-        created_at=datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 10, 12, 0, tzinfo=UTC),
         status="completed",
         total_cases=2,
         report={"slo_report": {"overall_passed": False}},

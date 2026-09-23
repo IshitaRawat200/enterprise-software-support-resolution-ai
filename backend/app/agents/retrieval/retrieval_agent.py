@@ -8,7 +8,7 @@ from app.database.connection import get_db_session
 from app.rag.services.fusion_retrieval_service import (
     FusionRetrievalService,
 )
-
+from app.observability.logging import logger
 
 class RetrievalAgent:
     """
@@ -110,6 +110,12 @@ class RetrievalAgent:
             evidence = await retrieval_service.retrieve_evidence(query)
 
         except (ValueError, RuntimeError, SQLAlchemyError) as exc:
+            logger.exception(
+                "RAG retrieval failed: query=%r error=%s",
+                query,
+                exc,
+            )
+
             return {
                 "success": False,
                 "query": query,

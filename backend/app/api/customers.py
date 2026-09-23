@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends
 
 from app.database.connection import get_db_session
-from app.database.models.user import User
-from app.database.repositories.customers import CustomerRepository
 from app.guardrails.rbac import require_customer
-from app.schemas.customer import CustomerProfileResponse
 
 router = APIRouter(
     prefix="/customers",

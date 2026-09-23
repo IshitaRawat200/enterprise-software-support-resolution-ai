@@ -1,9 +1,8 @@
 import os
 from types import SimpleNamespace
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
-
 
 # Ensure a DATABASE_URL exists
 os.environ.setdefault(
@@ -13,7 +12,7 @@ os.environ.setdefault(
 
 
 def _patch_chat_for_tests(monkeypatch):
-    import app.main as main
+    from app import main
 
     monkeypatch.setattr(main, "get_embedding_model", lambda: None)
 

@@ -3,7 +3,6 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-
 # Ensure a DATABASE_URL exists before importing the application.
 os.environ.setdefault(
     "DATABASE_URL",
@@ -12,8 +11,8 @@ os.environ.setdefault(
 
 
 def _patch_auth_for_tests(monkeypatch):
-    import app.main as main
     import app.api.auth as auth_api
+    from app import main
 
     # ---------------------------------------------------------
     # Disable expensive startup dependencies

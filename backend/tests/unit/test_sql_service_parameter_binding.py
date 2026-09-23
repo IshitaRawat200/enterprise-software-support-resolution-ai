@@ -6,11 +6,12 @@ from app.sql.sql_service import SQLService
 
 def test_sql_service_passes_customer_id_for_dollar_placeholder(monkeypatch):
     class FakeGeneration:
-        sql = "SELECT account_status, subscription_tier FROM customers WHERE id = $1 LIMIT 50"
-        confidence = 0.93
-        explanation = "Look up account fields for authenticated customer."
-        tables_used = ["customers"]
-        parameters = None
+        def __init__(self):
+            self.sql = "SELECT account_status, subscription_tier FROM customers WHERE id = $1 LIMIT 50"
+            self.confidence = 0.93
+            self.explanation = "Look up account fields for authenticated customer."
+            self.tables_used = ["customers"]
+            self.parameters = None
 
     async def fake_generate(self, question, customer_id=None):
         return FakeGeneration()

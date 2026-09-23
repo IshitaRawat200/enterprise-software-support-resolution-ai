@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import (
     APIRouter,
@@ -15,9 +15,6 @@ from app.database.models.user import User
 from app.database.repositories.customers import CustomerRepository
 from app.guardrails.rbac import require_customer
 from app.schemas.ticket import (
-    TicketCreateRequest,
-    TicketMessageCreateRequest,
-    TicketMessageResponse,
     TicketResponse,
 )
 from app.services.ticket_service import TicketService

@@ -5,10 +5,10 @@ from time import perf_counter
 from typing import Any
 
 from llama_index.core import (
-    Document,
     Settings,
     VectorStoreIndex,
 )
+from llama_index.core.schema import TextNode
 from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.retrievers import (
     QueryFusionRetriever,
@@ -232,12 +232,21 @@ class FusionRetrievalService:
             if not chunks:
                 raise ValueError("No knowledge-base chunks are available for retrieval.")
 
-            documents: list[Document] = []
+            nodes: list[TextNode] = []
 
             for chunk in chunks:
                 content = (chunk.get("content") or "").strip()
 
                 if not content:
+                    continue
+
+                embedding = chunk.get("embedding")
+
+                if embedding is None:
+                    logger.warning(
+                        "RAG: chunk %s has no stored embedding; skipping.",
+                        chunk.get("id"),
+                    )
                     continue
 
                 metadata = dict(
@@ -247,27 +256,44 @@ class FusionRetrievalService:
                     )
                 )
 
-                documents.append(
-                    Document(
+                metadata.update(
+                    {
+                        "chunk_id": str(chunk.get("id")),
+                        "document_id": str(chunk.get("document_id")),
+                        "chunk_index": chunk.get("chunk_index"),
+                        "document_name": chunk.get("document_name"),
+                        "document_type": chunk.get("document_type"),
+                        "source_url": chunk.get("source_url"),
+                        "product_name": chunk.get("product_name"),
+                        "product_version": chunk.get("product_version"),
+                        "version": chunk.get("version"),
+                    }
+                )
+
+                nodes.append(
+                    TextNode(
                         text=content,
                         metadata=metadata,
+                        embedding=list(embedding),
                     )
                 )
 
-            if not documents:
-                raise ValueError("No usable knowledge-base documents were found.")
+            if not nodes:
+                raise ValueError(
+                    "No usable knowledge-base chunks with stored embeddings "
+                    "were found."
+                )
 
-            # --------------------------------------------------------
-            # Configure local embedding model
-            # --------------------------------------------------------
+            logger.info(
+                "RAG: building vector index from %s stored embeddings; "
+                "no document re-embedding required.",
+                len(nodes),
+            )
 
-            Settings.embed_model = RAGLlamaIndexEmbedding()
-
-            # --------------------------------------------------------
-            # Vector index
-            # --------------------------------------------------------
-
-            self.vector_index = VectorStoreIndex.from_documents(documents)
+            self.vector_index = VectorStoreIndex(
+                nodes=nodes,
+                embed_model=RAGLlamaIndexEmbedding(),
+            )
 
             self.vector_retriever = self.vector_index.as_retriever(
                 similarity_top_k=(self.similarity_top_k)
@@ -321,10 +347,10 @@ class FusionRetrievalService:
             self.__class__._cached_fusion_retriever = self.fusion_retriever
 
             logger.info(
-                "RAG: retrieval index cache built top_k=%s chunks=%s documents=%s build_time_s=%.3f",
+                "RAG: retrieval index cache built top_k=%s chunks=%s nodes=%s build_time_s=%.3f",
                 self.similarity_top_k,
                 len(chunks),
-                len(documents),
+                len(nodes),
                 perf_counter() - build_start,
             )
 

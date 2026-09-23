@@ -354,7 +354,7 @@ async def list_conversations(
 
             return conversations
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception(
                 "Failed to list conversations "
                 "user_id=%s error=%s",
@@ -648,18 +648,63 @@ async def chat(
             # =================================================
 
             initial_state = {
+                # Conversation memory — preserve
                 "message": sanitized_message,
                 "conversation_id": str(session_id),
                 "user_id": str(user_id),
                 "user_role": user_role,
                 "customer_id": str(customer_id),
                 "conversation_history": history,
-                "conversation_context": (conversation_context),
+                "conversation_context": conversation_context,
+
+                # Current-turn workflow state — reset
                 "errors": [],
                 "iteration": 0,
                 "max_iterations": 2,
                 "replan_required": False,
+
+                "intent": None,
+                "route": None,
+
+                "severity": None,
+                "severity_confidence": 0.0,
+                "severity_reason": None,
+
+                "escalation_required": False,
+                "escalation_reason": None,
+                "escalation_priority": None,
+                "escalation_type": None,
+                "human_handoff_required": False,
+
+                "incident_active": False,
+                "incident_status": None,
+                "incident_code": None,
+                "incident_severity": None,
+                "incident_affects_production": False,
+                "incident_unresolved_critical_alert": False,
+                "incident_security_related": False,
+                "incident_data_loss_reported": False,
+
+                "ticket_id": None,
+                "ticket_number": None,
+                "ticket_created": False,
+                "ticket_updated": False,
+                "ticket_required": False,
+                "ticket_reason": None,
+                "ticket_action": None,
+
+                "retrieval_results": [],
+                "retrieval_confidence": 0.0,
                 "sufficient_evidence": False,
+
+                "sql_query": None,
+                "sql_rows": [],
+                "sql_success": False,
+
+                "hybrid_results": [],
+                "hybrid_success": False,
+
+                "response": None,
             }
 
             # =================================================

@@ -20,7 +20,6 @@ class RAGDatabaseRepository:
         self,
         session: AsyncSession,
     ) -> None:
-
         self.session = session
 
     # ============================================================
@@ -127,7 +126,9 @@ class RAGDatabaseRepository:
 
         chunk_id = uuid4()
 
-        embedding_text = "[" + ",".join(str(value) for value in embedding) + "]"
+        embedding_text = "[" + ",".join(
+            str(value) for value in embedding
+        ) + "]"
 
         await self.session.execute(
             text(
@@ -201,7 +202,9 @@ class RAGDatabaseRepository:
     ) -> list[dict]:
 
         if limit <= 0:
-            raise ValueError("limit must be greater than zero.")
+            raise ValueError(
+                "limit must be greater than zero."
+            )
 
         result = await self.session.execute(
             text(
@@ -212,6 +215,7 @@ class RAGDatabaseRepository:
                     dc.chunk_index,
                     dc.content,
                     dc.token_count,
+                    dc.embedding,
                     dc.metadata,
                     d.document_name,
                     d.document_type,
@@ -256,6 +260,14 @@ class RAGDatabaseRepository:
                 "version": row["version"],
             }
 
+            embedding = row["embedding"]
+
+            if embedding is not None:
+                if isinstance(embedding, str):
+                   embedding = json.loads(embedding)
+                   
+                embedding = list(embedding)
+
             chunks.append(
                 {
                     "id": row["id"],
@@ -263,6 +275,7 @@ class RAGDatabaseRepository:
                     "chunk_index": row["chunk_index"],
                     "content": row["content"],
                     "token_count": row["token_count"],
+                    "embedding": embedding,
                     "metadata": combined_metadata,
                 }
             )

@@ -7,7 +7,6 @@ import {
 import "./TicketDetails.css";
 
 const ACCESS_TOKEN_KEY = "eris_access_token";
-const USER_EMAIL_KEY = "eris_user_email";
 
 function TicketDetails() {
   const { id } = useParams<{ id: string }>();
@@ -64,12 +63,6 @@ function TicketDetails() {
       cancelled = true;
     };
   }, [id, navigate]);
-
-  function handleLogout() {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(USER_EMAIL_KEY);
-    window.location.href = "/login";
-  }
 
   function formatDate(value: string | null) {
     if (!value) {

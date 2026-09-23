@@ -50,7 +50,7 @@ def create_groq_llm(
         model,
         normalized_complexity,
         max_tokens,
-        3,
+        2,
         30,
     )
 
@@ -62,6 +62,6 @@ def create_groq_llm(
         # Keep your change.
         max_tokens=max_tokens,
         # You changed this from 4 -> 3.
-        max_retries=3,
+        max_retries=2,
         timeout=30,
     )

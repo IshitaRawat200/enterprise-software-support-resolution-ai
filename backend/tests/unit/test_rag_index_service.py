@@ -1,13 +1,13 @@
-from types import SimpleNamespace
-from pathlib import Path
-import pytest
-
 # Ensure compatibility with older embedding API name: create_embedding_model
 import importlib
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 emb_mod = importlib.import_module("app.rag.embeddings")
 # During tests, avoid loading heavy HF models — expose a no-op creator.
-setattr(emb_mod, "create_embedding_model", lambda: None)
+emb_mod.create_embedding_model = lambda: None
 
 
 def test_build_requires_documents(tmp_path):
@@ -85,7 +85,6 @@ def test_configure_embeddings_calls_create(monkeypatch):
 
     def fake_create():
         called["ok"] = True
-        return None
 
     monkeypatch.setattr(ris, "create_embedding_model", fake_create)
 
