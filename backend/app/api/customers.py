@@ -3,7 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.database.connection import get_db_session
-from app.guardrails.rbac import require_customer
+from app.guardrails.rbac import (
+    require_customer_or_admin,
+)
 
 router = APIRouter(
     prefix="/customers",
@@ -12,7 +14,7 @@ router = APIRouter(
 
 # Module-level dependency objects to avoid calling Depends() in
 # argument defaults (satisfies ruff B008).
-require_customer_dep = Depends(require_customer)
+require_customer_or_admin_dep = Depends(require_customer_or_admin)
 get_db_session_dep = Depends(get_db_session)
 
 

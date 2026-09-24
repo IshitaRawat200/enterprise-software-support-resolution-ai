@@ -45,7 +45,7 @@ class TicketService:
         return await self.tickets.list_by_customer(
             customer_id,
         )
-
+    
     async def get_customer_ticket(
         self,
         *,
@@ -504,3 +504,18 @@ class TicketService:
             return cleaned
 
         return f"{cleaned[:117]}..."
+
+    async def list_all_tickets(self):
+        return await self.tickets.list_all()
+
+    async def get_ticket(
+        self,
+        *,
+        ticket_id: UUID,
+    ):
+        ticket = await self.tickets.get_by_id(ticket_id)
+
+        if ticket is None:
+            raise ValueError("Ticket not found.")
+
+        return ticket

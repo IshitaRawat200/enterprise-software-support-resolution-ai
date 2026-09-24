@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException, status
 
 from app.guardrails.auth import get_current_user
 
-# Module-level dependency object to avoid calling Depends() in
-# argument defaults (satisfies ruff B008).
+# Module-level dependency object to avoid calling Depends()
+# in argument defaults (satisfies ruff B008).
 get_current_user_dep = Depends(get_current_user)
 
 
@@ -14,7 +14,6 @@ def require_role(*allowed_roles: str):
     async def role_checker(
         current_user=get_current_user_dep,
     ):
-
         user_role = str(current_user.role)
 
         if user_role not in allowed_roles:
@@ -28,7 +27,13 @@ def require_role(*allowed_roles: str):
     return role_checker
 
 
-require_admin = require_role("admin")
+# ============================================================
+# ROLE DEPENDENCIES
+# ============================================================
+
+require_admin = require_role(
+    "admin",
+)
 
 require_support_agent = require_role(
     "support_agent",
@@ -37,4 +42,16 @@ require_support_agent = require_role(
 
 require_customer = require_role(
     "customer",
+)
+
+# Customer-facing resources that Admin should also be
+# allowed to access.
+#
+# IMPORTANT:
+# This only handles authorization.
+# The endpoint/service must still decide what data
+# each role is allowed to see.
+require_customer_or_admin = require_role(
+    "customer",
+    "admin",
 )

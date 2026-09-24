@@ -12,6 +12,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     text,
@@ -64,6 +65,11 @@ class Document(Base):
 
     content_hash: Mapped[str | None] = mapped_column(
         String(128),
+        nullable=True,
+    )
+
+    file_data: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
         nullable=True,
     )
 

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getProfile } from "../../services/customerService";
 import "./AppLayout.css";
 
 interface AppLayoutProps {
@@ -16,6 +18,32 @@ function AppLayout({
 
   const userEmail =
     localStorage.getItem("eris_user_email") || "Customer";
+
+  const [userRole, setUserRole] = useState("customer");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      try {
+        const profile = await getProfile();
+
+        if (mounted) {
+          setUserRole(profile.user.role);
+        }
+      } catch {
+        if (mounted) {
+          setUserRole("customer");
+        }
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function isActive(path: string): boolean {
     return (
@@ -41,12 +69,22 @@ function AppLayout({
       return "Knowledge Base";
     }
 
+    if (isActive("/admin")) {
+      return "Admin Dashboard";
+    }
+
     if (isActive("/account")) {
       return "Account";
     }
 
     return "ERIS";
   }
+
+  function handleLogout() {
+    onLogout();
+  }
+
+  const isAdmin = userRole === "admin";
 
   return (
     <div className="app-layout">
@@ -124,6 +162,21 @@ function AppLayout({
             </span>
           </button>
 
+          {isAdmin && (
+            <button
+              type="button"
+              className={`app-nav-item ${
+                isActive("/admin") ? "active" : ""
+              }`}
+              onClick={() => navigate("/admin")}
+            >
+              <span className="app-nav-icon">⚙</span>
+              <span className="app-nav-label">
+                Admin
+              </span>
+            </button>
+          )}
+
           <button
             type="button"
             className={`app-nav-item ${
@@ -143,7 +196,7 @@ function AppLayout({
           <button
             type="button"
             className="app-nav-item"
-            onClick={onLogout}
+            onClick={handleLogout}
           >
             <span className="app-nav-icon">↪</span>
             <span className="app-nav-label">
@@ -168,7 +221,14 @@ function AppLayout({
 
               <div className="app-user-info">
                 <strong>{userEmail}</strong>
-                <span>Customer</span>
+
+                <span>
+                  {userRole === "admin"
+                    ? "Admin"
+                    : userRole === "support_agent"
+                      ? "Support Agent"
+                      : "Customer"}
+                </span>
               </div>
             </div>
           </div>

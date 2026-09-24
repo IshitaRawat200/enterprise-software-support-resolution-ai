@@ -13,30 +13,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.connection import get_db_session
 from app.database.models.user import User
 from app.database.repositories.customers import CustomerRepository
-from app.guardrails.rbac import require_customer
-from app.schemas.ticket import (
-    TicketResponse,
+from app.guardrails.rbac import (
+    require_customer_or_admin,
 )
+from app.schemas.ticket import TicketResponse
 from app.services.ticket_service import TicketService
+
 
 router = APIRouter(
     prefix="/tickets",
     tags=["Tickets"],
 )
 
-# Module-level dependency objects to avoid calling Depends() in
-# argument defaults (satisfies ruff B008).
-require_customer_dep = Depends(require_customer)
-get_db_session_dep = Depends(get_db_session)
 
+# ============================================================
+# DEPENDENCIES
+# ============================================================
+
+require_customer_or_admin_dep = Depends(
+    require_customer_or_admin
+)
+
+get_db_session_dep = Depends(
+    get_db_session
+)
+
+
+# ============================================================
+# CUSTOMER LOOKUP
+# ============================================================
 
 async def get_current_customer(
     current_user: User,
     session: AsyncSession,
 ):
-    customer_repository = CustomerRepository(session)
+    customer_repository = CustomerRepository(
+        session
+    )
 
-    customer = await customer_repository.get_by_user_id(current_user.id)
+    customer = (
+        await customer_repository.get_by_user_id(
+            current_user.id
+        )
+    )
 
     if customer is None:
         raise HTTPException(
@@ -46,60 +65,116 @@ async def get_current_customer(
 
     return customer
 
+
+# ============================================================
+# LIST TICKETS
+# ============================================================
+
 @router.get(
     "",
     response_model=list[TicketResponse],
 )
-async def list_my_tickets(
-    current_user: User = require_customer_dep,
+async def list_tickets(
+    current_user: User = require_customer_or_admin_dep,
     session: AsyncSession = get_db_session_dep,
 ) -> list[TicketResponse]:
+
+    service = TicketService(session)
+
+    # --------------------------------------------------------
+    # ADMIN
+    # --------------------------------------------------------
+
+    if str(current_user.role) == "admin":
+        tickets = await service.list_all_tickets()
+
+        return [
+            TicketResponse.model_validate(ticket)
+            for ticket in tickets
+        ]
+
+    # --------------------------------------------------------
+    # CUSTOMER
+    # --------------------------------------------------------
+
     customer = await get_current_customer(
         current_user,
         session,
     )
-
-    service = TicketService(session)
 
     tickets = await service.list_customer_tickets(
         customer_id=customer.id,
     )
 
-    return [TicketResponse.model_validate(ticket) for ticket in tickets]
+    return [
+        TicketResponse.model_validate(ticket)
+        for ticket in tickets
+    ]
 
+
+# ============================================================
+# GET SINGLE TICKET
+# ============================================================
 
 @router.get(
     "/{ticket_id}",
     response_model=TicketResponse,
 )
-async def get_my_ticket(
+async def get_ticket(
     ticket_id: UUID,
-    current_user: User = require_customer_dep,
+    current_user: User = require_customer_or_admin_dep,
     session: AsyncSession = get_db_session_dep,
 ) -> TicketResponse:
+
+    service = TicketService(session)
+
+    # --------------------------------------------------------
+    # ADMIN
+    # --------------------------------------------------------
+
+    if str(current_user.role) == "admin":
+        try:
+            ticket = await service.get_ticket(
+                ticket_id=ticket_id,
+            )
+
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+
+        return TicketResponse.model_validate(
+            ticket
+        )
+
+    # --------------------------------------------------------
+    # CUSTOMER
+    # --------------------------------------------------------
+
     customer = await get_current_customer(
         current_user,
         session,
     )
-
-    service = TicketService(session)
 
     try:
         ticket = await service.get_customer_ticket(
             customer_id=customer.id,
             ticket_id=ticket_id,
         )
+
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
+
     except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
 
-    return TicketResponse.model_validate(ticket)
-
-
+    return TicketResponse.model_validate(
+        ticket
+    )

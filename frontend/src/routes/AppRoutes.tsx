@@ -7,6 +7,7 @@ import Tickets from "../pages/Tickets";
 import TicketDetails from "../pages/TicketDetails";
 import KnowledgeBase from "../pages/KnowledgeBase";
 import Account from "../pages/Account";
+import AdminDashboard from "../pages/admin/AdminDashboard";
 
 function AppRoutes() {
   return (
@@ -39,6 +40,11 @@ function AppRoutes() {
       <Route
         path="/knowledge-base"
         element={<KnowledgeBase />}
+      />
+
+      <Route
+        path="/admin"
+        element={<AdminDashboard />}
       />
 
       <Route

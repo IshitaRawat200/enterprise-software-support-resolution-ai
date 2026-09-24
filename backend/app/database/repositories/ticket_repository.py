@@ -51,6 +51,16 @@ class TicketRepository:
 
         return list(result.scalars().all())
 
+    async def list_all(
+        self,
+    ) -> list[SupportTicket]:
+        result = await self.session.execute(
+            select(SupportTicket)
+            .order_by(SupportTicket.created_at.desc())
+        )
+
+        return list(result.scalars().all())
+
     async def find_active_for_customer(
         self,
         customer_id: UUID,
