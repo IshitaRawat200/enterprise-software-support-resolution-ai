@@ -138,6 +138,25 @@ interface ChatResponse {
   };
 }
 
+interface EvaluationStatusResponse {
+  request_id: string;
+  evaluation_status?:
+    | "pending"
+    | "completed"
+    | "partial"
+    | "failed";
+  accuracy?: number | null;
+  faithfulness?: number | null;
+  answer_relevance?: number | null;
+  context_precision?: number | null;
+  context_recall?: number | null;
+  route_accuracy?: number | null;
+  guardrail_effectiveness?: number | null;
+  cost_usd?: number | null;
+  latency_ms?: number | null;
+  ragas_errors?: string[];
+}
+
 type ChatMetadata = Omit<
   ChatResponse,
   "message"
@@ -534,99 +553,83 @@ function Chat() {
 
   async function refreshConversationMetrics(
     conversationId: string,
+    requestId?: string,
   ): Promise<void> {
+    if (!requestId) {
+      return;
+    }
+
     for (
       let attempt = 0;
       attempt < MAX_EVALUATION_POLL_ATTEMPTS;
       attempt += 1
     ) {
       try {
-        const savedConversations =
-          await getConversations(true);
-
-        const updatedConversation =
-          savedConversations.find(
-            (conversation) =>
-              conversation.conversation_id ===
-              conversationId,
+        const evaluation =
+          await apiRequest<EvaluationStatusResponse>(
+            `/chat/evaluations/${requestId}?refresh=${Date.now()}`,
+            {
+              method: "GET",
+            },
           );
 
-        if (!updatedConversation) {
-          return;
-        }
-
-        const mappedConversation =
-          mapApiConversations([
-            updatedConversation,
-          ])[0];
-
-        if (!mappedConversation) {
-          return;
-        }
-
-        setConversations((current) => {
-          const exists = current.some(
-            (conversation) =>
-              conversation.id ===
-              conversationId,
-          );
-
-          if (!exists) {
-            return [
-              mappedConversation,
-              ...current,
-            ];
-          }
-
-          return current.map(
-            (conversation) =>
-              conversation.id ===
+        setConversations((current) =>
+          current.map((conversation) => {
+            if (
+              conversation.id !==
               conversationId
-                ? mappedConversation
-                : conversation,
-          );
-        });
+            ) {
+              return conversation;
+            }
 
-        const latestAssistantMessage =
-          [...mappedConversation.messages]
-            .reverse()
-            .find(
-              (message) =>
-                message.role ===
-                "assistant",
-            );
+            const messages =
+              conversation.messages.map(
+                (message) => {
+                  if (
+                    message.role !==
+                    "assistant"
+                  ) {
+                    return message;
+                  }
 
-        const metadata =
-          latestAssistantMessage?.metadata;
+                  const messageRequestId =
+                    message.metadata?.request_id;
 
-        if (!metadata) {
-          await new Promise<void>(
-            (resolve) =>
-              window.setTimeout(
-                resolve,
-                EVALUATION_POLL_INTERVAL_MS,
-              ),
-          );
+                  if (
+                    messageRequestId !==
+                    requestId
+                  ) {
+                    return message;
+                  }
 
-          continue;
-        }
+                  return {
+                    ...message,
+                    metadata: {
+                      ...message.metadata,
+                      ...evaluation,
+                      request_id: requestId,
+                    },
+                  };
+                },
+              );
+
+            return {
+              ...conversation,
+              messages,
+            };
+          }),
+        );
+
+        const status =
+          evaluation.evaluation_status;
 
         if (
-          metadata.evaluation_status ===
+          status ===
             "completed" ||
-          metadata.evaluation_status ===
+          status ===
             "partial" ||
-          metadata.evaluation_status ===
+          status ===
             "failed"
-        ) {
-          return;
-        }
-
-        if (
-          metadata.faithfulness != null ||
-          metadata.answer_relevance != null ||
-          metadata.context_precision != null ||
-          metadata.context_recall != null
         ) {
           return;
         }
@@ -876,6 +879,7 @@ function Chat() {
 
       void refreshConversationMetrics(
         conversationId,
+        response.request_id,
       );
     } catch (error) {
       const errorMessage: ChatMessage =

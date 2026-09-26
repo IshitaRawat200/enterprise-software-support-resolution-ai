@@ -1,0 +1,164 @@
+{
+  "dataset": "ERIS-Golden-50",
+  "experiment": "ERIS Golden 50 Evaluation",
+  "dataset_run_url": "https://cloud.langfuse.com/project/cmto89gl10fcaad0ixqmh2k30/datasets/cmui5s3uc0i1tad0c9eurtz1e/runs/6838d9bb-d783-44a9-87e4-9f5ac30d63fb",
+  "experiment_id": "6838d9bb-d783-44a9-87e4-9f5ac30d63fb",
+  "item_count": 1,
+  "items": [
+    {
+      "id": "03b42396-3fa4-465f-b82f-37b92f28afd4",
+      "input": "My ticket says GET /tickets is slow. What P95 target should I compare against and what operational data should I inspect?",
+      "output": {
+        "test_id": "Q036",
+        "query": "My ticket says GET /tickets is slow. What P95 target should I compare against and what operational data should I inspect?",
+        "input": "My ticket says GET /tickets is slow. What P95 target should I compare against and what operational data should I inspect?",
+        "category": "Hybrid Performance",
+        "response": "**P95 target:**\u202fFor the\u202fGET\u202f/tickets\u202f(list) endpoint the documented P95 latency target is **150\u202fms**.\n\n**Operational data to inspect:**\n1. **Latency metrics** \u2013 pull the recent P95 response\u2011time values for\u202fGET\u202f/tickets\u202ffrom your monitoring system and compare them to the 150\u202fms target.  \n2. **Request volume** \u2013 check the number of requests per second against your tier\u2019s limits (e.g., Professional\u202f200\u202fRPS, Enterprise\u202f1,000+\u202fRPS).  \n3. **Response size & pagination** \u2013 verify that pagination is being used (max\u202f100\u202fitems per page) and that payload sizes are reasonable. Large pages can increase latency.  \n4. **Cache behavior** \u2013 look at cache\u2011hit vs. miss rates for the tickets list; a low hit rate can cause slower responses.  \n5. **Endpoint region** \u2013 confirm the client is calling the nearest region endpoint to minimize network latency.  \n\n**Reference:**\u202fPerformance & Scalability Guide \u2013 \u201cLatency Expectations & SLAs\u201d and \u201cLatency Optimization Tips\u201d.",
+        "intent": "performance_latency",
+        "route": "hybrid",
+        "severity": "medium",
+        "escalation_required": false,
+        "guardrail_action": null,
+        "source_pdf": "ERIS Backend Project Overview + Performance & Scalability Guide",
+        "source_section_page": "\u00a75.2 Chat Support + \u00a71/\u00a76 Performance Monitoring",
+        "slos_to_evaluate": "Answer Correctness; Faithfulness; Context Precision; Context Recall; Route Accuracy; SQL Correctness",
+        "expected_slo_targets": "Answer Correctness >=85%; Faithfulness >=80%; Context Precision >=70%; Context Recall >=75%; Route Accuracy >=95%; SQL Correctness >=95%",
+        "retrieval_results": [
+          {
+            "title": "(anonymous)",
+            "content": "Performance & Scalability Guide\n Enterprise Resolution Intelligence System API v3.5\n1. Latency Expectations & SLAs\nOperation\nP50\nP95\nP99\nNotes\nGET /tickets (list)\n50ms\n150ms\n300ms\nCacheable, pagination required\nGET /tickets/:id\n30ms\n80ms\n150ms\nSingle record, cache-friendly\nPOST /tickets\n100ms\n250ms\n500ms\nWrites to DB, invalidates cache\nPOST /analytics\n500ms\n1.5s\n3s\nHeavy computation, async preferred\nPOST /search\n200ms\n600ms\n1.2s\nFull-text search, index-dependent\nLatency Optimization Tips:\n\u007f Use pagination (max 100 items per page) to reduce response size\n\u007f Implement field filtering with ?fields=id,status,priority to reduce payload\n\u007f Leverage ETags for conditional requests (If-None-Match header)\n\u007f Choose nearest region endpoint to minimize network latency\n2. Throughput & Capacity Limits\nTier\nReq/Second\nConcurrent\nConnections\nBurst\nCapacity\nPayload\nLimit\nFree\n5\n10\n20/10s\n1 MB\nBasic\n50\n100\n100/10s\n5 MB\nProfessional\n200\n500\n400/10s\n10 MB\nEnterprise\n1,000+\n5,000+\nCustom\n50 MB",
+            "source": "unknown",
+            "document_name": null,
+            "document_id": "9faa0d55-517b-4ceb-b8e6-8311474057c7",
+            "chunk_id": "02c62ffd-34ff-482f-b6bc-72da16ef8d95",
+            "chunk_index": 0,
+            "vector_score": 0.6825,
+            "rrf_score": 0.0331,
+            "relevance_score": 0.6825
+          },
+          {
+            "title": "(anonymous)",
+            "content": "15 min\nHigh (P1)\nMajor functionality impaired\n8 hours\n4 hours\n1 hour\n30 min\nMedium (P2)\nPartial functionality issue\n24 hours\n8 hours\n4 hours\n2 hours\nLow (P3)\nMinor issue or question\n48 hours\n24 hours\n8 hours\n4 hours\nNote: Response time is measured from ticket creation to first meaningful response from support engineer.\n2.1 Resolution Time Targets\nSeverity\nTarget Resolution Time\nStatus Updates\nCritical (P0)\n< 4 hours\nEvery 30 minutes",
+            "source": "unknown",
+            "document_name": null,
+            "document_id": "85d13a66-2e6e-4927-b72b-efb87cffc44b",
+            "chunk_id": "306112c5-bc1d-4d4b-a886-39771e81ffb6",
+            "chunk_index": 1,
+            "vector_score": 0.6576,
+            "rrf_score": 0.0164,
+            "relevance_score": 0.6576
+          },
+          {
+            "title": "(anonymous)",
+            "content": "3. Incident Classification Model\nSeverity\nBusiness Impact\nUser Impact\nWorkaround\nCritical\n(P0)\n\u007f Production system down\n\u007f Revenue impact\n\u007f Security breach\n\u007f Data loss\n> 50% users\nunable to work\nNone available\nHigh\n(P1)\n\u007f Major feature broken\n\u007f Performance degraded\n\u007f Integration failure\n20-50% users\nseverely impacted\nDifficult or\ntime-consuming\nMedium\n(P2)\n\u007f Non-critical feature issue\n\u007f Minor performance impact\n\u007f Cosmetic bugs\n< 20% users\nmoderately affected\nAvailable\nLow\n(P3)\n\u007f Feature request\n\u007f Documentation\n\u007f General question\nMinimal or\nno impact\nNot applicable\n3.1 Incident Lifecycle\n1\nNew\n2\nAcknowledged\n3\nIn Progress\n4\nPending\n5\nResolved\nSLA Clock Running\nStage\nDescription\nOwner\n1. New\nTicket created, awaiting triage\nCustomer\n2. Acknowledged\nReceived and prioritized by support\nSupport Team\n3. In Progress\nActively investigating or resolving\nSupport Engineer\n4. Pending\nAwaiting customer info or action\nCustomer\n5. Resolved\nSolution provided, awaiting confirmation\nSupport Team",
+            "source": "unknown",
+            "document_name": null,
+            "document_id": "85d13a66-2e6e-4927-b72b-efb87cffc44b",
+            "chunk_id": "ec507764-8964-4925-9141-382b8449504f",
+            "chunk_index": 3,
+            "vector_score": 0.6265,
+            "rrf_score": 0.0161,
+            "relevance_score": 0.6265
+          },
+          {
+            "title": "(anonymous)",
+            "content": "5. Quick Start Code Examples\nPython Example:\nimport requests\nheaders = {\"X-API-Key\": \"sk_live_abc123\", \"Content-Type\": \"application/json\"}\nresponse = requests.get(\"https://api.example.com/v3/tickets\", headers=headers)\nif response.status_code == 200: print(response.json())\nJavaScript Example:\nconst response = await fetch('https://api.example.com/v3/tickets', {\nheaders: { 'X-API-Key': 'sk_live_abc123', 'Content-Type': 'application/json' }\n});\nconst data = await response.json();\ncURL Example:\ncurl -X GET https://api.example.com/v3/tickets \\\n-H \"X-API-Key: sk_live_abc123\" \\\n-H \"Content-Type: application/json\"\n6. Key API Endpoints\nEndpoint\nMethod\nDescription\n/v3/tickets\nGET\nList all support tickets\n/v3/tickets\nPOST\nCreate new ticket\n/v3/tickets/:id\nGET\nGet ticket details\n/v3/tickets/:id\nPATCH\nUpdate ticket\n/v3/users\nGET\nList users\n/v3/analytics\nGET\nGet analytics data\n/v3/webhooks\nPOST\nRegister webhook\n API Support Resources",
+            "source": "unknown",
+            "document_name": null,
+            "document_id": "e3fd6148-f40b-46e5-bf34-a4b464ce36e6",
+            "chunk_id": "e7c87aa0-ccab-45da-9226-2c09a5d464de",
+            "chunk_index": 5,
+            "vector_score": 0.0,
+            "rrf_score": 0.0167,
+            "relevance_score": 0.0
+          },
+          {
+            "title": "(anonymous)",
+            "content": "\u007f Root cause analysis: Technical and procedural factors that enabled incident\n\u007f Impact assessment: Systems affected, data exposed, downtime incurred\n\u007f Response effectiveness: What worked well, what needs improvement\n\u007f Action items: Preventive measures with owners and deadlines\n\u007f Documentation: Store in secure incident database for trend analysis\n Security Contact Information\nSecurity Operations: security@example.com | Emergency Hotline: +1-800-SEC-OPS\nBug Bounty: https://bugcrowd.com/example | Security Advisories: https://security.example.com\n PGP Key: https://example.com/pgp-key.asc",
+            "source": "unknown",
+            "document_name": null,
+            "document_id": "790d795f-eb28-43e6-8fc6-8d1ee915335c",
+            "chunk_id": "0468d65f-892e-4db7-9246-d39c8658a911",
+            "chunk_index": 6,
+            "vector_score": 0.0,
+            "rrf_score": 0.0161,
+            "relevance_score": 0.0
+          }
+        ],
+        "errors": [],
+        "latency_ms": 12154.81,
+        "llm_judge": null,
+        "llm_judge_error": null,
+        "ground_truth_available": true,
+        "expected_route": "hybrid",
+        "expected_escalation": false,
+        "expected_guardrail": "allow",
+        "route_correct": true,
+        "escalation_correct": true,
+        "guardrail_correct": false,
+        "slo_target_evaluations": {
+          "answer_correctness": {
+            "actual": null,
+            "operator": ">=",
+            "threshold": 85.0,
+            "passed": null
+          },
+          "faithfulness": {
+            "actual": null,
+            "operator": ">=",
+            "threshold": 80.0,
+            "passed": null
+          },
+          "context_precision": {
+            "actual": null,
+            "operator": ">=",
+            "threshold": 70.0,
+            "passed": null
+          },
+          "context_recall": {
+            "actual": null,
+            "operator": ">=",
+            "threshold": 75.0,
+            "passed": null
+          },
+          "route_accuracy": {
+            "actual": 100.0,
+            "operator": ">=",
+            "threshold": 95.0,
+            "passed": true
+          },
+          "sql_correctness": {
+            "actual": null,
+            "operator": ">=",
+            "threshold": 95.0,
+            "passed": null
+          }
+        }
+      },
+      "trace_id": "ad75cbf1b3386843ef8400114d53db50",
+      "evaluations": [
+        {
+          "name": "route_accuracy",
+          "value": 1.0,
+          "comment": "route_correct=True"
+        },
+        {
+          "name": "escalation_accuracy",
+          "value": 1.0,
+          "comment": "escalation_correct=True"
+        },
+        {
+          "name": "guardrail_accuracy",
+          "value": 0.0,
+          "comment": "guardrail_correct=False"
+        },
+        {
+          "name": "execution_success",
+          "value": 1.0,
+          "comment": "success"
+        }
+      ]
+    }
+  ],
+  "run_evaluations": []
+}

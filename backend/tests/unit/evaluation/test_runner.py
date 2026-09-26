@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.evaluation.runner import (
     BenchmarkCase,
     build_slo_inputs,
@@ -8,11 +10,42 @@ from app.evaluation.runner import (
 )
 
 
-def test_load_benchmark_cases() -> None:
+def test_load_benchmark_cases(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_items = [
+        {
+            "id": "langfuse-item-1",
+            "input": "How should I handle HTTP 500 errors?",
+            "metadata": {
+                "test_id": "Q015",
+                "category": "API Errors",
+                "expected_route": "RAG",
+                "expected_escalation": "Yes",
+                "expected_guardrail": "ALLOW",
+                "expected_slo_targets": "Route Accuracy >=95%",
+                "source_pdf": "API Error Codes & Troubleshooting Handbook",
+                "source_section_page": "Section 4",
+                "slos_to_evaluate": "Accuracy; Route Accuracy",
+            },
+            "expected_output": {
+                "expected_output": "Retry once and escalate with request_id if persistent.",
+            },
+        }
+    ]
+
+    monkeypatch.setattr(
+        "app.evaluation.runner._load_dataset_items",
+        lambda dataset_name="ERIS-Golden-50": fake_items,
+    )
+
     cases = load_benchmark_cases()
 
-    assert len(cases) == 12
-    assert cases[0].case_id == "BENCH-001"
+    assert len(cases) == 1
+    assert cases[0].case_id == "Q015"
+    assert cases[0].message.startswith("How should I handle")
+    assert cases[0].expected_route == "rag"
+    assert cases[0].expected_escalation is True
+    assert cases[0].expected_guardrail_action == "allow"
+    assert cases[0].metadata["source_pdf"] == "API Error Codes & Troubleshooting Handbook"
 
 
 def test_evaluate_case() -> None:

@@ -39,6 +39,10 @@ def test_normalize_route_cases():
     assert intent_mod._normalize_route("production_incident", None) == "incident"
     assert intent_mod._normalize_route("billing_account", None) == "sql"
 
+    # explicit out-of-scope handling
+    assert intent_mod._normalize_route("out_of_scope", None) == "out_of_scope"
+    assert intent_mod._normalize_route("unknown", "out_of_scope") == "out_of_scope"
+
     # security with suggested valid
     assert intent_mod._normalize_route("security", "incident") == "incident"
     # security fallback

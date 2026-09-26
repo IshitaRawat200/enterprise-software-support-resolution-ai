@@ -35,6 +35,7 @@ ALLOWED INTENTS:
 - performance_latency
 - production_incident
 - billing_account
+- out_of_scope
 - unknown
 
 ALLOWED SUGGESTED ROUTES:
@@ -44,6 +45,7 @@ ALLOWED SUGGESTED ROUTES:
 - hybrid
 - incident
 - clarification
+- out_of_scope
 
 ALLOWED INITIAL ACTIONS:
 
@@ -74,6 +76,12 @@ production failures, or active production incidents.
 billing_account:
 Questions about invoices, charges, subscriptions, account status,
 billing information, or support-account data.
+
+out_of_scope:
+Use when the request is unrelated to ERIS enterprise support,
+customer support, product configuration, troubleshooting, APIs,
+account data, or incident handling. This includes general knowledge
+questions, unrelated trivia, and non-support conversations.
 
 unknown:
 Use when the customer's intent cannot be confidently classified from the

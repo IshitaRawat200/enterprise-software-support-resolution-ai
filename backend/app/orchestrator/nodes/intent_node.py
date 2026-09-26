@@ -49,6 +49,9 @@ def _normalize_route(
     # Deterministic routes
     # --------------------------------------------------------
 
+    if normalized_intent == "out_of_scope" or normalized_route == "out_of_scope":
+        return "out_of_scope"
+
     if normalized_intent == "usage_configuration":
         return "rag"
 
@@ -144,6 +147,7 @@ def _normalize_route(
         "hybrid",
         "incident",
         "clarification",
+        "out_of_scope",
     }:
         return normalized_route
 

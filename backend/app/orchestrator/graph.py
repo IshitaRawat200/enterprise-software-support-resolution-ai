@@ -137,6 +137,11 @@ def route_after_intent(
     if state.get("human_handoff_required") or state.get("escalation_required"):
         return "severity"
 
+    route = (state.get("route") or "").lower()
+    intent = (state.get("intent") or "").lower()
+    if route == "out_of_scope" or intent == "out_of_scope":
+        return "resolve"
+
     if is_simple_conversation(message):
         return "conversation"
 
@@ -149,6 +154,7 @@ builder.add_conditional_edges(
     {
         "conversation": "conversation",
         "severity": "severity",
+        "resolve": "resolve",
         "act": "act",
     },
 )

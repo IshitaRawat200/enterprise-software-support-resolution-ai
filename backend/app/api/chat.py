@@ -68,6 +68,7 @@ class ChatResponse(BaseModel):
     message: str
 
     conversation_id: str | None = None
+    request_id: str | None = None
 
     evaluation_status: str | None = None
 
@@ -210,6 +211,21 @@ class ConversationResponse(BaseModel):
     messages: list[ConversationMessageResponse] = Field(
         default_factory=list
     )
+
+
+class EvaluationStatusResponse(BaseModel):
+    request_id: str
+    evaluation_status: str | None = None
+    accuracy: float | None = None
+    faithfulness: float | None = None
+    answer_relevance: float | None = None
+    context_precision: float | None = None
+    context_recall: float | None = None
+    route_accuracy: float | None = None
+    guardrail_effectiveness: float | None = None
+    cost_usd: float | None = None
+    latency_ms: float | None = None
+    ragas_errors: list[str] = Field(default_factory=list)
 # ============================================================
 # ORM → DICT
 # ============================================================
@@ -648,6 +664,114 @@ async def list_conversations(
             ) from exc
 
     return []
+
+
+@router.get(
+    "/evaluations/{request_id}",
+    response_model=EvaluationStatusResponse,
+)
+async def get_evaluation_status(
+    request_id: str,
+    current_user: Annotated[
+        Any,
+        Depends(get_current_user),
+    ],
+) -> EvaluationStatusResponse:
+    user_id_value = getattr(
+        current_user,
+        "id",
+        None,
+    )
+
+    if user_id_value is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user ID is missing.",
+        )
+
+    try:
+        user_id = (
+            user_id_value
+            if isinstance(user_id_value, UUID)
+            else UUID(str(user_id_value))
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticated user ID.",
+        ) from exc
+
+    async for db_session in get_db_session():
+        try:
+            conversation_service = ConversationService(
+                db_session
+            )
+
+            metadata = await conversation_service.get_ai_message_metadata_by_request_id_for_user(
+                request_id=request_id,
+                user_id=user_id,
+            )
+
+            if metadata is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Evaluation metadata not found.",
+                )
+
+            nested = metadata.get("evaluation")
+            nested_eval = nested if isinstance(nested, dict) else {}
+
+            ragas_errors = metadata.get("ragas_errors")
+            if not isinstance(ragas_errors, list):
+                ragas_errors = nested_eval.get("ragas_errors", [])
+            if not isinstance(ragas_errors, list):
+                ragas_errors = []
+
+            evaluation_status = (
+                metadata.get("evaluation_status")
+                or nested_eval.get("status")
+            )
+
+            return EvaluationStatusResponse(
+                request_id=request_id,
+                evaluation_status=(
+                    str(evaluation_status)
+                    if evaluation_status is not None
+                    else None
+                ),
+                accuracy=metadata.get("accuracy"),
+                faithfulness=metadata.get("faithfulness"),
+                answer_relevance=metadata.get("answer_relevance"),
+                context_precision=metadata.get("context_precision"),
+                context_recall=metadata.get("context_recall"),
+                route_accuracy=metadata.get("route_accuracy"),
+                guardrail_effectiveness=metadata.get("guardrail_effectiveness"),
+                cost_usd=metadata.get("cost_usd"),
+                latency_ms=metadata.get("latency_ms"),
+                ragas_errors=[str(item) for item in ragas_errors],
+            )
+
+        except HTTPException:
+            raise
+
+        except Exception as exc:
+            logger.exception(
+                "Failed to load evaluation status "
+                "request_id=%s user_id=%s error=%s",
+                request_id,
+                user_id,
+                str(exc),
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to load evaluation status.",
+            ) from exc
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Unable to initialize database session.",
+    )
 
 # ============================================================
 # CHAT
@@ -1552,6 +1676,7 @@ async def chat(
             return ChatResponse(
                 message=response_message,
                 conversation_id=str(session_id),
+                request_id=request_id,
                 evaluation_status=(
                     "pending"
                     if result.get("route") == "rag"

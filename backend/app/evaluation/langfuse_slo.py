@@ -8,7 +8,6 @@ from langfuse import get_client
 from app.observability.metrics import (
     P95_LATENCY_TARGET_MS,
     calculate_p95_latency,
-    latency_slo_passed,
 )
 
 # ============================================================
@@ -50,7 +49,7 @@ def publish_p95_to_langfuse(
     # Evaluate SLO
     # --------------------------------------------------------
 
-    passed = latency_slo_passed(p95_latency_ms)
+    passed = p95_latency_ms <= P95_LATENCY_TARGET_MS
 
     # --------------------------------------------------------
     # Build result

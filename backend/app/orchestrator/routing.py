@@ -48,8 +48,9 @@ def route_after_intent(state: SupportState) -> str:
     """
 
     logger.info(
-        "ROUTER: INTENT | intent=%s | clarification=%s | errors=%s",
+        "ROUTER: INTENT | intent=%s | route=%s | clarification=%s | errors=%s",
         state.get("intent"),
+        state.get("route"),
         state.get("requires_clarification"),
         bool(state.get("errors")),
     )
@@ -64,6 +65,12 @@ def route_after_intent(state: SupportState) -> str:
     if state.get("human_handoff_required") or state.get("escalation_required"):
         logger.info("ROUTER: INTENT explicit human escalation requested, routing to SEVERITY")
         return "severity"
+
+    route = (state.get("route") or "").lower()
+    intent = (state.get("intent") or "").lower()
+    if route == "out_of_scope" or intent == "out_of_scope":
+        logger.info("ROUTER: INTENT out-of-scope request, completing without escalation")
+        return "complete"
 
     if state.get("requires_clarification", False):
         return "complete"
@@ -124,9 +131,17 @@ def route_after_check(state: SupportState) -> str:
     """
 
     logger.info(
-        "ROUTER: CHECK | errors=%s",
+        "ROUTER: CHECK | errors=%s | route=%s | intent=%s",
         bool(state.get("errors")),
+        state.get("route"),
+        state.get("intent"),
     )
+
+    route = (state.get("route") or "").lower()
+    intent = (state.get("intent") or "").lower()
+    if route == "out_of_scope" or intent == "out_of_scope":
+        logger.info("ROUTER: CHECK | out-of-scope request, routing to RESOLVE")
+        return "resolve"
 
     if _is_low_risk_rag_request(state):
         logger.info(
@@ -292,11 +307,19 @@ def route_after_resolve(state: SupportState) -> str:
     """
 
     logger.info(
-        "ROUTER: RESOLVE | errors=%s",
+        "ROUTER: RESOLVE | errors=%s | route=%s | intent=%s",
         bool(state.get("errors")),
+        state.get("route"),
+        state.get("intent"),
     )
 
     if state.get("errors"):
+        return "complete"
+
+    route = (state.get("route") or "").lower()
+    intent = (state.get("intent") or "").lower()
+    if route == "out_of_scope" or intent == "out_of_scope":
+        logger.info("ROUTER: RESOLVE | out-of-scope answer, skipping severity escalation")
         return "complete"
 
     if _is_low_risk_rag_request(state):

@@ -10,6 +10,7 @@ IntentType = Literal[
     "performance_latency",
     "production_incident",
     "billing_account",
+    "out_of_scope",
     "unknown",
 ]
 
@@ -20,6 +21,7 @@ SuggestedRoute = Literal[
     "hybrid",
     "incident",
     "clarification",
+    "out_of_scope",
 ]
 
 

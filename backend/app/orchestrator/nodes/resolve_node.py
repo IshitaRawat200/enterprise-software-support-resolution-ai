@@ -139,6 +139,26 @@ async def resolve_node(
     try:
         state["current_node"] = "resolve"
 
+        route = (state.get("route") or "").lower()
+        intent = (state.get("intent") or "").lower()
+        if route == "out_of_scope" or intent == "out_of_scope":
+            return {
+                "current_node": "resolve",
+                "response": (
+                    "I can help with ERIS enterprise support questions, but I don't handle "
+                    "general knowledge or unrelated topics. Please ask me about ERIS, APIs, "
+                    "tickets, configuration, or troubleshooting."
+                ),
+                "recommended_action": "Continue automated resolution.",
+                "severity": "low",
+                "severity_confidence": 0.0,
+                "severity_reason": "Out-of-scope request; no escalation required.",
+                "escalation_required": False,
+                "escalation_reason": None,
+                "human_handoff_required": False,
+                "errors": [],
+            }
+
         # ========================================================
         # CURRENT CUSTOMER MESSAGE
         # ========================================================

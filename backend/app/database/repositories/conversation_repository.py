@@ -104,6 +104,19 @@ class ConversationRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_ai_message_by_request_id_for_user(self, *, request_id: str, user_id: UUID) -> ConversationHistory | None:
+        result = await self.session.execute(
+            select(ConversationHistory)
+            .where(
+                ConversationHistory.role == "ai",
+                ConversationHistory.user_id == user_id,
+                ConversationHistory.metadata_.contains({"request_id": request_id}),
+            )
+            .order_by(ConversationHistory.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def update_message_metadata(self, *, message: ConversationHistory, metadata: dict[str, Any]) -> None:
         message.metadata_ = dict(metadata)
         await self.session.flush()
