@@ -81,3 +81,16 @@ async def test_json_llm_high_severity_enforces_escalation_and_reason(monkeypatch
     assert out["severity"] == "high"
     assert out["escalation_recommended"] is True
     assert out["escalation_reason"] is not None
+
+
+@pytest.mark.asyncio
+async def test_p1_security_incident_is_critical_and_escalates(monkeypatch):
+    monkeypatch.setattr(sa_mod, "get_llm", lambda complexity=None: _make_fake_llm({}))
+    agent = sa_mod.SeverityAssessmentAgent()
+
+    out = await agent.run(message="My security incident is classified P1.")
+
+    assert out["success"] is True
+    assert out["severity"] == "critical"
+    assert out["escalation_recommended"] is True
+    assert "P1" in (out["escalation_reason"] or "")

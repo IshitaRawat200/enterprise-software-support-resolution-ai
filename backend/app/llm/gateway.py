@@ -213,24 +213,12 @@ class LLMGateway:
         )
 
         # --------------------------------------------------------
-        # COMPLEX ROUTES
+        # FALLBACK OPTIONS
         # --------------------------------------------------------
         #
-        # Complex/high-risk already uses the large model.
-        # There is no second Groq model configured here.
-        #
-
-        if route.complexity == "complex":
-            return primary_llm
-
-        # --------------------------------------------------------
-        # SIMPLE / MEDIUM FALLBACK
-        # --------------------------------------------------------
-        #
-        # Groq is rate-limited on the shared on-demand plan. If the
-        # primary Groq model exhausts its quota, automatically retry
-        # using a cross-provider fallback rather than failing the whole
-        # request.
+        # Groq is rate-limited on the shared on-demand plan. We keep
+        # the primary Groq model for the selected route, but every route
+        # should have a cross-provider backup when a quota error occurs.
         #
 
         fallback_models: list[BaseChatModel] = []
@@ -238,22 +226,23 @@ class LLMGateway:
         if self.settings.openrouter_api_key:
             fallback_models.append(create_openrouter_llm())
 
-        if (
-            self.settings.groq_complex_model
-            and self.settings.groq_complex_model != route.model
-        ):
-            fallback_route = LLMRoute(
-                provider="groq",
-                model=self.settings.groq_complex_model,
-                complexity="complex",
-                reason=(
-                    "Fallback from Groq GPT-OSS-20B "
-                    "to GPT-OSS-120B."
-                ),
-            )
-            fallback_models.append(
-                self._create_primary_llm(route=fallback_route),
-            )
+        if route.complexity != "complex":
+            if (
+                self.settings.groq_complex_model
+                and self.settings.groq_complex_model != route.model
+            ):
+                fallback_route = LLMRoute(
+                    provider="groq",
+                    model=self.settings.groq_complex_model,
+                    complexity="complex",
+                    reason=(
+                        "Fallback from Groq GPT-OSS-20B "
+                        "to GPT-OSS-120B."
+                    ),
+                )
+                fallback_models.append(
+                    self._create_primary_llm(route=fallback_route),
+                )
 
         logger.info(
             "LLM Gateway fallback configured: primary=%s fallback_count=%s",

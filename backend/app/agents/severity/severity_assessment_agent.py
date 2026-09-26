@@ -119,6 +119,11 @@ class SeverityAssessmentAgent:
             r"\bapi key\b.*\bleaked\b",
             r"\bcredential\b.*\bcompromised\b",
             r"\bcredentials\b.*\bcompromised\b",
+            r"\bsecurity incident\b.*\bP1\b",
+            r"\bP1\b.*\bsecurity incident\b",
+            r"\bclassified\s+P1\b",
+            r"\bseverity\s*[:=-]?\s*P1\b",
+            r"\bpriority\s*[:=-]?\s*P1\b",
         ]
 
         for pattern in critical_security_patterns:
@@ -132,13 +137,13 @@ class SeverityAssessmentAgent:
                     "severity": "critical",
                     "confidence": 0.99,
                     "reason": (
-                        "The customer message contains a "
-                        "security or credential-compromise "
-                        "indicator."
+                        "The customer message indicates a "
+                        "security incident or P1-priority "
+                        "security case."
                     ),
                     "escalation_recommended": True,
                     "escalation_reason": (
-                        "Critical security incident requires human escalation."
+                        "Critical P1 security incident requires human escalation."
                     ),
                 }
 

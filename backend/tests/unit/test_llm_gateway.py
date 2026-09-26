@@ -58,3 +58,26 @@ def test_get_llm_uses_openrouter_fallback_when_groq_is_exhausted(monkeypatch):
 
     assert isinstance(llm, FakeGroq)
     assert any(isinstance(item, FakeOpenRouter) for item in llm.fallbacks)
+
+
+def test_get_llm_adds_openrouter_fallback_for_complex_workload(monkeypatch):
+    import app.llm.gateway as gateway_mod
+
+    class FakeGroq:
+        def __init__(self):
+            self.fallbacks = []
+
+        def with_fallbacks(self, fallbacks):
+            self.fallbacks = fallbacks
+            return self
+
+    class FakeOpenRouter:
+        pass
+
+    monkeypatch.setattr(gateway_mod, "create_groq_llm", lambda complexity: FakeGroq())
+    monkeypatch.setattr(gateway_mod, "create_openrouter_llm", lambda: FakeOpenRouter())
+
+    llm = gateway_mod.LLMGateway().get_llm(complexity="complex")
+
+    assert isinstance(llm, FakeGroq)
+    assert any(isinstance(item, FakeOpenRouter) for item in llm.fallbacks)
