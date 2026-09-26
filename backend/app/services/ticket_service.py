@@ -45,7 +45,7 @@ class TicketService:
         return await self.tickets.list_by_customer(
             customer_id,
         )
-    
+
     async def get_customer_ticket(
         self,
         *,
@@ -130,12 +130,9 @@ class TicketService:
         session_id: UUID | None = None,
         commit: bool = True,
     ):
-        explicit_human_handoff = (
-            bool(escalation_required)
-            and (
-                intent == "human_handoff"
-                or detect_explicit_human_request(message)["trigger"]
-            )
+        explicit_human_handoff = bool(escalation_required) and (
+            intent == "human_handoff"
+            or detect_explicit_human_request(message)["trigger"]
         )
 
         existing = None
@@ -351,9 +348,7 @@ class TicketService:
 
         priority = handoff_context.get("priority")
 
-        escalation_type = handoff_context.get(
-            "type"
-        ) or handoff_context.get(
+        escalation_type = handoff_context.get("type") or handoff_context.get(
             "escalation_type"
         )
 
@@ -363,16 +358,10 @@ class TicketService:
         if not escalation_type and escalation_required:
             escalation_type = "human_requested"
 
-        if (
-            handoff_context.get("priority") is None
-            and priority is not None
-        ):
+        if handoff_context.get("priority") is None and priority is not None:
             handoff_context["priority"] = priority
 
-        if (
-            handoff_context.get("type") is None
-            and escalation_type is not None
-        ):
+        if handoff_context.get("type") is None and escalation_type is not None:
             handoff_context["type"] = escalation_type
 
         if (
@@ -381,31 +370,21 @@ class TicketService:
         ):
             handoff_context["escalation_type"] = escalation_type
 
-        explicit_human_request = detect_explicit_human_request(
-            message
-        )["trigger"]
+        explicit_human_request = detect_explicit_human_request(message)["trigger"]
 
-        if (
-            escalation_required
-            and (
-                explicit_human_request
-                or intent == "human_handoff"
-                or (
-                    isinstance(handoff_context, dict)
-                    and handoff_context.get("type")
-                    == "human_requested"
-                )
+        if escalation_required and (
+            explicit_human_request
+            or intent == "human_handoff"
+            or (
+                isinstance(handoff_context, dict)
+                and handoff_context.get("type") == "human_requested"
             )
         ):
             escalation_reason_text = (
-                "Customer explicitly requested human "
-                "support intervention."
+                "Customer explicitly requested human support intervention."
             )
         else:
-            escalation_reason_text = (
-                escalation_reason
-                or "Human intervention required."
-            )
+            escalation_reason_text = escalation_reason or "Human intervention required."
 
         # Save the final escalation reason directly
         # on the support ticket.
@@ -432,16 +411,10 @@ class TicketService:
                 "recommended_action": recommended_action,
                 "context": handoff_context,
                 "customer_id": str(customer_id),
-                "conversation_id": (
-                    str(session_id)
-                    if session_id
-                    else None
-                ),
+                "conversation_id": (str(session_id) if session_id else None),
             },
             "investigation_summary": (
-                ai_investigation_summary
-                or handoff_summary
-                or recommended_action
+                ai_investigation_summary or handoff_summary or recommended_action
             ),
         }
 
@@ -452,12 +425,8 @@ class TicketService:
                 reason=escalation_result["reason"],
                 severity=escalation_result["severity"],
                 confidence=confidence,
-                handoff_package=escalation_result[
-                    "handoff_package"
-                ],
-                investigation_summary=escalation_result[
-                    "investigation_summary"
-                ],
+                handoff_package=escalation_result["handoff_package"],
+                investigation_summary=escalation_result["investigation_summary"],
             )
 
             escalation_result["id"] = escalation.id

@@ -55,8 +55,7 @@ class TicketRepository:
         self,
     ) -> list[SupportTicket]:
         result = await self.session.execute(
-            select(SupportTicket)
-            .order_by(SupportTicket.created_at.desc())
+            select(SupportTicket).order_by(SupportTicket.created_at.desc())
         )
 
         return list(result.scalars().all())

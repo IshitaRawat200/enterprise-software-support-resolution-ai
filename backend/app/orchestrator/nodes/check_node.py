@@ -216,7 +216,8 @@ async def check_node(
             if sql_success
             else (
                 documentation_only_hybrid
-                and hybrid_confidence >= HybridRetrievalService.SUFFICIENT_EVIDENCE_THRESHOLD
+                and hybrid_confidence
+                >= HybridRetrievalService.SUFFICIENT_EVIDENCE_THRESHOLD
                 and retrieval_confidence >= RetrievalAgent.SUFFICIENT_EVIDENCE_THRESHOLD
             )
         )

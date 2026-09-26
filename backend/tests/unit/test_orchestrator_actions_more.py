@@ -176,7 +176,9 @@ def test_run_hybrid_guidance_only_request_treats_sql_gap_as_recoverable(monkeypa
 
         async def run(self, query, customer_id=None, session=None):
             return {
-                "rag_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+                "rag_results": [
+                    {"title": "429 Policy", "content": "Use Retry-After and backoff."}
+                ],
                 "rag_confidence": 0.64,
                 "sufficient_evidence": True,
                 "sql_result": {

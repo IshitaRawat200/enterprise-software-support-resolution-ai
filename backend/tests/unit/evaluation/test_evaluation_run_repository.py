@@ -27,7 +27,7 @@ class FakeSession:
 
         filtered_runs = self.runs
 
-        if 'status = \'completed\'' in compiled_sql:
+        if "status = 'completed'" in compiled_sql:
             filtered_runs = [run for run in self.runs if run.status == "completed"]
 
         filtered_runs = sorted(

@@ -19,8 +19,6 @@ async def get_production_evaluator() -> ProductionEvaluator:
 
     async with _evaluator_lock:
         if _evaluator is None:
-            _evaluator = ProductionEvaluator(
-                ragas_evaluator=RagasEvaluator()
-            )
+            _evaluator = ProductionEvaluator(ragas_evaluator=RagasEvaluator())
 
     return _evaluator

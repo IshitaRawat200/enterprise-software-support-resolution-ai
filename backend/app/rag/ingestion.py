@@ -59,18 +59,12 @@ class RAGDocumentIngestionService:
     ) -> list[LlamaIndexDocument]:
         loaded_documents = self.loader.load_file(file_path)
 
-        processed_documents = self.processor.process(
-            loaded_documents
-        )
+        processed_documents = self.processor.process(loaded_documents)
 
-        chunks = self.chunker.split_documents(
-            processed_documents
-        )
+        chunks = self.chunker.split_documents(processed_documents)
 
         if not chunks:
-            raise ValueError(
-                f"No chunks generated from {file_path}"
-            )
+            raise ValueError(f"No chunks generated from {file_path}")
 
         llama_documents: list[LlamaIndexDocument] = []
 
@@ -94,22 +88,14 @@ class RAGDocumentIngestionService:
         directory_path: str | Path,
         metadata: dict[str, Any] | None = None,
     ) -> list[LlamaIndexDocument]:
-        loaded_documents = self.loader.load_directory(
-            directory_path
-        )
+        loaded_documents = self.loader.load_directory(directory_path)
 
-        processed_documents = self.processor.process(
-            loaded_documents
-        )
+        processed_documents = self.processor.process(loaded_documents)
 
-        chunks = self.chunker.split_documents(
-            processed_documents
-        )
+        chunks = self.chunker.split_documents(processed_documents)
 
         if not chunks:
-            raise ValueError(
-                f"No chunks generated from {directory_path}"
-            )
+            raise ValueError(f"No chunks generated from {directory_path}")
 
         llama_documents: list[LlamaIndexDocument] = []
 
@@ -166,9 +152,7 @@ class DBRAGIngestionService:
 
         self.embedding_service = RAGEmbeddingService()
 
-        self.repository = RAGDatabaseRepository(
-            session
-        )
+        self.repository = RAGDatabaseRepository(session)
 
     async def ingest_file(
         self,
@@ -189,9 +173,7 @@ class DBRAGIngestionService:
         )
 
         if not documents:
-            raise ValueError(
-                f"No documents generated from {file_path}"
-            )
+            raise ValueError(f"No documents generated from {file_path}")
 
         chunk_rows: list[DocumentChunk] = []
 
@@ -201,21 +183,13 @@ class DBRAGIngestionService:
             if not content:
                 continue
 
-            embedding = self.embedding_service.embed_document(
-                content
-            )
+            embedding = self.embedding_service.embed_document(content)
 
-            chunk_metadata = dict(
-                document.metadata or {}
-            )
+            chunk_metadata = dict(document.metadata or {})
 
-            chunk_metadata["document_id"] = str(
-                document_id
-            )
+            chunk_metadata["document_id"] = str(document_id)
 
-            chunk_metadata["chunk_index"] = (
-                chunk_index
-            )
+            chunk_metadata["chunk_index"] = chunk_index
 
             chunk_rows.append(
                 DocumentChunk(
@@ -229,9 +203,7 @@ class DBRAGIngestionService:
             )
 
         if not chunk_rows:
-            raise ValueError(
-                f"No usable chunks generated from {file_path}"
-            )
+            raise ValueError(f"No usable chunks generated from {file_path}")
 
         self.session.add_all(chunk_rows)
 
@@ -256,9 +228,7 @@ class DBRAGIngestionService:
         )
 
         if not documents:
-            raise ValueError(
-                f"No documents generated from {directory_path}"
-            )
+            raise ValueError(f"No documents generated from {directory_path}")
 
         chunk_rows: list[DocumentChunk] = []
 
@@ -268,21 +238,13 @@ class DBRAGIngestionService:
             if not content:
                 continue
 
-            embedding = self.embedding_service.embed_document(
-                content
-            )
+            embedding = self.embedding_service.embed_document(content)
 
-            chunk_metadata = dict(
-                document.metadata or {}
-            )
+            chunk_metadata = dict(document.metadata or {})
 
-            chunk_metadata["document_id"] = str(
-                document_id
-            )
+            chunk_metadata["document_id"] = str(document_id)
 
-            chunk_metadata["chunk_index"] = (
-                chunk_index
-            )
+            chunk_metadata["chunk_index"] = chunk_index
 
             chunk_rows.append(
                 DocumentChunk(
@@ -296,9 +258,7 @@ class DBRAGIngestionService:
             )
 
         if not chunk_rows:
-            raise ValueError(
-                f"No usable chunks generated from {directory_path}"
-            )
+            raise ValueError(f"No usable chunks generated from {directory_path}")
 
         self.session.add_all(chunk_rows)
 

@@ -101,7 +101,6 @@ class ChatResponse(BaseModel):
     # Evaluation / Observability
     # --------------------------------------------------------
 
-
     accuracy: float | None = None
     faithfulness: float | None = None
     answer_relevance: float | None = None
@@ -208,6 +207,7 @@ class ChatResponse(BaseModel):
         default_factory=list,
     )
 
+
 class ConversationMessageResponse(BaseModel):
     id: str
     role: str
@@ -220,9 +220,7 @@ class ConversationMessageResponse(BaseModel):
 class ConversationResponse(BaseModel):
     conversation_id: str
     created_at: str | None = None
-    messages: list[ConversationMessageResponse] = Field(
-        default_factory=list
-    )
+    messages: list[ConversationMessageResponse] = Field(default_factory=list)
 
 
 class EvaluationStatusResponse(BaseModel):
@@ -238,6 +236,8 @@ class EvaluationStatusResponse(BaseModel):
     cost_usd: float | None = None
     latency_ms: float | None = None
     ragas_errors: list[str] = Field(default_factory=list)
+
+
 # ============================================================
 # ORM → DICT
 # ============================================================
@@ -325,6 +325,7 @@ def build_conversation_context(
 
     return "\n".join(lines)
 
+
 async def run_post_response_evaluation(
     *,
     request_id: str,
@@ -411,16 +412,13 @@ async def run_post_response_evaluation(
         )
 
         logger.info(
-            "Opening fresh DB session for RAGAS persistence "
-            "request_id=%s",
+            "Opening fresh DB session for RAGAS persistence request_id=%s",
             request_id,
         )
 
         async for db_session in get_db_session():
             try:
-                conversation_service = ConversationService(
-                    db_session
-                )
+                conversation_service = ConversationService(db_session)
 
                 await conversation_service.update_ai_message_evaluation(
                     request_id=request_id,
@@ -430,8 +428,7 @@ async def run_post_response_evaluation(
                 await db_session.commit()
 
                 logger.info(
-                    "Persisted asynchronous RAGAS evaluation "
-                    "request_id=%s",
+                    "Persisted asynchronous RAGAS evaluation request_id=%s",
                     request_id,
                 )
 
@@ -439,8 +436,7 @@ async def run_post_response_evaluation(
                 await db_session.rollback()
 
                 logger.exception(
-                    "Failed to persist RAGAS evaluation "
-                    "request_id=%s",
+                    "Failed to persist RAGAS evaluation request_id=%s",
                     request_id,
                 )
 
@@ -450,16 +446,13 @@ async def run_post_response_evaluation(
 
     except asyncio.CancelledError:
         logger.warning(
-            "RAGAS asyncio task was cancelled "
-            "request_id=%s",
+            "RAGAS asyncio task was cancelled request_id=%s",
             request_id,
         )
 
         try:
             async for db_session in get_db_session():
-                conversation_service = ConversationService(
-                    db_session
-                )
+                conversation_service = ConversationService(db_session)
 
                 await conversation_service.update_ai_message_evaluation(
                     request_id=request_id,
@@ -471,9 +464,7 @@ async def run_post_response_evaluation(
                         "route_accuracy": None,
                         "ragas_evaluated": False,
                         "evaluation_status": "failed",
-                        "ragas_errors": [
-                            "RAGAS evaluation task was cancelled"
-                        ],
+                        "ragas_errors": ["RAGAS evaluation task was cancelled"],
                     },
                 )
 
@@ -482,8 +473,7 @@ async def run_post_response_evaluation(
 
         except Exception:  # noqa: BLE001
             logger.exception(
-                "Failed to persist cancelled RAGAS evaluation "
-                "request_id=%s",
+                "Failed to persist cancelled RAGAS evaluation request_id=%s",
                 request_id,
             )
 
@@ -491,17 +481,14 @@ async def run_post_response_evaluation(
 
     except Exception as exc:  # noqa: BLE001
         logger.exception(
-            "Asynchronous RAGAS evaluation failed "
-            "request_id=%s error=%s",
+            "Asynchronous RAGAS evaluation failed request_id=%s error=%s",
             request_id,
             str(exc),
         )
 
         try:
             async for db_session in get_db_session():
-                conversation_service = ConversationService(
-                    db_session
-                )
+                conversation_service = ConversationService(db_session)
 
                 await conversation_service.update_ai_message_evaluation(
                     request_id=request_id,
@@ -513,9 +500,7 @@ async def run_post_response_evaluation(
                         "route_accuracy": None,
                         "ragas_evaluated": False,
                         "evaluation_status": "failed",
-                        "ragas_errors": [
-                            f"{type(exc).__name__}: {exc}"
-                        ],
+                        "ragas_errors": [f"{type(exc).__name__}: {exc}"],
                     },
                 )
 
@@ -524,8 +509,7 @@ async def run_post_response_evaluation(
 
         except Exception:  # noqa: BLE001
             logger.exception(
-                "Failed to persist failed RAGAS evaluation "
-                "request_id=%s",
+                "Failed to persist failed RAGAS evaluation request_id=%s",
                 request_id,
             )
 
@@ -573,43 +557,32 @@ async def list_conversations(
 
     async for db_session in get_db_session():
         try:
-            conversation_service = ConversationService(
-                db_session
-            )
+            conversation_service = ConversationService(db_session)
 
             sessions = await conversation_service.list_sessions(
                 user_id=user_id,
             )
 
-            conversations: list[
-                ConversationResponse
-            ] = []
+            conversations: list[ConversationResponse] = []
 
             for session in sessions:
-                session_id = session.get(
-                    "session_id"
-                )
+                session_id = session.get("session_id")
 
                 if session_id is None:
                     continue
 
                 # Your repository may call this last_activity
                 # because the session query uses MAX(created_at).
-                conversation_timestamp = (
-                    session.get("created_at")
-                    or session.get("last_activity")
+                conversation_timestamp = session.get("created_at") or session.get(
+                    "last_activity"
                 )
 
-                history = (
-                    await conversation_service.get_history(
-                        session_id=session_id,
-                        user_id=user_id,
-                    )
+                history = await conversation_service.get_history(
+                    session_id=session_id,
+                    user_id=user_id,
                 )
 
-                messages: list[
-                    ConversationMessageResponse
-                ] = []
+                messages: list[ConversationMessageResponse] = []
 
                 for item in history:
                     item_metadata = getattr(
@@ -630,24 +603,16 @@ async def list_conversations(
                             role=str(item.role),
                             content=item.content or "",
                             created_at=(
-                                item.created_at.isoformat()
-                                if item.created_at
-                                else None
+                                item.created_at.isoformat() if item.created_at else None
                             ),
-                            ticket_id=(
-                                str(item.ticket_id)
-                                if item.ticket_id
-                                else None
-                            ),
+                            ticket_id=(str(item.ticket_id) if item.ticket_id else None),
                             metadata=item_metadata,
                         )
                     )
 
                 conversations.append(
                     ConversationResponse(
-                        conversation_id=str(
-                            session_id
-                        ),
+                        conversation_id=str(session_id),
                         created_at=(
                             conversation_timestamp.isoformat()
                             if conversation_timestamp
@@ -664,8 +629,7 @@ async def list_conversations(
 
         except Exception as exc:
             logger.exception(
-                "Failed to list conversations "
-                "user_id=%s error=%s",
+                "Failed to list conversations user_id=%s error=%s",
                 user_id,
                 str(exc),
             )
@@ -715,9 +679,7 @@ async def get_evaluation_status(
 
     async for db_session in get_db_session():
         try:
-            conversation_service = ConversationService(
-                db_session
-            )
+            conversation_service = ConversationService(db_session)
 
             metadata = await conversation_service.get_ai_message_metadata_by_request_id_for_user(
                 request_id=request_id,
@@ -739,17 +701,14 @@ async def get_evaluation_status(
             if not isinstance(ragas_errors, list):
                 ragas_errors = []
 
-            evaluation_status = (
-                metadata.get("evaluation_status")
-                or nested_eval.get("status")
+            evaluation_status = metadata.get("evaluation_status") or nested_eval.get(
+                "status"
             )
 
             return EvaluationStatusResponse(
                 request_id=request_id,
                 evaluation_status=(
-                    str(evaluation_status)
-                    if evaluation_status is not None
-                    else None
+                    str(evaluation_status) if evaluation_status is not None else None
                 ),
                 accuracy=metadata.get("accuracy"),
                 faithfulness=metadata.get("faithfulness"),
@@ -768,8 +727,7 @@ async def get_evaluation_status(
 
         except Exception as exc:
             logger.exception(
-                "Failed to load evaluation status "
-                "request_id=%s user_id=%s error=%s",
+                "Failed to load evaluation status request_id=%s user_id=%s error=%s",
                 request_id,
                 user_id,
                 str(exc),
@@ -784,6 +742,7 @@ async def get_evaluation_status(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Unable to initialize database session.",
     )
+
 
 # ============================================================
 # CHAT
@@ -1074,26 +1033,21 @@ async def chat(
                 "customer_id": str(customer_id),
                 "conversation_history": history,
                 "conversation_context": conversation_context,
-
                 # Current-turn workflow state — reset
                 "errors": [],
                 "iteration": 0,
                 "max_iterations": 2,
                 "replan_required": False,
-
                 "intent": None,
                 "route": None,
-
                 "severity": None,
                 "severity_confidence": 0.0,
                 "severity_reason": None,
-
                 "escalation_required": False,
                 "escalation_reason": None,
                 "escalation_priority": None,
                 "escalation_type": None,
                 "human_handoff_required": False,
-
                 "incident_active": False,
                 "incident_status": None,
                 "incident_code": None,
@@ -1102,7 +1056,6 @@ async def chat(
                 "incident_unresolved_critical_alert": False,
                 "incident_security_related": False,
                 "incident_data_loss_reported": False,
-
                 "ticket_id": None,
                 "ticket_number": None,
                 "ticket_created": False,
@@ -1110,18 +1063,14 @@ async def chat(
                 "ticket_required": False,
                 "ticket_reason": None,
                 "ticket_action": None,
-
                 "retrieval_results": [],
                 "retrieval_confidence": 0.0,
                 "sufficient_evidence": False,
-
                 "sql_query": None,
                 "sql_rows": [],
                 "sql_success": False,
-
                 "hybrid_results": [],
                 "hybrid_success": False,
-
                 "response": None,
             }
 
@@ -1424,7 +1373,11 @@ async def chat(
                         or "human_requested"
                     )
                     result["handoff_context"] = {
-                        **(persistence.get("handoff_context") or result.get("handoff_context") or {}),
+                        **(
+                            persistence.get("handoff_context")
+                            or result.get("handoff_context")
+                            or {}
+                        ),
                         "priority": (
                             persistence.get("escalation_priority")
                             or result.get("escalation_priority")
@@ -1441,14 +1394,12 @@ async def chat(
                             or "human_requested"
                         ),
                     }
-                    result["handoff_summary"] = (
-                        persistence.get("handoff_summary")
-                        or result.get("handoff_summary")
-                    )
-                    result["recommended_action"] = (
-                        persistence.get("recommended_action")
-                        or result.get("recommended_action")
-                    )
+                    result["handoff_summary"] = persistence.get(
+                        "handoff_summary"
+                    ) or result.get("handoff_summary")
+                    result["recommended_action"] = persistence.get(
+                        "recommended_action"
+                    ) or result.get("recommended_action")
 
                     logger.info(
                         "Persistent escalation ticket created request_id=%s conversation_id=%s ticket_id=%s escalation_id=%s",
@@ -1560,9 +1511,7 @@ async def chat(
                 output_allowed=response_guardrail_result.allowed,
             )
 
-            evaluation_case = get_evaluation_case(
-                sanitized_message
-            )
+            evaluation_case = get_evaluation_case(sanitized_message)
 
             async_evaluation_enabled = _should_schedule_async_evaluation(
                 route=result.get("route"),
@@ -1599,9 +1548,7 @@ async def chat(
                     False,
                 ),
                 "evaluation_status": (
-                    "pending"
-                    if async_evaluation_enabled
-                    else "completed"
+                    "pending" if async_evaluation_enabled else "completed"
                 ),
                 "accuracy": None,
                 "faithfulness": None,
@@ -1613,11 +1560,7 @@ async def chat(
                 "cost_usd": request_metrics.get("cost_usd"),
                 "latency_ms": request_metrics.get("latency_ms"),
                 "evaluation": {
-                    "status": (
-                        "pending"
-                        if async_evaluation_enabled
-                        else "completed"
-                    ),
+                    "status": ("pending" if async_evaluation_enabled else "completed"),
                     "accuracy": None,
                     "faithfulness": None,
                     "answer_relevance": None,
@@ -1675,9 +1618,7 @@ async def chat(
 
                 _ragas_tasks.add(evaluation_task)
 
-                evaluation_task.add_done_callback(
-                    _ragas_tasks.discard
-                )
+                evaluation_task.add_done_callback(_ragas_tasks.discard)
 
                 logger.info(
                     "Asynchronous RAGAS asyncio task created "
@@ -1708,9 +1649,7 @@ async def chat(
                 conversation_id=str(session_id),
                 request_id=request_id,
                 evaluation_status=(
-                    "pending"
-                    if async_evaluation_enabled
-                    else "completed"
+                    "pending" if async_evaluation_enabled else "completed"
                 ),
                 # Intent
                 intent=result.get("intent"),
@@ -1721,7 +1660,6 @@ async def chat(
                 intent_reason=result.get("intent_reason"),
                 # Routing
                 route=result.get("route"),
-
                 # Evaluation / Observability
                 accuracy=result.get("accuracy"),
                 faithfulness=result.get("faithfulness"),
@@ -1732,7 +1670,6 @@ async def chat(
                 guardrail_effectiveness=guardrail_effectiveness,
                 cost_usd=request_metrics.get("cost_usd"),
                 latency_ms=request_metrics.get("latency_ms"),
-
                 # RAG
                 retrieval_confidence=result.get(
                     "retrieval_confidence",
@@ -1798,9 +1735,7 @@ async def chat(
                 escalation_type=result.get("escalation_type"),
                 escalation_reference_id=result.get("escalation_reference_id"),
                 ticket_id=(
-                    str(result.get("ticket_id"))
-                    if result.get("ticket_id")
-                    else None
+                    str(result.get("ticket_id")) if result.get("ticket_id") else None
                 ),
                 escalation_id=(
                     str(result.get("escalation_reference_id"))
@@ -1872,6 +1807,8 @@ async def chat(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=("Unable to initialize database session."),
     )
+
+
 def calculate_guardrail_effectiveness(
     *,
     input_allowed: bool,
@@ -1886,8 +1823,4 @@ def calculate_guardrail_effectiveness(
     This is an operational metric, not one of the six approved SLOs.
     """
 
-    return (
-        100.0
-        if input_allowed and output_allowed
-        else 0.0
-    )
+    return 100.0 if input_allowed and output_allowed else 0.0

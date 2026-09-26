@@ -74,10 +74,7 @@ def is_low_risk_informational_request(state: SupportState) -> bool:
     if bool(state.get("incident_affects_production", False)):
         return False
 
-    if bool(state.get("incident_unresolved_critical_alert", False)):
-        return False
-
-    return True
+    return not bool(state.get("incident_unresolved_critical_alert", False))
 
 
 def hybrid_requires_sql_evidence(state: SupportState) -> bool:
@@ -94,10 +91,9 @@ def hybrid_requires_sql_evidence(state: SupportState) -> bool:
     if any(re.search(pattern, text) for pattern in _SQL_REQUIRED_HYBRID_PATTERNS):
         return True
 
-    if any(re.search(pattern, text) for pattern in _GUIDANCE_ONLY_HYBRID_PATTERNS):
-        return False
-
-    return True
+    return not any(
+        re.search(pattern, text) for pattern in _GUIDANCE_ONLY_HYBRID_PATTERNS
+    )
 
 
 def can_resolve_hybrid_from_documentation(state: SupportState) -> bool:

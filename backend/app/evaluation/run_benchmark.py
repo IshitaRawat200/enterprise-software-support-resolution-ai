@@ -52,7 +52,9 @@ async def _store_evaluation_run(*, report: dict[str, Any], total_cases: int) -> 
         break
 
 
-def _should_persist_evaluation_run(evaluation_results, *, expected_case_count: int) -> bool:
+def _should_persist_evaluation_run(
+    evaluation_results, *, expected_case_count: int
+) -> bool:
     if len(evaluation_results) != expected_case_count:
         return False
 
@@ -66,8 +68,12 @@ def print_report(report: dict[str, Any]) -> None:
     print("=" * 60)
     print("ENTERPRISE SUPPORT SLO EVALUATION")
     print("=" * 60)
-    print(f"TSR: {slo.get('tsr_percent', 0.0):.2f}% {'PASS' if slo.get('tsr_passed') else 'FAIL'}")
-    print(f"P95 Latency: {slo.get('p95_latency_ms', 0.0):.2f} ms {'PASS' if slo.get('latency_passed') else 'FAIL'}")
+    print(
+        f"TSR: {slo.get('tsr_percent', 0.0):.2f}% {'PASS' if slo.get('tsr_passed') else 'FAIL'}"
+    )
+    print(
+        f"P95 Latency: {slo.get('p95_latency_ms', 0.0):.2f} ms {'PASS' if slo.get('latency_passed') else 'FAIL'}"
+    )
     print(
         f"SQL Correctness: {slo.get('sql_correctness_percent', 0.0):.2f}% "
         f"{'PASS' if slo.get('sql_correctness_passed') else 'FAIL'}"
@@ -76,7 +82,9 @@ def print_report(report: dict[str, Any]) -> None:
         f"Critical Misclassification: {slo.get('critical_misclassification_percent', 0.0):.2f}% "
         f"{'PASS' if slo.get('critical_misclassification_passed') else 'FAIL'}"
     )
-    print(f"Average Cost: ${slo.get('average_cost_usd', 0.0):.6f} {'PASS' if slo.get('cost_passed') else 'FAIL'}")
+    print(
+        f"Average Cost: ${slo.get('average_cost_usd', 0.0):.6f} {'PASS' if slo.get('cost_passed') else 'FAIL'}"
+    )
     print("-" * 60)
     print(f"OVERALL SLO: {'PASS' if slo.get('overall_passed') else 'FAIL'}")
     print("=" * 60)
@@ -94,21 +102,33 @@ async def run_benchmark() -> None:
         support_graph = getattr(app.state, "support_graph", None)
 
         if support_graph is None:
-            raise RuntimeError("support_graph was not initialized by the application lifespan.")
+            raise RuntimeError(
+                "support_graph was not initialized by the application lifespan."
+            )
 
         workflow = create_workflow_adapter(support_graph)
         evaluation_results = await evaluate_dataset(workflow, cases=cases)
         report = build_report(evaluation_results)
 
-        latencies_ms = [result.latency_ms for result in evaluation_results if result.latency_ms is not None]
+        latencies_ms = [
+            result.latency_ms
+            for result in evaluation_results
+            if result.latency_ms is not None
+        ]
         report["p95_langfuse"] = publish_p95_to_langfuse(latencies_ms)
 
         report_path = save_report(report)
 
-        if _should_persist_evaluation_run(evaluation_results, expected_case_count=len(cases)):
-            await _store_evaluation_run(report=report, total_cases=len(evaluation_results))
+        if _should_persist_evaluation_run(
+            evaluation_results, expected_case_count=len(cases)
+        ):
+            await _store_evaluation_run(
+                report=report, total_cases=len(evaluation_results)
+            )
         else:
-            print("Evaluation run was not persisted because it was incomplete or contained case errors.")
+            print(
+                "Evaluation run was not persisted because it was incomplete or contained case errors."
+            )
 
         print_report(report)
         print(f"Report saved to: {report_path}")

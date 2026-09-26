@@ -191,7 +191,10 @@ async def run_hybrid(state: SupportState) -> dict[str, Any]:
                 and not sql_success
                 and bool(sql_error)
                 and bool(hybrid_errors)
-                and all(str(error).strip() == str(sql_error).strip() for error in hybrid_errors)
+                and all(
+                    str(error).strip() == str(sql_error).strip()
+                    for error in hybrid_errors
+                )
             )
 
             fatal_hybrid_errors = [] if recoverable_sql_gap else hybrid_errors

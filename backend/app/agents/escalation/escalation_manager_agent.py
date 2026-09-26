@@ -113,12 +113,10 @@ class EscalationManagerAgent:
             or "api key compromised" in normalized_message
             or "security vulnerability" in normalized_message
             or (
-                "security incident" in normalized_message
-                and "p1" in normalized_message
+                "security incident" in normalized_message and "p1" in normalized_message
             )
             or (
-                "p1" in normalized_message
-                and "security incident" in normalized_message
+                "p1" in normalized_message and "security incident" in normalized_message
             )
             or "classified p1" in normalized_message
             or "severity p1" in normalized_message

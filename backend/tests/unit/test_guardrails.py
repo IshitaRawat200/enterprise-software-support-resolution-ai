@@ -656,7 +656,9 @@ def test_default_password_documentation_is_allowed():
 
 
 def test_default_password_documentation_in_markdown_is_allowed():
-    result = validate_output_text("* Password: `changeme` (must be changed on first login)")
+    result = validate_output_text(
+        "* Password: `changeme` (must be changed on first login)"
+    )
 
     assert result.allowed is True
 
@@ -683,6 +685,26 @@ def test_example_password_in_markdown_is_allowed():
     result = validate_output_text("Password: `example123`")
 
     assert result.allowed is True
+
+
+def test_documentation_api_key_example_is_allowed():
+    result = validate_output_text("X-API-Key: sk_live_abc123xyz")
+
+    assert result.allowed is True
+
+
+def test_documentation_api_key_assignment_in_markdown_is_allowed():
+    result = validate_output_text("`X-API-Key`: `sk_test_abc123xyz`")
+
+    assert result.allowed is True
+
+
+def test_documentation_example_sanitization_replaces_literal_key_values():
+    text, result = sanitize_output_text('curl -H "X-API-Key: sk_live_abc123xyz" https://api.example.com')
+
+    assert result.allowed is True
+    assert "sk_live_abc123xyz" not in text
+    assert "<your_api_key>" in text
 
 
 def test_realistic_password_assignment_is_blocked():
@@ -959,7 +981,9 @@ def test_explicit_human_request_is_detected():
     result = detect_explicit_human_request("Please speak to a human.")
 
     assert result["trigger"] is True
-    assert result["reason"] == "Customer explicitly requested human support intervention."
+    assert (
+        result["reason"] == "Customer explicitly requested human support intervention."
+    )
 
 
 def test_normal_message_does_not_trigger_human_request():

@@ -43,9 +43,8 @@ class ProductionEvaluator:
             )
         except Exception as exc:
             logger.exception(
-                "Production evaluation failed request_id=%s error=%s",
+                "Production evaluation failed request_id=%s",
                 request_id,
-                exc,
             )
             return {
                 "request_id": request_id,

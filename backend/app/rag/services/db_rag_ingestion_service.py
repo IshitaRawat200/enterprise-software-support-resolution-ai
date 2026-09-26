@@ -72,9 +72,7 @@ class DBRAGIngestionService:
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(
-                f"Document not found: {path}"
-            )
+            raise FileNotFoundError(f"Document not found: {path}")
 
         document_name = (
             original_filename.strip()
@@ -92,9 +90,7 @@ class DBRAGIngestionService:
         )
 
         if not documents:
-            raise ValueError(
-                f"No chunks generated from {path}."
-            )
+            raise ValueError(f"No chunks generated from {path}.")
 
         # -------------------------------------------------
         # Preserve the actual uploaded filename
@@ -116,9 +112,7 @@ class DBRAGIngestionService:
         from app.database.models.knowledge import DocumentChunk
 
         await self.session.execute(
-            delete(DocumentChunk).where(
-                DocumentChunk.document_id == document_id
-            )
+            delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
         )
 
         # -------------------------------------------------
@@ -135,9 +129,7 @@ class DBRAGIngestionService:
                     continue
 
                 # Generate embedding
-                embedding = self.embedding_service.embed_document(
-                    content
-                )
+                embedding = self.embedding_service.embed_document(content)
 
                 chunk_metadata = {
                     **document.metadata,
@@ -161,9 +153,7 @@ class DBRAGIngestionService:
                 chunks_created += 1
 
             if chunks_created == 0:
-                raise ValueError(
-                    f"No non-empty chunks generated from {path}."
-                )
+                raise ValueError(f"No non-empty chunks generated from {path}.")
 
             # -------------------------------------------------
             # Commit document chunks
@@ -183,10 +173,14 @@ class DBRAGIngestionService:
             await FusionRetrievalService.invalidate_cache(
                 reason="document_upload_or_ingestion"
             )
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, AttributeError):
             # Cache invalidation failure should not make an
             # otherwise successful ingestion fail.
-            pass
+            logger = __import__("logging").getLogger("enterprise_support_ai")
+            logger.debug(
+                "Retrieval cache invalidation failed during document ingestion",
+                exc_info=True,
+            )
 
         return {
             "status": "indexed",
@@ -194,7 +188,5 @@ class DBRAGIngestionService:
             "document_name": document_name,
             "document_type": path.suffix.lower(),
             "chunks_created": chunks_created,
-            "embedding_dimension": (
-                self.embedding_service.EMBEDDING_DIMENSION
-            ),
+            "embedding_dimension": (self.embedding_service.EMBEDDING_DIMENSION),
         }

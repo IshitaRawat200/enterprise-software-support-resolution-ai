@@ -63,103 +63,59 @@ class SLOEvaluator:
 
         return {
             "request_id": (
-                request_id
-                if request_id is not None
-                else result.get("request_id")
+                request_id if request_id is not None else result.get("request_id")
             ),
-
             "latency_ms": latency_ms,
-
-            "intent": (
-                intent
-                if intent is not None
-                else result.get("intent")
-            ),
-
+            "intent": (intent if intent is not None else result.get("intent")),
             "intent_confidence": (
                 intent_confidence
                 if intent_confidence is not None
                 else result.get("intent_confidence")
             ),
-
             "sql_confidence": (
                 sql_confidence
                 if sql_confidence is not None
                 else result.get("sql_confidence")
             ),
-
             "severity_confidence": (
                 severity_confidence
                 if severity_confidence is not None
                 else result.get("severity_confidence")
             ),
-
-            "route": (
-                route
-                if route is not None
-                else result.get("route")
-            ),
-
-            "severity": (
-                severity
-                if severity is not None
-                else result.get("severity")
-            ),
-
+            "route": (route if route is not None else result.get("route")),
+            "severity": (severity if severity is not None else result.get("severity")),
             "escalation_required": (
                 escalation_required
                 if escalation_required is not None
                 else result.get("escalation_required")
             ),
-
             "retrieval_confidence": (
                 retrieval_confidence
                 if retrieval_confidence is not None
                 else result.get("retrieval_confidence")
             ),
-
             "accuracy": accuracy,
             "faithfulness": faithfulness,
             "answer_relevance": answer_relevance,
             "context_precision": context_precision,
             "context_recall": context_recall,
             "route_accuracy": route_accuracy,
-
-            "guardrail_effectiveness": (
-                guardrail_effectiveness
-            ),
-
+            "guardrail_effectiveness": (guardrail_effectiveness),
             "cost_usd": cost_usd,
-
             "sufficient_evidence": (
                 sufficient_evidence
                 if sufficient_evidence is not None
                 else result.get("sufficient_evidence")
             ),
-
             "retrieval_result_count": (
                 retrieval_result_count
                 if retrieval_result_count is not None
-                else len(
-                    result.get(
-                        "retrieval_results"
-                    ) or []
-                )
+                else len(result.get("retrieval_results") or [])
             ),
+            "errors": (errors if errors is not None else result.get("errors") or []),
+            "status": (status if status is not None else result.get("status")),
+        }
 
-            "errors": (
-                errors
-                if errors is not None
-                else result.get("errors") or []
-            ),
-
-            "status": (
-                status
-                if status is not None
-                else result.get("status")
-            ),
-        }    
-    
     # ========================================================
     # SUPPORT RESULT
     # ========================================================
@@ -175,29 +131,15 @@ class SLOEvaluator:
             "request_id": result.get("request_id"),
             "latency_ms": result.get("latency_ms"),
             "intent": result.get("intent"),
-            "intent_confidence": result.get(
-                "intent_confidence"
-            ),
-            "sql_confidence": result.get(
-                "sql_confidence"
-            ),
-            "severity_confidence": result.get(
-                "severity_confidence"
-            ),
+            "intent_confidence": result.get("intent_confidence"),
+            "sql_confidence": result.get("sql_confidence"),
+            "severity_confidence": result.get("severity_confidence"),
             "route": result.get("route"),
             "severity": result.get("severity"),
-            "escalation_required": result.get(
-                "escalation_required"
-            ),
-            "retrieval_confidence": result.get(
-                "retrieval_confidence"
-            ),
-            "sufficient_evidence": result.get(
-                "sufficient_evidence"
-            ),
-            "retrieval_result_count": len(
-                result.get("retrieval_results") or []
-            ),
+            "escalation_required": result.get("escalation_required"),
+            "retrieval_confidence": result.get("retrieval_confidence"),
+            "sufficient_evidence": result.get("sufficient_evidence"),
+            "retrieval_result_count": len(result.get("retrieval_results") or []),
             "errors": result.get("errors") or [],
             "status": status or result.get("status"),
         }
@@ -297,41 +239,29 @@ class SLOEvaluator:
         ragas_results: Iterable[Mapping[str, Any]],
     ) -> SLOReport:
 
-        latency_values = [
-            float(value)
-            for value in latencies_ms
-            if value is not None
-        ]
+        latency_values = [float(value) for value in latencies_ms if value is not None]
 
         route_cases = list(route_results)
         ragas_cases = list(ragas_results)
 
-        faithfulness_scores = (
-            self._extract_ragas_scores(
-                ragas_cases,
-                "faithfulness",
-            )
+        faithfulness_scores = self._extract_ragas_scores(
+            ragas_cases,
+            "faithfulness",
         )
 
-        answer_relevance_scores = (
-            self._extract_ragas_scores(
-                ragas_cases,
-                "answer_relevance",
-            )
+        answer_relevance_scores = self._extract_ragas_scores(
+            ragas_cases,
+            "answer_relevance",
         )
 
-        context_precision_scores = (
-            self._extract_ragas_scores(
-                ragas_cases,
-                "context_precision",
-            )
+        context_precision_scores = self._extract_ragas_scores(
+            ragas_cases,
+            "context_precision",
         )
 
-        context_recall_scores = (
-            self._extract_ragas_scores(
-                ragas_cases,
-                "context_recall",
-            )
+        context_recall_scores = self._extract_ragas_scores(
+            ragas_cases,
+            "context_recall",
         )
 
         return calculate_slo_report(

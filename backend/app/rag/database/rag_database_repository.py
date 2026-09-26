@@ -126,9 +126,7 @@ class RAGDatabaseRepository:
 
         chunk_id = uuid4()
 
-        embedding_text = "[" + ",".join(
-            str(value) for value in embedding
-        ) + "]"
+        embedding_text = "[" + ",".join(str(value) for value in embedding) + "]"
 
         await self.session.execute(
             text(
@@ -202,9 +200,7 @@ class RAGDatabaseRepository:
     ) -> list[dict]:
 
         if limit <= 0:
-            raise ValueError(
-                "limit must be greater than zero."
-            )
+            raise ValueError("limit must be greater than zero.")
 
         result = await self.session.execute(
             text(
@@ -264,8 +260,8 @@ class RAGDatabaseRepository:
 
             if embedding is not None:
                 if isinstance(embedding, str):
-                   embedding = json.loads(embedding)
-                   
+                    embedding = json.loads(embedding)
+
                 embedding = list(embedding)
 
             chunks.append(

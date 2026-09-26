@@ -19,22 +19,70 @@ class ConversationService:
     def create_session_id() -> UUID:
         return uuid4()
 
-    async def list_sessions(self, *, user_id: UUID, limit: int = 10) -> list[dict[str, Any]]:
+    async def list_sessions(
+        self, *, user_id: UUID, limit: int = 10
+    ) -> list[dict[str, Any]]:
         return await self.repository.list_sessions(user_id=user_id, limit=limit)
 
     async def get_history(self, *, session_id: UUID, user_id: UUID) -> list[Any]:
         return await self.repository.get_history(session_id=session_id, user_id=user_id)
 
-    async def add_customer_message(self, *, session_id: UUID, user_id: UUID, content: str, metadata: dict[str, Any] | None = None, ticket_id: UUID | None = None):
-        return await self.repository.add_customer_message(session_id=session_id, user_id=user_id, content=content, metadata=metadata, ticket_id=ticket_id)
+    async def add_customer_message(
+        self,
+        *,
+        session_id: UUID,
+        user_id: UUID,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+        ticket_id: UUID | None = None,
+    ):
+        return await self.repository.add_customer_message(
+            session_id=session_id,
+            user_id=user_id,
+            content=content,
+            metadata=metadata,
+            ticket_id=ticket_id,
+        )
 
-    async def add_ai_message(self, *, session_id: UUID, user_id: UUID, content: str, metadata: dict[str, Any] | None = None, ticket_id: UUID | None = None):
-        return await self.repository.add_ai_message(session_id=session_id, user_id=user_id, content=content, metadata=metadata, ticket_id=ticket_id)
+    async def add_ai_message(
+        self,
+        *,
+        session_id: UUID,
+        user_id: UUID,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+        ticket_id: UUID | None = None,
+    ):
+        return await self.repository.add_ai_message(
+            session_id=session_id,
+            user_id=user_id,
+            content=content,
+            metadata=metadata,
+            ticket_id=ticket_id,
+        )
 
-    async def add_support_agent_message(self, *, session_id: UUID, user_id: UUID, content: str, metadata: dict[str, Any] | None = None, ticket_id: UUID | None = None, sender_user_id: UUID | None = None):
-        return await self.repository.add_support_agent_message(session_id=session_id, user_id=user_id, content=content, metadata=metadata, ticket_id=ticket_id, sender_user_id=sender_user_id)
+    async def add_support_agent_message(
+        self,
+        *,
+        session_id: UUID,
+        user_id: UUID,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+        ticket_id: UUID | None = None,
+        sender_user_id: UUID | None = None,
+    ):
+        return await self.repository.add_support_agent_message(
+            session_id=session_id,
+            user_id=user_id,
+            content=content,
+            metadata=metadata,
+            ticket_id=ticket_id,
+            sender_user_id=sender_user_id,
+        )
 
-    async def get_ai_message_metadata_by_request_id_for_user(self, *, request_id: str, user_id: UUID) -> dict[str, Any] | None:
+    async def get_ai_message_metadata_by_request_id_for_user(
+        self, *, request_id: str, user_id: UUID
+    ) -> dict[str, Any] | None:
         message = await self.repository.get_ai_message_by_request_id_for_user(
             request_id=request_id,
             user_id=user_id,
@@ -50,8 +98,12 @@ class ConversationService:
 
         return dict(metadata)
 
-    async def update_ai_message_evaluation(self, *, request_id: str, evaluation: dict[str, Any]) -> None:
-        message = await self.repository.get_ai_message_by_request_id(request_id=request_id)
+    async def update_ai_message_evaluation(
+        self, *, request_id: str, evaluation: dict[str, Any]
+    ) -> None:
+        message = await self.repository.get_ai_message_by_request_id(
+            request_id=request_id
+        )
         if message is None:
             raise ValueError("AI message not found for request_id.")
 
@@ -128,5 +180,9 @@ class ConversationService:
 
         return sum(normalized_scores) / len(normalized_scores)
 
-    async def link_session_to_ticket(self, *, session_id: UUID, user_id: UUID, ticket_id: UUID) -> int:
-        return await self.repository.link_session_to_ticket(session_id=session_id, user_id=user_id, ticket_id=ticket_id)
+    async def link_session_to_ticket(
+        self, *, session_id: UUID, user_id: UUID, ticket_id: UUID
+    ) -> int:
+        return await self.repository.link_session_to_ticket(
+            session_id=session_id, user_id=user_id, ticket_id=ticket_id
+        )

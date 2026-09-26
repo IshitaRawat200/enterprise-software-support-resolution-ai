@@ -23,7 +23,9 @@ def test_ground_truth_falls_back_to_local_csv_when_langfuse_missing(
     )
 
     monkeypatch.setattr(gt, "LOCAL_GOLDEN_SET_PATH", csv_path)
-    monkeypatch.setattr(gt, "_load_dataset_items", lambda dataset_name=gt.DATASET_NAME: [])
+    monkeypatch.setattr(
+        gt, "_load_dataset_items", lambda dataset_name=gt.DATASET_NAME: []
+    )
 
     _clear_ground_truth_caches()
 
@@ -49,7 +51,9 @@ def test_ground_truth_case_lookup_by_test_id_uses_local_csv(
     )
 
     monkeypatch.setattr(gt, "LOCAL_GOLDEN_SET_PATH", csv_path)
-    monkeypatch.setattr(gt, "_load_dataset_items", lambda dataset_name=gt.DATASET_NAME: [])
+    monkeypatch.setattr(
+        gt, "_load_dataset_items", lambda dataset_name=gt.DATASET_NAME: []
+    )
 
     _clear_ground_truth_caches()
 

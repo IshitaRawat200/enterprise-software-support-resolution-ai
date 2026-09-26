@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 DATASET_NAME = "ERIS-Golden-50"
 EXPERIMENT_NAME = "ERIS Golden 50 Evaluation"
-REPORT_PATH = Path(__file__).resolve().parent / "reports" / "langfuse_golden_50_report.json"
+REPORT_PATH = (
+    Path(__file__).resolve().parent / "reports" / "langfuse_golden_50_report.json"
+)
 
 load_dotenv()
 
@@ -129,9 +131,13 @@ def _resolve_test_id(item: Any) -> str:
     metadata = _item_metadata(item)
     expected_output = _item_expected_output(item)
 
-    candidate = _normalized_lookup(metadata, ["test_id", "test id", "case_id", "case id", "id"])
+    candidate = _normalized_lookup(
+        metadata, ["test_id", "test id", "case_id", "case id", "id"]
+    )
     if candidate in (None, ""):
-        candidate = _normalized_lookup(expected_output, ["test_id", "test id", "case_id", "case id", "id"])
+        candidate = _normalized_lookup(
+            expected_output, ["test_id", "test id", "case_id", "case id", "id"]
+        )
 
     if candidate in (None, ""):
         candidate = _item_id(item)
@@ -163,23 +169,37 @@ def _resolve_expected_fields(item: Any) -> dict[str, Any]:
         ["expected_route", "expected route", "route"],
     )
     if expected_route in (None, ""):
-        expected_route = _normalized_lookup(metadata, ["expected_route", "expected route"])
+        expected_route = _normalized_lookup(
+            metadata, ["expected_route", "expected route"]
+        )
 
     expected_escalation = _normalized_lookup(
         expected_output,
         ["expected_escalation", "expected escalation", "escalation"],
     )
     if expected_escalation in (None, ""):
-        expected_escalation = _normalized_lookup(metadata, ["expected_escalation", "expected escalation"])
+        expected_escalation = _normalized_lookup(
+            metadata, ["expected_escalation", "expected escalation"]
+        )
 
     expected_guardrail = _normalized_lookup(
         expected_output,
-        ["expected_guardrail", "expected guardrail", "expected_guardrail_action", "expected guardrail action"],
+        [
+            "expected_guardrail",
+            "expected guardrail",
+            "expected_guardrail_action",
+            "expected guardrail action",
+        ],
     )
     if expected_guardrail in (None, ""):
         expected_guardrail = _normalized_lookup(
             metadata,
-            ["expected_guardrail", "expected guardrail", "expected_guardrail_action", "expected guardrail action"],
+            [
+                "expected_guardrail",
+                "expected guardrail",
+                "expected_guardrail_action",
+                "expected guardrail action",
+            ],
         )
 
     slo_targets = _normalized_lookup(
@@ -187,25 +207,41 @@ def _resolve_expected_fields(item: Any) -> dict[str, Any]:
         ["expected_slo_targets", "expected slo targets", "slo_targets", "slo targets"],
     )
     if slo_targets in (None, ""):
-        slo_targets = _normalized_lookup(expected_output, ["expected_slo_targets", "expected slo targets"])
+        slo_targets = _normalized_lookup(
+            expected_output, ["expected_slo_targets", "expected slo targets"]
+        )
 
     return {
         "category": (str(category).strip() if category not in (None, "") else None),
         "expected_route": _normalize_route(expected_route),
         "expected_escalation": _normalize_bool(expected_escalation),
-        "expected_guardrail": (str(expected_guardrail).strip().lower() if expected_guardrail not in (None, "") else None),
-        "source_pdf": (str(source_pdf).strip() if source_pdf not in (None, "") else None),
+        "expected_guardrail": (
+            str(expected_guardrail).strip().lower()
+            if expected_guardrail not in (None, "")
+            else None
+        ),
+        "source_pdf": (
+            str(source_pdf).strip() if source_pdf not in (None, "") else None
+        ),
         "source_section_page": (
-            str(source_section_page).strip() if source_section_page not in (None, "") else None
+            str(source_section_page).strip()
+            if source_section_page not in (None, "")
+            else None
         ),
         "slos_to_evaluate": (
-            str(slos_to_evaluate).strip() if slos_to_evaluate not in (None, "") else None
+            str(slos_to_evaluate).strip()
+            if slos_to_evaluate not in (None, "")
+            else None
         ),
-        "expected_slo_targets": str(slo_targets).strip() if slo_targets not in (None, "") else None,
+        "expected_slo_targets": str(slo_targets).strip()
+        if slo_targets not in (None, "")
+        else None,
     }
 
 
-_SLO_TARGET_PATTERN = re.compile(r"\s*([^:]+?)\s*(>=|<=|=)?\s*([0-9]+(?:\.[0-9]+)?)%?\s*$")
+_SLO_TARGET_PATTERN = re.compile(
+    r"\s*([^:]+?)\s*(>=|<=|=)?\s*([0-9]+(?:\.[0-9]+)?)%?\s*$"
+)
 
 
 def parse_slo_targets(value: str | None) -> dict[str, dict[str, Any]]:
@@ -234,7 +270,9 @@ def parse_slo_targets(value: str | None) -> dict[str, dict[str, Any]]:
     return parsed
 
 
-def _evaluate_threshold(actual_value: float | None, rule: dict[str, Any]) -> bool | None:
+def _evaluate_threshold(
+    actual_value: float | None, rule: dict[str, Any]
+) -> bool | None:
     if actual_value is None:
         return None
 
@@ -274,13 +312,29 @@ def _map_metric_value(output: dict[str, Any], metric_key: str) -> float | None:
 
     judge = output.get("llm_judge") or {}
     if metric_key in {"faithfulness"}:
-        return float(judge.get("faithfulness")) if judge.get("faithfulness") is not None else None
+        return (
+            float(judge.get("faithfulness"))
+            if judge.get("faithfulness") is not None
+            else None
+        )
     if metric_key in {"answer_relevancy", "answer_relevance"}:
-        return float(judge.get("answer_relevance")) if judge.get("answer_relevance") is not None else None
+        return (
+            float(judge.get("answer_relevance"))
+            if judge.get("answer_relevance") is not None
+            else None
+        )
     if metric_key in {"context_precision"}:
-        return float(judge.get("context_precision")) if judge.get("context_precision") is not None else None
+        return (
+            float(judge.get("context_precision"))
+            if judge.get("context_precision") is not None
+            else None
+        )
     if metric_key in {"context_recall"}:
-        return float(judge.get("context_recall")) if judge.get("context_recall") is not None else None
+        return (
+            float(judge.get("context_recall"))
+            if judge.get("context_recall") is not None
+            else None
+        )
 
     return None
 
@@ -351,8 +405,12 @@ async def build_task(support_graph: Any):
 
             actual_route = _normalize_route(result.get("route"))
             actual_escalation = _normalize_bool(result.get("escalation_required"))
-            actual_guardrail = result.get("guardrail_action") or result.get("guardrail_decision")
-            actual_guardrail = str(actual_guardrail).strip().lower() if actual_guardrail else None
+            actual_guardrail = result.get("guardrail_action") or result.get(
+                "guardrail_decision"
+            )
+            actual_guardrail = (
+                str(actual_guardrail).strip().lower() if actual_guardrail else None
+            )
 
             ground_truth_available = any(
                 value is not None
@@ -369,7 +427,9 @@ async def build_task(support_graph: Any):
 
             escalation_correct = None
             if expected["expected_escalation"] is not None:
-                escalation_correct = actual_escalation == expected["expected_escalation"]
+                escalation_correct = (
+                    actual_escalation == expected["expected_escalation"]
+                )
 
             guardrail_correct = None
             if expected["expected_guardrail"] is not None:
@@ -380,12 +440,16 @@ async def build_task(support_graph: Any):
                 "query": query,
                 "input": query,
                 "category": expected["category"],
-                "response": result.get("response") or result.get("generated_answer") or result.get("message") or "",
+                "response": result.get("response")
+                or result.get("generated_answer")
+                or result.get("message")
+                or "",
                 "intent": result.get("intent"),
                 "route": result.get("route"),
                 "severity": result.get("severity"),
                 "escalation_required": result.get("escalation_required"),
-                "guardrail_action": result.get("guardrail_action") or result.get("guardrail_decision"),
+                "guardrail_action": result.get("guardrail_action")
+                or result.get("guardrail_decision"),
                 "source_pdf": expected["source_pdf"],
                 "source_section_page": expected["source_section_page"],
                 "slos_to_evaluate": expected["slos_to_evaluate"],
@@ -419,7 +483,7 @@ async def build_task(support_graph: Any):
 
             return output
 
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, AttributeError) as exc:
             latency_ms = (time.perf_counter() - start) * 1000
             return {
                 "test_id": test_id,
@@ -468,7 +532,9 @@ def escalation_evaluator(*, output, **kwargs):
     escalation_correct = output.get("escalation_correct")
     return Evaluation(
         name="escalation_accuracy",
-        value=(1.0 if escalation_correct else 0.0) if escalation_correct is not None else None,
+        value=(1.0 if escalation_correct else 0.0)
+        if escalation_correct is not None
+        else None,
         comment=f"escalation_correct={escalation_correct}",
     )
 
@@ -478,7 +544,9 @@ def guardrail_evaluator(*, output, **kwargs):
     guardrail_correct = output.get("guardrail_correct")
     return Evaluation(
         name="guardrail_accuracy",
-        value=(1.0 if guardrail_correct else 0.0) if guardrail_correct is not None else None,
+        value=(1.0 if guardrail_correct else 0.0)
+        if guardrail_correct is not None
+        else None,
         comment=f"guardrail_correct={guardrail_correct}",
     )
 
@@ -508,8 +576,14 @@ def write_report(result) -> Path:
 
     for item_result in result.item_results:
         item = item_result.item
-        item_id = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
-        item_input = item.get("input") if isinstance(item, dict) else getattr(item, "input", None)
+        item_id = (
+            item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+        )
+        item_input = (
+            item.get("input")
+            if isinstance(item, dict)
+            else getattr(item, "input", None)
+        )
 
         report["items"].append(
             {
@@ -518,14 +592,22 @@ def write_report(result) -> Path:
                 "output": item_result.output,
                 "trace_id": item_result.trace_id,
                 "evaluations": [
-                    {"name": evaluation.name, "value": evaluation.value, "comment": evaluation.comment}
+                    {
+                        "name": evaluation.name,
+                        "value": evaluation.value,
+                        "comment": evaluation.comment,
+                    }
                     for evaluation in item_result.evaluations
                 ],
             }
         )
 
     report["run_evaluations"] = [
-        {"name": evaluation.name, "value": evaluation.value, "comment": evaluation.comment}
+        {
+            "name": evaluation.name,
+            "value": evaluation.value,
+            "comment": evaluation.comment,
+        }
         for evaluation in result.run_evaluations
     ]
 
@@ -536,7 +618,9 @@ def write_report(result) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run ERIS Langfuse Golden-50 evaluation")
+    parser = argparse.ArgumentParser(
+        description="Run ERIS Langfuse Golden-50 evaluation"
+    )
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--test-id", type=str, default=None)
     parser.add_argument("--query", type=str, default=None)
@@ -560,7 +644,9 @@ async def run_evaluation() -> None:
         support_graph = getattr(app.state, "support_graph", None)
 
         if support_graph is None:
-            raise RuntimeError("support_graph was not initialized by the application lifespan.")
+            raise RuntimeError(
+                "support_graph was not initialized by the application lifespan."
+            )
 
         task = await build_task(support_graph)
 

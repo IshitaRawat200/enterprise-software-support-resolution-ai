@@ -229,7 +229,9 @@ class FusionRetrievalService:
             chunks = await self.repository.list_chunks()
 
             if not chunks:
-                raise ValueError("No knowledge-base chunks are available for retrieval.")
+                raise ValueError(
+                    "No knowledge-base chunks are available for retrieval."
+                )
 
             nodes: list[TextNode] = []
 
@@ -279,8 +281,7 @@ class FusionRetrievalService:
 
             if not nodes:
                 raise ValueError(
-                    "No usable knowledge-base chunks with stored embeddings "
-                    "were found."
+                    "No usable knowledge-base chunks with stored embeddings were found."
                 )
 
             logger.info(

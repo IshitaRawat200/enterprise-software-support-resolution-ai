@@ -127,7 +127,7 @@ async def test_create_ai_ticket_updates_existing_if_present(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_persist_ticket_and_escalation_uses_existing_ticket_service(monkeypatch):
-    svc, fs = make_service()
+    svc, _ = make_service()
 
     created_ticket = SimpleNamespace(
         id=uuid4(),
@@ -145,7 +145,13 @@ async def test_persist_ticket_and_escalation_uses_existing_ticket_service(monkey
     async def fake_link_session(**kwargs):
         return None
 
+    async def fake_update(ticket, values):
+        ticket.escalation_required = values.get("escalation_required")
+        ticket.escalation_reason = values.get("escalation_reason")
+        return ticket
+
     monkeypatch.setattr(svc, "create_ai_ticket", fake_create_ai_ticket)
+    monkeypatch.setattr(svc, "tickets", SimpleNamespace(update=fake_update))
     monkeypatch.setattr(
         "app.services.ticket_service.EscalationService.create_or_update",
         fake_escalation_create_or_update,
@@ -173,14 +179,19 @@ async def test_persist_ticket_and_escalation_uses_existing_ticket_service(monkey
     assert result["escalation_id"] == created_escalation.id
     assert result["escalation_required"] is True
     assert result["human_handoff_required"] is True
-    assert result["escalation_reason"] == "Customer explicitly requested human support intervention."
+    assert (
+        result["escalation_reason"]
+        == "Customer explicitly requested human support intervention."
+    )
     assert result["ticket_number"] == "TCK-12345678"
     assert result["handoff_context"]["priority"] == "high"
     assert result["handoff_context"]["type"] == "human_requested"
 
 
 @pytest.mark.asyncio
-async def test_create_ai_ticket_creates_fresh_ticket_for_explicit_human_handoff(monkeypatch):
+async def test_create_ai_ticket_creates_fresh_ticket_for_explicit_human_handoff(
+    monkeypatch,
+):
     svc, _ = make_service()
 
     customer_id = uuid4()

@@ -140,7 +140,9 @@ def test_evaluation_report_endpoint_requires_admin(monkeypatch) -> None:
     async def fake_support_user():
         return MagicMock(role="support_agent", is_active=True)
 
-    monkeypatch.setattr(report_api, "EvaluationRunRepository", lambda session: MagicMock())
+    monkeypatch.setattr(
+        report_api, "EvaluationRunRepository", lambda session: MagicMock()
+    )
 
     app.dependency_overrides[get_db_session] = fake_db_session
     app.dependency_overrides[get_current_user] = fake_support_user

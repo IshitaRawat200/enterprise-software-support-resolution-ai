@@ -29,32 +29,23 @@ router = APIRouter(
 # DEPENDENCIES
 # ============================================================
 
-require_customer_or_admin_dep = Depends(
-    require_customer_or_admin
-)
+require_customer_or_admin_dep = Depends(require_customer_or_admin)
 
-get_db_session_dep = Depends(
-    get_db_session
-)
+get_db_session_dep = Depends(get_db_session)
 
 
 # ============================================================
 # CUSTOMER LOOKUP
 # ============================================================
 
+
 async def get_current_customer(
     current_user: User,
     session: AsyncSession,
 ):
-    customer_repository = CustomerRepository(
-        session
-    )
+    customer_repository = CustomerRepository(session)
 
-    customer = (
-        await customer_repository.get_by_user_id(
-            current_user.id
-        )
-    )
+    customer = await customer_repository.get_by_user_id(current_user.id)
 
     if customer is None:
         raise HTTPException(
@@ -68,6 +59,7 @@ async def get_current_customer(
 # ============================================================
 # LIST TICKETS
 # ============================================================
+
 
 @router.get(
     "",
@@ -87,10 +79,7 @@ async def list_tickets(
     if str(current_user.role) == "admin":
         tickets = await service.list_all_tickets()
 
-        return [
-            TicketResponse.model_validate(ticket)
-            for ticket in tickets
-        ]
+        return [TicketResponse.model_validate(ticket) for ticket in tickets]
 
     # --------------------------------------------------------
     # CUSTOMER
@@ -105,15 +94,13 @@ async def list_tickets(
         customer_id=customer.id,
     )
 
-    return [
-        TicketResponse.model_validate(ticket)
-        for ticket in tickets
-    ]
+    return [TicketResponse.model_validate(ticket) for ticket in tickets]
 
 
 # ============================================================
 # GET SINGLE TICKET
 # ============================================================
+
 
 @router.get(
     "/{ticket_id}",
@@ -143,9 +130,7 @@ async def get_ticket(
                 detail=str(exc),
             ) from exc
 
-        return TicketResponse.model_validate(
-            ticket
-        )
+        return TicketResponse.model_validate(ticket)
 
     # --------------------------------------------------------
     # CUSTOMER
@@ -174,6 +159,4 @@ async def get_ticket(
             detail=str(exc),
         ) from exc
 
-    return TicketResponse.model_validate(
-        ticket
-    )
+    return TicketResponse.model_validate(ticket)

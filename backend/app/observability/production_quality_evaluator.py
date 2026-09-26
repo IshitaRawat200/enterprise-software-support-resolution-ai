@@ -44,10 +44,7 @@ class ProductionQualityEvaluator:
                 continue
 
             content = (
-                item.get("content")
-                or item.get("text")
-                or item.get("source")
-                or ""
+                item.get("content") or item.get("text") or item.get("source") or ""
             )
 
             if not content:
@@ -60,9 +57,7 @@ class ProductionQualityEvaluator:
                 or f"evidence_{index}"
             )
 
-            parts.append(
-                f"[Evidence {index} | {source}]\n{str(content).strip()}"
-            )
+            parts.append(f"[Evidence {index} | {source}]\n{str(content).strip()}")
 
         return "\n\n".join(parts)
 
@@ -157,16 +152,26 @@ class ProductionQualityEvaluator:
             return None
 
         try:
-            prompt = max(0.0, float(usage.get("prompt_tokens") or usage.get("input_tokens") or 0))
-            completion = max(0.0, float(usage.get("completion_tokens") or usage.get("output_tokens") or 0))
+            prompt = max(
+                0.0, float(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+            )
+            completion = max(
+                0.0,
+                float(
+                    usage.get("completion_tokens") or usage.get("output_tokens") or 0
+                ),
+            )
             cached = max(0.0, min(prompt, float(usage.get("cached_tokens") or 0)))
         except (TypeError, ValueError):
             return None
 
         return round(
-            ((prompt - cached) * pricing["input"]
-             + cached * pricing["cached_input"]
-             + completion * pricing["output"]) / 1_000_000.0,
+            (
+                (prompt - cached) * pricing["input"]
+                + cached * pricing["cached_input"]
+                + completion * pricing["output"]
+            )
+            / 1_000_000.0,
             8,
         )
 
@@ -180,14 +185,10 @@ class ProductionQualityEvaluator:
         expected_route: str | None = None,
         guardrail_allowed: bool | None = None,
     ) -> dict[str, Any]:
-        evidence = self._context_text(
-            retrieval_results or []
-        )
+        evidence = self._context_text(retrieval_results or [])
 
         if not evidence:
-            logger.info(
-                "Production quality evaluation skipped: no retrieved evidence."
-            )
+            logger.info("Production quality evaluation skipped: no retrieved evidence.")
             return {
                 "accuracy": None,
                 "faithfulness": None,
@@ -278,29 +279,15 @@ JSON schema:
             evaluator_cost_usd = self._usage_cost_from_raw(
                 getattr(response, "raw", None)
             )
-            parsed = self._extract_json(
-                response.text
-            )
+            parsed = self._extract_json(response.text)
 
             result = {
-                "accuracy": self._score(
-                    parsed.get("accuracy")
-                ),
-                "faithfulness": self._score(
-                    parsed.get("faithfulness")
-                ),
-                "answer_relevance": self._score(
-                    parsed.get("answer_relevance")
-                ),
-                "context_precision": self._score(
-                    parsed.get("context_precision")
-                ),
-                "context_recall": self._score(
-                    parsed.get("context_recall")
-                ),
-                "route_accuracy": self._score(
-                    parsed.get("route_accuracy")
-                ),
+                "accuracy": self._score(parsed.get("accuracy")),
+                "faithfulness": self._score(parsed.get("faithfulness")),
+                "answer_relevance": self._score(parsed.get("answer_relevance")),
+                "context_precision": self._score(parsed.get("context_precision")),
+                "context_recall": self._score(parsed.get("context_recall")),
+                "route_accuracy": self._score(parsed.get("route_accuracy")),
                 "guardrail_effectiveness": (
                     100.0
                     if guardrail_allowed is True
@@ -311,9 +298,7 @@ JSON schema:
                 "evaluator_cost_usd": evaluator_cost_usd,
                 "quality_evaluation_available": True,
                 "quality_evaluation_error": None,
-                "quality_evaluation_reason": str(
-                    parsed.get("reason") or ""
-                ),
+                "quality_evaluation_reason": str(parsed.get("reason") or ""),
             }
 
             logger.info(

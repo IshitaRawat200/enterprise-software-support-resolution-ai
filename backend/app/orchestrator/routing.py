@@ -67,13 +67,17 @@ def route_after_intent(state: SupportState) -> str:
         return "severity"
 
     if state.get("human_handoff_required") or state.get("escalation_required"):
-        logger.info("ROUTER: INTENT explicit human escalation requested, routing to SEVERITY")
+        logger.info(
+            "ROUTER: INTENT explicit human escalation requested, routing to SEVERITY"
+        )
         return "severity"
 
     route = (state.get("route") or "").lower()
     intent = (state.get("intent") or "").lower()
     if route == "out_of_scope" or intent == "out_of_scope":
-        logger.info("ROUTER: INTENT out-of-scope request, completing without escalation")
+        logger.info(
+            "ROUTER: INTENT out-of-scope request, completing without escalation"
+        )
         return "complete"
 
     if state.get("requires_clarification", False):
@@ -125,7 +129,9 @@ def _is_low_risk_hybrid_request(state: SupportState) -> bool:
     if not bool(state.get("sufficient_evidence", False)):
         return False
 
-    if not bool(state.get("sql_success", False)) and not can_resolve_hybrid_from_documentation(state):
+    if not bool(
+        state.get("sql_success", False)
+    ) and not can_resolve_hybrid_from_documentation(state):
         return False
 
     severity = (state.get("severity") or "").lower()
@@ -256,9 +262,7 @@ def route_after_reflect(state: SupportState) -> str:
         return "resolve"
 
     if state.get("human_handoff_required") or state.get("escalation_required"):
-        logger.info(
-            "ROUTER: Explicit human escalation requested, routing to RESOLVE"
-        )
+        logger.info("ROUTER: Explicit human escalation requested, routing to RESOLVE")
         return "resolve"
 
     # --------------------------------------------------------
@@ -371,7 +375,9 @@ def route_after_resolve(state: SupportState) -> str:
     route = (state.get("route") or "").lower()
     intent = (state.get("intent") or "").lower()
     if route == "out_of_scope" or intent == "out_of_scope":
-        logger.info("ROUTER: RESOLVE | out-of-scope answer, skipping severity escalation")
+        logger.info(
+            "ROUTER: RESOLVE | out-of-scope answer, skipping severity escalation"
+        )
         return "complete"
 
     if _is_low_risk_rag_request(state):

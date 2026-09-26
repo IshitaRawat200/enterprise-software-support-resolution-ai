@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any
 
+from app.guardrails.output_guardrail import _replace_documentation_examples
 from app.llm.complexity import assess_complexity
 from app.llm.gateway import get_llm
 from app.llm.static_prompts.resolution_prompt import (
@@ -64,13 +65,13 @@ def _direct_sql_response(state: SupportState) -> str | None:
 
     if not any(
         phrase in normalized
-        for phrase in {
+        for phrase in (
             "status of ticket",
             "ticket status",
             "status for ticket",
             "what is the status",
             "is ticket",
-        }
+        )
     ):
         return None
 
@@ -142,6 +143,44 @@ def _fallback_answer_from_evidence(state: SupportState, message: str) -> str | N
     return None
 
 
+def _is_low_risk_support_response(state: SupportState) -> bool:
+    return (
+        (state.get("route") or "").lower() in {"rag", "hybrid"}
+        and (state.get("intent") or "").lower()
+        in {"usage_configuration", "integration_api", "performance_latency"}
+        and bool(state.get("sufficient_evidence", False))
+        and not bool(state.get("incident_active", False))
+        and not bool(state.get("incident_security_related", False))
+        and not bool(state.get("incident_data_loss_reported", False))
+        and not bool(state.get("incident_affects_production", False))
+        and not bool(state.get("incident_unresolved_critical_alert", False))
+        and not bool(state.get("escalation_required", False))
+        and not bool(state.get("human_handoff_required", False))
+        and (
+            ((state.get("route") or "").lower() != "hybrid")
+            or bool(state.get("sql_success", False))
+            or can_resolve_hybrid_from_documentation(state)
+        )
+    )
+
+
+def _build_low_risk_support_answer(state: SupportState, message: str) -> str | None:
+    answer = _fallback_answer_from_evidence(state, message)
+    if answer:
+        return _replace_documentation_examples(answer)
+
+    if bool(state.get("sql_success", False)):
+        sql_rows = state.get("sql_rows") or []
+        if sql_rows:
+            first_row = sql_rows[0]
+            if isinstance(first_row, dict):
+                values = [str(v).strip() for v in first_row.values() if str(v).strip()]
+                if values:
+                    return _replace_documentation_examples("; ".join(values[:3]))
+
+    return None
+
+
 def _compact_history(history: list[Any]) -> list[dict[str, Any]]:
     compact: list[dict[str, Any]] = []
 
@@ -186,10 +225,7 @@ def _compact_retrieval_results(
                     result.get("content"),
                     MAX_RAG_CONTENT_CHARS,
                 ),
-                "source": (
-                    result.get("source")
-                    or result.get("document_name")
-                ),
+                "source": (result.get("source") or result.get("document_name")),
                 "source_url": result.get("source_url"),
                 "relevance_score": result.get("relevance_score"),
             }
@@ -306,9 +342,7 @@ async def resolve_node(
             MAX_CONVERSATION_CONTEXT_CHARS,
         )
 
-        conversation_history = _compact_history(
-            state.get("conversation_history") or []
-        )
+        conversation_history = _compact_history(state.get("conversation_history") or [])
 
         # ========================================================
         # RAG EVIDENCE
@@ -316,9 +350,7 @@ async def resolve_node(
 
         retrieval_results = state.get("retrieval_results") or []
 
-        rag_evidence = _compact_retrieval_results(
-            retrieval_results
-        )
+        rag_evidence = _compact_retrieval_results(retrieval_results)
 
         # ========================================================
         # SQL EVIDENCE
@@ -326,9 +358,7 @@ async def resolve_node(
 
         sql_rows = state.get("sql_rows") or []
 
-        compact_sql_rows = _compact_generic_results(
-            sql_rows
-        )
+        compact_sql_rows = _compact_generic_results(sql_rows)
 
         sql_evidence = {
             "success": state.get(
@@ -346,9 +376,7 @@ async def resolve_node(
         # HYBRID EVIDENCE
         # ========================================================
 
-        hybrid_results = _compact_generic_results(
-            state.get("hybrid_results") or []
-        )
+        hybrid_results = _compact_generic_results(state.get("hybrid_results") or [])
 
         # ========================================================
         # ACCOUNT VALIDATION
@@ -405,15 +433,12 @@ async def resolve_node(
             "mcp_tool_calls": _compact_generic_results(
                 state.get("mcp_tool_calls") or []
             ),
-            "results": _compact_generic_results(
-                state.get("incident_results") or []
-            ),
+            "results": _compact_generic_results(state.get("incident_results") or []),
         }
 
-        documentation_only_hybrid = (
-            can_resolve_hybrid_from_documentation(state)
-            and not bool(state.get("sql_success", False))
-        )
+        documentation_only_hybrid = can_resolve_hybrid_from_documentation(
+            state
+        ) and not bool(state.get("sql_success", False))
 
         # ========================================================
         # VERIFIED WORKFLOW EVIDENCE
@@ -506,6 +531,23 @@ async def resolve_node(
             )
         )
 
+        low_risk_support_response = _is_low_risk_support_response(state)
+        if low_risk_support_response:
+            answer = _build_low_risk_support_answer(state, message)
+            if answer:
+                return {
+                    "current_node": "resolve",
+                    "response": answer,
+                    "recommended_action": "Continue automated resolution.",
+                    "severity": "low",
+                    "severity_confidence": 0.0,
+                    "severity_reason": "Low-risk informational support request; default severity is low.",
+                    "escalation_required": False,
+                    "escalation_reason": None,
+                    "human_handoff_required": False,
+                    "errors": [],
+                }
+
         # ========================================================
         # BUILD CENTRALIZED RESOLUTION PROMPT
         # ========================================================
@@ -595,6 +637,7 @@ async def resolve_node(
             )
 
         answer = str(answer).strip()
+        answer = _replace_documentation_examples(answer)
 
         if not answer:
             return {
@@ -612,30 +655,13 @@ async def resolve_node(
         ):
             fallback_answer = _fallback_answer_from_evidence(state, message)
             if fallback_answer:
-                answer = fallback_answer
+                answer = _replace_documentation_examples(fallback_answer)
 
         # ========================================================
         # RECOMMENDED ACTION
         # ========================================================
 
-        low_risk_support_response = (
-            (state.get("route") or "").lower() in {"rag", "hybrid"}
-            and (state.get("intent") or "").lower()
-            in {"usage_configuration", "integration_api", "performance_latency"}
-            and bool(state.get("sufficient_evidence", False))
-            and not bool(state.get("incident_active", False))
-            and not bool(state.get("incident_security_related", False))
-            and not bool(state.get("incident_data_loss_reported", False))
-            and not bool(state.get("incident_affects_production", False))
-            and not bool(state.get("incident_unresolved_critical_alert", False))
-            and not bool(state.get("escalation_required", False))
-            and not bool(state.get("human_handoff_required", False))
-            and (
-                (state.get("route") or "").lower() != "hybrid"
-                or bool(state.get("sql_success", False))
-                or can_resolve_hybrid_from_documentation(state)
-            )
-        )
+        low_risk_support_response = _is_low_risk_support_response(state)
 
         recommended_action = (
             "Escalate to human support."
@@ -655,15 +681,23 @@ async def resolve_node(
             "response": answer,
             "recommended_action": (recommended_action),
             "severity": "low" if low_risk_support_response else state.get("severity"),
-            "severity_confidence": 0.0 if low_risk_support_response else state.get("severity_confidence", 0.0),
+            "severity_confidence": 0.0
+            if low_risk_support_response
+            else state.get("severity_confidence", 0.0),
             "severity_reason": (
                 "Low-risk informational support request; default severity is low."
                 if low_risk_support_response
                 else state.get("severity_reason")
             ),
-            "escalation_required": False if low_risk_support_response else state.get("escalation_required", False),
-            "escalation_reason": None if low_risk_support_response else state.get("escalation_reason"),
-            "human_handoff_required": False if low_risk_support_response else state.get("human_handoff_required", False),
+            "escalation_required": False
+            if low_risk_support_response
+            else state.get("escalation_required", False),
+            "escalation_reason": None
+            if low_risk_support_response
+            else state.get("escalation_reason"),
+            "human_handoff_required": False
+            if low_risk_support_response
+            else state.get("human_handoff_required", False),
             "errors": [],
         }
 

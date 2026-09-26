@@ -16,9 +16,7 @@ class ProductionEvaluationRecord:
 
     answer: str
 
-    retrieved_contexts: list[str] = field(
-        default_factory=list
-    )
+    retrieved_contexts: list[str] = field(default_factory=list)
 
     actual_route: str | None = None
 
@@ -28,6 +26,4 @@ class ProductionEvaluationRecord:
 
     reference_answer: str | None = None
 
-    metadata: dict[str, Any] = field(
-        default_factory=dict
-    )
+    metadata: dict[str, Any] = field(default_factory=dict)

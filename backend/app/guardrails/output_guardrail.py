@@ -71,15 +71,15 @@ SECRET_PATTERNS: tuple[tuple[str, str], ...] = (
     ),
     (
         "password_assignment",
-        r"\b(?:password|passwd|pwd)\s*[:=]\s*\S+",
+        r"\b(?:password|passwd|pwd)\b\s*(?:[:=]|is)\s*\S+",
     ),
     (
         "api_key_assignment",
-        r"\bapi[_-]?key\s*[:=]\s*\S+",
+        r"\b(?:api[_-]?\s*key|x-api-key|api\s*key)\b\s*(?:[:=]|is)\s*\S+",
     ),
     (
         "secret_assignment",
-        r"\bsecret\s*[:=]\s*\S+",
+        r"\bsecret\b\s*(?:[:=]|is)\s*\S+",
     ),
 )
 
@@ -100,6 +100,7 @@ INTERNAL_CONTENT_PATTERNS: tuple[str, ...] = (
 # ============================================================
 # NORMALIZATION
 # ============================================================
+
 
 def _normalize_value(value: str) -> str:
     """
@@ -122,7 +123,8 @@ def _normalize_value(value: str) -> str:
         if (
             len(normalized) >= 2
             and normalized[0] == normalized[-1]
-            and normalized[0] in {
+            and normalized[0]
+            in {
                 "`",
                 '"',
                 "'",
@@ -134,10 +136,57 @@ def _normalize_value(value: str) -> str:
     return normalized.lower()
 
 
+def _is_documentation_example(value: str) -> bool:
+    """Allow obvious documentation examples such as sk_live_abc123."""
+    normalized = _normalize_value(value)
+
+    example_prefixes = (
+        "sk_live_",
+        "sk_test_",
+        "pk_live_",
+        "pk_test_",
+        "example_",
+        "example-",
+        "sample_",
+        "sample-",
+    )
+
+    if normalized.startswith(example_prefixes):
+        return True
+
+    if normalized.startswith("api_key_") or normalized.startswith("api-key-"):
+        return True
+
+    if normalized.startswith("sk-"):
+        return False
+
+    return bool(re.fullmatch(r"(?:[a-z]+_)?(?:live|test)_[a-z0-9]+", normalized))
+
+
+def _replace_documentation_examples(text: str) -> str:
+    """Replace literal example credentials with neutral placeholders."""
+    replacements = (
+        (r'(?i)(\b(?:x-api-key|api[_-]?key|authorization|token|secret|password)\b\s*(?:[:=]|is)\s*["\']?)(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+(["\']?)', r'\1<your_api_key>\2'),
+        (r'(?i)(\b(?:x-api-key|api[_-]?key|authorization|token|secret|password)\b\s*(?:[:=]|is)\s*["\']?)(?:example|sample)_[A-Za-z0-9_-]+(["\']?)', r'\1<your_api_key>\2'),
+        (r'(?i)(Bearer\s+)(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+', r'\1<your_token>'),
+        (r'(?i)(Bearer\s+)(?:example|sample)_[A-Za-z0-9_-]+', r'\1<your_token>'),
+        (r'(?i)(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+', "<your_api_key>"),
+        (r'(?i)(?:example|sample)_[A-Za-z0-9_-]+', "<your_api_key>"),
+    )
+
+    sanitized = text
+    for pattern, replacement in replacements:
+        sanitized = re.sub(pattern, replacement, sanitized)
+    return sanitized
+
+
 def _is_safe_placeholder(value: str) -> bool:
     normalized = _normalize_value(value)
 
     if normalized in SAFE_PLACEHOLDERS:
+        return True
+
+    if _is_documentation_example(normalized):
         return True
 
     # Generic documentation placeholders.
@@ -179,15 +228,13 @@ def _is_safe_placeholder(value: str) -> bool:
     if normalized.startswith("example_"):
         return True
 
-    if normalized.startswith("example-"):
-        return True
-
-    return False
+    return normalized.startswith("example-")
 
 
 # ============================================================
 # EXTRACT ASSIGNMENT VALUE
 # ============================================================
+
 
 def _extract_assignment_value(
     matched_text: str,
@@ -226,6 +273,7 @@ def _extract_assignment_value(
 # ============================================================
 # SECRET FINDER
 # ============================================================
+
 
 def _find_secret(
     text: str,
@@ -292,6 +340,7 @@ def _find_secret(
 # INTERNAL CONTENT
 # ============================================================
 
+
 def _contains_internal_content(
     text: str,
 ) -> bool:
@@ -309,6 +358,7 @@ def _contains_internal_content(
 # ============================================================
 # SECRET REDACTION
 # ============================================================
+
 
 def _redact_secrets(
     text: str,
@@ -385,6 +435,7 @@ def _redact_secrets(
 # OUTPUT TEXT VALIDATION
 # ============================================================
 
+
 def validate_output_text(
     text: str,
 ) -> GuardrailResult:
@@ -445,6 +496,7 @@ def validate_output_text(
 # OUTPUT SANITIZATION
 # ============================================================
 
+
 def sanitize_output_text(
     text: str,
 ) -> tuple[str, GuardrailResult]:
@@ -471,6 +523,7 @@ def sanitize_output_text(
     sanitized, categories = _redact_secrets(
         text,
     )
+    sanitized = _replace_documentation_examples(sanitized)
 
     if _contains_internal_content(
         sanitized,
@@ -509,6 +562,7 @@ def sanitize_output_text(
 # STRUCTURED RESPONSE VALIDATION
 # ============================================================
 
+
 def validate_response_payload(
     payload: dict[str, Any],
 ) -> GuardrailResult:
@@ -536,11 +590,7 @@ def validate_response_payload(
         "escalation_required",
     }
 
-    missing_fields = sorted(
-        field
-        for field in required_fields
-        if field not in payload
-    )
+    missing_fields = sorted(field for field in required_fields if field not in payload)
 
     if missing_fields:
         return GuardrailResult.block(

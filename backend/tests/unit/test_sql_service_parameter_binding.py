@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from typing import ClassVar
 
 from app.sql.sql_service import SQLService
 
@@ -60,8 +61,8 @@ def test_sql_service_rejects_customer_scoped_query_without_customer_id(monkeypat
         sql = "SELECT account_status FROM customers WHERE id = $1 LIMIT 50"
         confidence = 0.7
         explanation = "Account lookup"
-        tables_used = ["customers"]
-        parameters = None
+        tables_used: ClassVar[list[str]] = ["customers"]
+        parameters: ClassVar[list[str] | None] = None
 
     async def fake_generate(self, question, customer_id=None):
         return FakeGeneration()
@@ -77,13 +78,15 @@ def test_sql_service_rejects_customer_scoped_query_without_customer_id(monkeypat
         assert "customer_id is required" in str(exc)
 
 
-def test_sql_service_overrides_generator_customer_param_with_authenticated_customer(monkeypatch):
+def test_sql_service_overrides_generator_customer_param_with_authenticated_customer(
+    monkeypatch,
+):
     class FakeGeneration:
         sql = "SELECT account_status FROM customers WHERE id = $1 LIMIT 50"
         confidence = 0.8
         explanation = "Account lookup"
-        tables_used = ["customers"]
-        parameters = ["other-customer-id"]
+        tables_used: ClassVar[list[str]] = ["customers"]
+        parameters: ClassVar[list[str]] = ["other-customer-id"]
 
     async def fake_generate(self, question, customer_id=None):
         return FakeGeneration()
@@ -114,7 +117,9 @@ def test_sql_service_overrides_generator_customer_param_with_authenticated_custo
     monkeypatch.setattr("app.sql.sql_executor.SQLExecutor.execute", fake_execute)
 
     svc = SQLService(session=SimpleNamespace())
-    out = asyncio.run(svc.query("What is my account status?", customer_id="auth-customer-id"))
+    out = asyncio.run(
+        svc.query("What is my account status?", customer_id="auth-customer-id")
+    )
 
     assert out["success"] is True
     assert captured["parameters"] == ["auth-customer-id"]

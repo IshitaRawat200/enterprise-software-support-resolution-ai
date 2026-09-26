@@ -11,8 +11,7 @@ from langfuse import get_client
 
 DATASET_NAME = "ERIS-Golden-50"
 LOCAL_GOLDEN_SET_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "ERIS-Golden-50-with-SLO-Targets (1).csv"
+    Path(__file__).resolve().parents[3] / "ERIS-Golden-50-with-SLO-Targets (1).csv"
 )
 
 
@@ -137,7 +136,7 @@ def _build_case(
 
 def _load_csv_evaluation_cases() -> tuple[EvaluationCase, ...]:
     if not LOCAL_GOLDEN_SET_PATH.exists():
-        return tuple()
+        return ()
 
     cases: list[EvaluationCase] = []
 
@@ -147,7 +146,9 @@ def _load_csv_evaluation_cases() -> tuple[EvaluationCase, ...]:
         for row in reader:
             case = _build_case(
                 question=_row_get(row, "Input / Query", "Input", "Query"),
-                reference_answer=_row_get(row, "Expected Output", "Reference Answer", "Answer"),
+                reference_answer=_row_get(
+                    row, "Expected Output", "Reference Answer", "Answer"
+                ),
                 expected_route=_row_get(row, "Expected Route", "Route"),
                 test_id=_row_get(row, "Test ID", "Case ID", "ID"),
                 expected_escalation=_row_get(
@@ -175,7 +176,7 @@ def _load_evaluation_cases() -> tuple[EvaluationCase, ...]:
 
     try:
         items = _load_dataset_items()
-    except Exception:
+    except (RuntimeError, ValueError, TypeError, AttributeError):
         items = []
 
     for item in items:
@@ -183,12 +184,16 @@ def _load_evaluation_cases() -> tuple[EvaluationCase, ...]:
         expected_output = _item_expected_output(item)
 
         question = _item_input(item)
-        reference_answer = _row_get(expected_output, "expected output", "reference answer", "answer")
+        reference_answer = _row_get(
+            expected_output, "expected output", "reference answer", "answer"
+        )
 
         if reference_answer in (None, ""):
             reference_answer = _row_get(metadata, "expected output", "reference answer")
 
-        expected_route = _row_get(expected_output, "expected route", "expected_route", "route")
+        expected_route = _row_get(
+            expected_output, "expected route", "expected_route", "route"
+        )
         if expected_route in (None, ""):
             expected_route = _row_get(metadata, "expected route", "expected_route")
 
@@ -267,16 +272,13 @@ def _load_evaluation_cases() -> tuple[EvaluationCase, ...]:
 
 
 def _normalize_question(question: str) -> str:
-    return " ".join(
-        str(question).strip().lower().split()
-    )
+    return " ".join(str(question).strip().lower().split())
 
 
 @lru_cache(maxsize=1)
 def _cases_by_question() -> dict[str, EvaluationCase]:
     return {
-        _normalize_question(case.question): case
-        for case in _load_evaluation_cases()
+        _normalize_question(case.question): case for case in _load_evaluation_cases()
     }
 
 
@@ -308,9 +310,7 @@ def get_evaluation_case(
     if not question:
         return None
 
-    return _cases_by_question().get(
-        _normalize_question(question)
-    )
+    return _cases_by_question().get(_normalize_question(question))
 
 
 def get_reference_answer(

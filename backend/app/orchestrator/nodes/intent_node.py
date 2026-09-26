@@ -254,7 +254,9 @@ def _requires_hybrid_evidence(text: str) -> bool:
         return True
 
     has_structured_verb = any(re.search(pattern, text) for pattern in structured_verbs)
-    has_structured_target = any(re.search(pattern, text) for pattern in structured_targets)
+    has_structured_target = any(
+        re.search(pattern, text) for pattern in structured_targets
+    )
 
     return has_structured_verb and has_structured_target
 
@@ -273,13 +275,13 @@ def _is_ticket_status_lookup(text: str) -> bool:
 
     return any(
         phrase in normalized
-        for phrase in {
+        for phrase in (
             "status of ticket",
             "ticket status",
             "status for ticket",
             "what is the status",
             "is ticket",
-        }
+        )
     )
 
 

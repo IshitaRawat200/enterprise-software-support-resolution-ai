@@ -112,7 +112,9 @@ def _resolve_test_id(item: Any) -> str | None:
     test_id = _row_get(metadata, "test_id", "test id", "case_id", "case id", "id")
 
     if test_id in (None, ""):
-        test_id = _row_get(expected_output, "test_id", "test id", "case_id", "case id", "id")
+        test_id = _row_get(
+            expected_output, "test_id", "test id", "case_id", "case id", "id"
+        )
 
     if test_id in (None, ""):
         test_id = _item_id(item)
@@ -217,15 +219,23 @@ def load_benchmark_cases(
         message = _item_input(item)
 
         if not case_id or not message:
-            raise ValueError(f"Invalid Golden-50 dataset item at index {index}: missing test_id or input")
+            raise ValueError(
+                f"Invalid Golden-50 dataset item at index {index}: missing test_id or input"
+            )
 
-        expected_route = _row_get(expected_output, "expected route", "expected_route", "route")
+        expected_route = _row_get(
+            expected_output, "expected route", "expected_route", "route"
+        )
         if expected_route in (None, ""):
             expected_route = _row_get(metadata, "expected route", "expected_route")
 
-        expected_escalation = _row_get(expected_output, "expected escalation", "expected_escalation", "escalation")
+        expected_escalation = _row_get(
+            expected_output, "expected escalation", "expected_escalation", "escalation"
+        )
         if expected_escalation in (None, ""):
-            expected_escalation = _row_get(metadata, "expected escalation", "expected_escalation")
+            expected_escalation = _row_get(
+                metadata, "expected escalation", "expected_escalation"
+            )
 
         expected_guardrail = _row_get(
             expected_output,
@@ -243,7 +253,9 @@ def load_benchmark_cases(
                 "expected_guardrail_action",
             )
 
-        expected_output_text = _row_get(expected_output, "expected output", "reference answer", "answer")
+        expected_output_text = _row_get(
+            expected_output, "expected output", "reference answer", "answer"
+        )
 
         expected_slo_targets = _row_get(
             metadata,
@@ -253,7 +265,9 @@ def load_benchmark_cases(
             "slo_targets",
         )
         if expected_slo_targets in (None, ""):
-            expected_slo_targets = _row_get(expected_output, "expected_slo_targets", "expected slo targets")
+            expected_slo_targets = _row_get(
+                expected_output, "expected_slo_targets", "expected slo targets"
+            )
 
         normalized_metadata = {
             "test_id": case_id,
@@ -265,7 +279,9 @@ def load_benchmark_cases(
                 "source section page",
                 "source_section_page",
             ),
-            "slos_to_evaluate": _row_get(metadata, "slos to evaluate", "slo_to_evaluate", "slos_to_evaluate"),
+            "slos_to_evaluate": _row_get(
+                metadata, "slos to evaluate", "slo_to_evaluate", "slos_to_evaluate"
+            ),
             "expected_slo_targets": expected_slo_targets,
         }
 
@@ -274,12 +290,18 @@ def load_benchmark_cases(
                 case_id=str(case_id).strip(),
                 category=str(normalized_metadata.get("category") or "").strip() or None,
                 message=str(message).strip(),
-                expected_route=(str(expected_route).strip().lower() if expected_route else None),
+                expected_route=(
+                    str(expected_route).strip().lower() if expected_route else None
+                ),
                 expected_escalation=_parse_bool(expected_escalation),
                 expected_guardrail_action=(
-                    str(expected_guardrail).strip().lower() if expected_guardrail else None
+                    str(expected_guardrail).strip().lower()
+                    if expected_guardrail
+                    else None
                 ),
-                expected_output=(str(expected_output_text).strip() if expected_output_text else None),
+                expected_output=(
+                    str(expected_output_text).strip() if expected_output_text else None
+                ),
                 expected_slo_targets=(
                     str(expected_slo_targets).strip() or None
                     if expected_slo_targets not in (None, "")
@@ -312,7 +334,9 @@ def _compare_bool(actual: bool | None, expected: bool | None) -> bool | None:
     return bool(actual) == bool(expected)
 
 
-def _compare_sql_tables(result: dict[str, Any], expected_tables: list[str] | None) -> bool | None:
+def _compare_sql_tables(
+    result: dict[str, Any], expected_tables: list[str] | None
+) -> bool | None:
     if expected_tables is None:
         return None
 
@@ -339,16 +363,24 @@ def evaluate_case(
     actual_severity = result.get("severity")
     actual_escalation = result.get("escalation_required")
 
-    actual_response = result.get("response") or result.get("generated_answer") or result.get("message")
+    actual_response = (
+        result.get("response")
+        or result.get("generated_answer")
+        or result.get("message")
+    )
     retrieval_results = result.get("retrieval_results") or []
 
-    actual_guardrail_action = result.get("guardrail_action") or result.get("guardrail_decision")
+    actual_guardrail_action = result.get("guardrail_action") or result.get(
+        "guardrail_decision"
+    )
 
     actual_authorization_result = result.get("authorization_allowed")
     if actual_authorization_result is None and "authorized" in result:
         actual_authorization_result = result.get("authorized")
 
-    actual_resolution = result.get("status") in {"resolved", "closed"} and not bool(actual_escalation)
+    actual_resolution = result.get("status") in {"resolved", "closed"} and not bool(
+        actual_escalation
+    )
 
     return EvaluationResult(
         case_id=case.case_id,
@@ -385,7 +417,9 @@ def evaluate_case(
         actual_authorization_result=actual_authorization_result,
         expected_authorization_result=case.expected_authorization_result,
         authorization_correct=(
-            _compare_bool(actual_authorization_result, case.expected_authorization_result)
+            _compare_bool(
+                actual_authorization_result, case.expected_authorization_result
+            )
             if case.expected_authorization_result is not None
             else None
         ),
@@ -399,7 +433,9 @@ def evaluate_case(
 WorkflowAdapter = Callable[[BenchmarkCase], Awaitable[tuple[dict[str, Any], float]]]
 
 
-def create_workflow_adapter(support_graph: Any, *, customer_id: str | None = None) -> WorkflowAdapter:
+def create_workflow_adapter(
+    support_graph: Any, *, customer_id: str | None = None
+) -> WorkflowAdapter:
     evaluation_run_id = uuid4().hex
 
     async def run(case: BenchmarkCase) -> tuple[dict[str, Any], float]:
@@ -505,7 +541,9 @@ async def evaluate_dataset(
     return results
 
 
-def build_slo_inputs(evaluation_results: list[EvaluationResult]) -> dict[str, list[dict[str, Any]]]:
+def build_slo_inputs(
+    evaluation_results: list[EvaluationResult],
+) -> dict[str, list[dict[str, Any]]]:
     support_results: list[dict[str, Any]] = []
     latencies_ms: list[float] = []
     sql_results: list[dict[str, Any]] = []
@@ -579,7 +617,10 @@ def build_slo_inputs(evaluation_results: list[EvaluationResult]) -> dict[str, li
                 }
             )
 
-        if item.expected_guardrail_action is not None or item.actual_guardrail_action is not None:
+        if (
+            item.expected_guardrail_action is not None
+            or item.actual_guardrail_action is not None
+        ):
             guardrail_results.append(
                 {
                     "expected_guardrail_action": item.expected_guardrail_action,
@@ -587,7 +628,10 @@ def build_slo_inputs(evaluation_results: list[EvaluationResult]) -> dict[str, li
                 }
             )
 
-        if item.expected_authorization_result is not None or item.actual_authorization_result is not None:
+        if (
+            item.expected_authorization_result is not None
+            or item.actual_authorization_result is not None
+        ):
             authorization_results.append(
                 {
                     "expected_authorization_result": item.expected_authorization_result,

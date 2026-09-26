@@ -108,9 +108,7 @@ def average_ragas_scores(
     if not numeric_values:
         return None
 
-    return (
-        sum(numeric_values) / len(numeric_values)
-    ) * 100.0
+    return (sum(numeric_values) / len(numeric_values)) * 100.0
 
 
 # ============================================================
@@ -127,9 +125,7 @@ def calculate_p95_latency(
     Returns None when no latency values are available.
     """
 
-    values = sorted(
-        _numeric_values(values_ms)
-    )
+    values = sorted(_numeric_values(values_ms))
 
     if not values:
         return None
@@ -147,14 +143,7 @@ def calculate_p95_latency(
 
     fraction = position - lower_index
 
-    return (
-        values[lower_index]
-        + (
-            values[upper_index]
-            - values[lower_index]
-        )
-        * fraction
-    )
+    return values[lower_index] + (values[upper_index] - values[lower_index]) * fraction
 
 
 # ============================================================
@@ -186,13 +175,9 @@ def calculate_route_accuracy(
         if expected is None or actual is None:
             continue
 
-        expected_normalized = (
-            str(expected).strip().lower()
-        )
+        expected_normalized = str(expected).strip().lower()
 
-        actual_normalized = (
-            str(actual).strip().lower()
-        )
+        actual_normalized = str(actual).strip().lower()
 
         evaluated += 1
 
@@ -202,9 +187,7 @@ def calculate_route_accuracy(
     if evaluated == 0:
         return None
 
-    return (
-        correct / evaluated
-    ) * 100.0
+    return (correct / evaluated) * 100.0
 
 
 # ============================================================
@@ -247,29 +230,17 @@ def calculate_slo_report(
     latency_ms_values: Iterable[Any],
 ) -> SLOReport:
 
-    faithfulness = average_ragas_scores(
-        faithfulness_scores
-    )
+    faithfulness = average_ragas_scores(faithfulness_scores)
 
-    answer_relevance = average_ragas_scores(
-        answer_relevance_scores
-    )
+    answer_relevance = average_ragas_scores(answer_relevance_scores)
 
-    context_precision = average_ragas_scores(
-        context_precision_scores
-    )
+    context_precision = average_ragas_scores(context_precision_scores)
 
-    context_recall = average_ragas_scores(
-        context_recall_scores
-    )
+    context_recall = average_ragas_scores(context_recall_scores)
 
-    route_accuracy = calculate_route_accuracy(
-        route_cases
-    )
+    route_accuracy = calculate_route_accuracy(route_cases)
 
-    p95_latency_ms = calculate_p95_latency(
-        latency_ms_values
-    )
+    p95_latency_ms = calculate_p95_latency(latency_ms_values)
 
     faithfulness_passed = _passes_minimum(
         faithfulness,

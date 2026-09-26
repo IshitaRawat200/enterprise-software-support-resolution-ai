@@ -216,13 +216,13 @@ class SQLService:
 
         return any(
             phrase in normalized
-            for phrase in {
+            for phrase in (
                 "status of ticket",
                 "ticket status",
                 "status for ticket",
                 "what is the status",
                 "is ticket",
-            }
+            )
         )
 
     @staticmethod
@@ -234,7 +234,11 @@ class SQLService:
         placeholders = [int(match) for match in re.findall(r"\$(\d+)", sql)]
 
         if not placeholders:
-            return list(generation_parameters) if isinstance(generation_parameters, list) else None
+            return (
+                list(generation_parameters)
+                if isinstance(generation_parameters, list)
+                else None
+            )
 
         max_index = max(placeholders)
 

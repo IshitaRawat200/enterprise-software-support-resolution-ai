@@ -50,11 +50,13 @@ def test_conversation_node_and_normalization():
 def test_graph_route_after_intent_uses_human_handoff_fast_path():
     from app.orchestrator.graph import route_after_intent
 
-    route = route_after_intent({
-        "intent": "human_handoff",
-        "human_handoff_required": True,
-        "escalation_required": True,
-    })
+    route = route_after_intent(
+        {
+            "intent": "human_handoff",
+            "human_handoff_required": True,
+            "escalation_required": True,
+        }
+    )
 
     assert route == "severity"
 
@@ -72,11 +74,13 @@ def test_graph_route_after_intent_avoids_mcp_for_pure_human_request(monkeypatch)
         fake_mcp,
     )
 
-    route = route_after_intent({
-        "intent": "human_handoff",
-        "human_handoff_required": True,
-        "message": "I need to speak to a human support agent. Please escalate this issue.",
-    })
+    route = route_after_intent(
+        {
+            "intent": "human_handoff",
+            "human_handoff_required": True,
+            "message": "I need to speak to a human support agent. Please escalate this issue.",
+        }
+    )
 
     assert route == "severity"
     assert called["mcp"] is False
@@ -284,7 +288,9 @@ def test_resolution_node_safe_rag_answer_stays_grounded_and_low_severity(monkeyp
         "route": "rag",
         "intent": "usage_configuration",
         "sufficient_evidence": True,
-        "retrieval_results": [{"title": "Install Guide", "content": "Install ERIS via Docker Compose."}],
+        "retrieval_results": [
+            {"title": "Install Guide", "content": "Install ERIS via Docker Compose."}
+        ],
         "retrieval_confidence": 0.9,
         "incident_active": False,
         "incident_security_related": False,
@@ -310,7 +316,9 @@ def test_resolution_node_safe_hybrid_answer_stays_low_severity(monkeypatch):
             return type(
                 "Resp",
                 (),
-                {"content": "Wait for Retry-After, apply backoff, and review request IDs on the ticket."},
+                {
+                    "content": "Wait for Retry-After, apply backoff, and review request IDs on the ticket."
+                },
             )()
 
     monkeypatch.setattr(
@@ -331,8 +339,12 @@ def test_resolution_node_safe_hybrid_answer_stays_low_severity(monkeypatch):
         "intent": "usage_configuration",
         "sufficient_evidence": True,
         "sql_success": True,
-        "retrieval_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
-        "hybrid_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+        "retrieval_results": [
+            {"title": "429 Policy", "content": "Use Retry-After and backoff."}
+        ],
+        "hybrid_results": [
+            {"title": "429 Policy", "content": "Use Retry-After and backoff."}
+        ],
         "sql_rows": [{"ticket_number": "TCK-1", "status": "open"}],
         "retrieval_confidence": 0.9,
         "sql_confidence": 0.95,
@@ -354,13 +366,17 @@ def test_resolution_node_safe_hybrid_answer_stays_low_severity(monkeypatch):
     assert out["human_handoff_required"] is False
 
 
-def test_resolution_node_guidance_only_hybrid_answer_stays_low_severity_without_sql(monkeypatch):
+def test_resolution_node_guidance_only_hybrid_answer_stays_low_severity_without_sql(
+    monkeypatch,
+):
     class FakeLLM:
         async def ainvoke(self, prompt):
             return type(
                 "Resp",
                 (),
-                {"content": "Wait for Retry-After, apply backoff, and review request IDs on the ticket."},
+                {
+                    "content": "Wait for Retry-After, apply backoff, and review request IDs on the ticket."
+                },
             )()
 
     monkeypatch.setattr(
@@ -382,8 +398,12 @@ def test_resolution_node_guidance_only_hybrid_answer_stays_low_severity_without_
         "sufficient_evidence": True,
         "sql_success": False,
         "sql_error": "No ticket-scoped SQL evidence was available.",
-        "retrieval_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
-        "hybrid_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+        "retrieval_results": [
+            {"title": "429 Policy", "content": "Use Retry-After and backoff."}
+        ],
+        "hybrid_results": [
+            {"title": "429 Policy", "content": "Use Retry-After and backoff."}
+        ],
         "sql_rows": [],
         "retrieval_confidence": 0.64,
         "hybrid_confidence": 0.64,

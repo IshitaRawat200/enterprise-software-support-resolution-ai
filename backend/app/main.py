@@ -104,9 +104,7 @@ async def _prewarm_ragas_evaluator() -> None:
             exc,
         )
     else:
-        logger.info(
-            "RAGAS: background evaluator prewarm completed"
-        )
+        logger.info("RAGAS: background evaluator prewarm completed")
 
 
 # ============================================================
@@ -206,13 +204,9 @@ async def lifespan(app: FastAPI):
         # Background prewarm for RAG retrieval cache
         # ----------------------------------------------------
 
-        prewarm_task = asyncio.create_task(
-            _prewarm_retrieval_cache()
-        )
+        prewarm_task = asyncio.create_task(_prewarm_retrieval_cache())
 
-        ragas_prewarm_task = asyncio.create_task(
-            _prewarm_ragas_evaluator()
-        )
+        ragas_prewarm_task = asyncio.create_task(_prewarm_ragas_evaluator())
 
         app.state.rag_prewarm_task = prewarm_task
         app.state.ragas_prewarm_task = ragas_prewarm_task

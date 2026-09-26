@@ -82,7 +82,9 @@ def test_resolve_node_falls_back_when_llm_echoes_question(monkeypatch):
 
     class FakeLLM:
         async def ainvoke(self, prompt):
-            return SimpleNamespace(content="Which operating systems and software dependency versions are supported for ERIS 3.5.x?")
+            return SimpleNamespace(
+                content="Which operating systems and software dependency versions are supported for ERIS 3.5.x?"
+            )
 
     monkeypatch.setattr(resolve_mod, "get_llm", lambda complexity: FakeLLM())
 
@@ -90,4 +92,73 @@ def test_resolve_node_falls_back_when_llm_echoes_question(monkeypatch):
     assert out["current_node"] == "resolve"
     assert out["response"] != state["message"]
     assert "Ubuntu" in out["response"] or "PostgreSQL" in out["response"]
+    assert out["errors"] == []
+
+
+def test_resolve_node_uses_evidence_directly_for_low_risk_support(monkeypatch):
+    state = {
+        "message": "Which operating systems and software dependency versions are supported for ERIS 3.5.x?",
+        "route": "rag",
+        "intent": "usage_configuration",
+        "sufficient_evidence": True,
+        "retrieval_results": [
+            {
+                "title": "ERIS 3.5.x compatibility",
+                "content": "ERIS 3.5.x supports Ubuntu 22.04 LTS, RHEL 8/9, and Debian 12. Supported dependency versions include Java 17 and PostgreSQL 15.",
+                "source": "ERIS compatibility guide",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(
+        resolve_mod, "build_resolution_prompt", lambda **kwargs: "PROMPT"
+    )
+    monkeypatch.setattr(
+        resolve_mod, "assess_complexity", lambda message, route, severity: "simple"
+    )
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("LLM should not be called for low-risk evidence answers")
+
+    monkeypatch.setattr(resolve_mod, "get_llm", fail_if_called)
+
+    out = asyncio.run(resolve_mod.resolve_node(state))
+    assert out["current_node"] == "resolve"
+    assert "Ubuntu" in out["response"]
+    assert "Java 17" in out["response"] or "PostgreSQL 15" in out["response"]
+    assert out["recommended_action"] == "Continue automated resolution."
+    assert out["errors"] == []
+
+
+def test_resolve_node_redacts_documentation_api_key_examples_from_evidence(monkeypatch):
+    state = {
+        "message": "How do I authenticate to the API?",
+        "route": "rag",
+        "intent": "integration_api",
+        "sufficient_evidence": True,
+        "retrieval_results": [
+            {
+                "title": "API quick start",
+                "content": 'cURL example: curl -H "X-API-Key: sk_live_abc123xyz" https://api.example.com/v3/tickets',
+                "source": "ERIS API docs",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(
+        resolve_mod, "build_resolution_prompt", lambda **kwargs: "PROMPT"
+    )
+    monkeypatch.setattr(
+        resolve_mod, "assess_complexity", lambda message, route, severity: "simple"
+    )
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("LLM should not be called for low-risk evidence answers")
+
+    monkeypatch.setattr(resolve_mod, "get_llm", fail_if_called)
+
+    out = asyncio.run(resolve_mod.resolve_node(state))
+    assert out["current_node"] == "resolve"
+    assert "sk_live_abc123xyz" not in out["response"]
+    assert "<your_api_key>" in out["response"] or "your API key" in out["response"].lower()
     assert out["errors"] == []

@@ -162,7 +162,9 @@ def test_complete_slo_evaluation():
         sql_results=sql_results,
         severity_results=severity_results,
         cost_results=cost_results,
-        route_results=[{"expected_route": "RAG", "actual_route": "RAG"} for _ in range(10)],
+        route_results=[
+            {"expected_route": "RAG", "actual_route": "RAG"} for _ in range(10)
+        ],
         escalation_results=[
             {"expected_escalation": False, "actual_escalation": False},
             {"expected_escalation": False, "actual_escalation": False},
@@ -175,16 +177,25 @@ def test_complete_slo_evaluation():
             {"expected_escalation": False, "actual_escalation": False},
             {"expected_escalation": False, "actual_escalation": False},
         ],
-        retrieval_results=[{
-            "message": "How do I reset my password?",
-            "response": "You can reset your password in account settings.",
-            "retrieval_results": [{"content": "password reset instructions"}],
-            "expected_claims": ["You can reset your password in account settings."],
-            "expected_relevant_chunks": ["password reset"],
-            "expected_answer_relevance": 1.0,
-        } for _ in range(10)],
-        guardrail_results=[{"expected_guardrail_action": "allow", "actual_guardrail_action": "allow"} for _ in range(10)],
-        authorization_results=[{"expected_authorization_result": True, "actual_authorization_result": True} for _ in range(10)],
+        retrieval_results=[
+            {
+                "message": "How do I reset my password?",
+                "response": "You can reset your password in account settings.",
+                "retrieval_results": [{"content": "password reset instructions"}],
+                "expected_claims": ["You can reset your password in account settings."],
+                "expected_relevant_chunks": ["password reset"],
+                "expected_answer_relevance": 1.0,
+            }
+            for _ in range(10)
+        ],
+        guardrail_results=[
+            {"expected_guardrail_action": "allow", "actual_guardrail_action": "allow"}
+            for _ in range(10)
+        ],
+        authorization_results=[
+            {"expected_authorization_result": True, "actual_authorization_result": True}
+            for _ in range(10)
+        ],
         judge_results=[{"judge_score": 100.0} for _ in range(10)],
     )
 

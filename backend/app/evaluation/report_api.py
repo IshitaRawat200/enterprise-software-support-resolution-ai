@@ -44,30 +44,20 @@ class EvaluationRunSummary(BaseModel):
     status: str
     total_cases: int
     overall_passed: bool
-    metrics: list[SLOMetricSummary] = Field(
-        default_factory=list
-    )
+    metrics: list[SLOMetricSummary] = Field(default_factory=list)
 
 
 class EvaluationRunDetails(EvaluationRunSummary):
     report: dict[str, Any]
-    cases: list[dict[str, Any]] = Field(
-        default_factory=list
-    )
+    cases: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class EvaluationReportResponse(BaseModel):
     latest_run: EvaluationRunDetails
-    historical_runs: list[EvaluationRunSummary] = Field(
-        default_factory=list
-    )
-    slo_metrics: list[SLOMetricSummary] = Field(
-        default_factory=list
-    )
+    historical_runs: list[EvaluationRunSummary] = Field(default_factory=list)
+    slo_metrics: list[SLOMetricSummary] = Field(default_factory=list)
     case_count: int
-    cases: list[dict[str, Any]] = Field(
-        default_factory=list
-    )
+    cases: list[dict[str, Any]] = Field(default_factory=list)
     generated_at: datetime
 
 
@@ -138,9 +128,7 @@ def _build_metric_summaries(
 ) -> list[SLOMetricSummary]:
     summaries: list[SLOMetricSummary] = []
 
-    for name, target, passed_key in (
-        _METRIC_DEFINITIONS
-    ):
+    for name, target, passed_key in _METRIC_DEFINITIONS:
         actual = report.get(
             name,
             0.0,
@@ -171,9 +159,7 @@ def _build_run_summary(
 ) -> EvaluationRunSummary:
     report = run.report or {}
 
-    slo_report = _get_slo_report(
-        report
-    )
+    slo_report = _get_slo_report(report)
 
     return EvaluationRunSummary(
         run_id=run.run_id,
@@ -186,9 +172,7 @@ def _build_run_summary(
                 False,
             )
         ),
-        metrics=_build_metric_summaries(
-            slo_report
-        ),
+        metrics=_build_metric_summaries(slo_report),
     )
 
 
@@ -197,9 +181,7 @@ def _build_run_details(
 ) -> EvaluationRunDetails:
     report = run.report or {}
 
-    slo_report = _get_slo_report(
-        report
-    )
+    slo_report = _get_slo_report(report)
 
     cases = report.get(
         "cases",
@@ -220,9 +202,7 @@ def _build_run_details(
                 False,
             )
         ),
-        metrics=_build_metric_summaries(
-            slo_report
-        ),
+        metrics=_build_metric_summaries(slo_report),
         report=report,
         cases=list(cases),
     )
@@ -234,51 +214,33 @@ def _build_run_details(
 )
 async def get_evaluation_report(
     current_user=require_admin_dep,
-    session: AsyncSession=get_db_session_dep,
+    session: AsyncSession = get_db_session_dep,
 ) -> EvaluationReportResponse:
-    repository = EvaluationRunRepository(
-        session
-    )
+    repository = EvaluationRunRepository(session)
 
-    latest_run = (
-        await repository.get_latest_run()
-    )
+    latest_run = await repository.get_latest_run()
 
     if latest_run is None:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "No evaluation runs have "
-                "been stored yet."
-            ),
+            detail=("No evaluation runs have been stored yet."),
         )
 
-    recent_runs = (
-        await repository.list_recent_runs(
-            limit=20
-        )
-    )
+    recent_runs = await repository.list_recent_runs(limit=20)
 
-    latest_run_details = (
-        _build_run_details(
-            latest_run
-        )
-    )
+    latest_run_details = _build_run_details(latest_run)
 
     historical_runs = [
         _build_run_summary(run)
         for run in recent_runs
-        if run.run_id
-        != latest_run.run_id
+        if run.run_id != latest_run.run_id
     ]
 
     return EvaluationReportResponse(
         latest_run=latest_run_details,
         historical_runs=historical_runs,
         slo_metrics=latest_run_details.metrics,
-        case_count=(
-            latest_run_details.total_cases
-        ),
+        case_count=(latest_run_details.total_cases),
         cases=latest_run_details.cases,
         generated_at=datetime.now(UTC),
     )

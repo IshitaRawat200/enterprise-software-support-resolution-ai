@@ -63,9 +63,7 @@ class RagasEvaluator:
     # ================================================================
 
     def __init__(self) -> None:
-        self.openrouter_api_key = os.getenv(
-            "OPENROUTER_API_KEY"
-        )
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
 
         self.openrouter_base_url = os.getenv(
             "OPENROUTER_BASE_URL",
@@ -95,9 +93,7 @@ class RagasEvaluator:
         self.metric_timeout_seconds = max(5, parsed_timeout)
 
         if not self.openrouter_api_key:
-            raise RuntimeError(
-                "OPENROUTER_API_KEY is not configured."
-            )
+            raise RuntimeError("OPENROUTER_API_KEY is not configured.")
 
         logger.info(
             "RAGAS configuration: "
@@ -127,9 +123,7 @@ class RagasEvaluator:
             if self._initialized:
                 return
 
-            logger.info(
-                "RAGAS: creating OpenRouter-compatible async client"
-            )
+            logger.info("RAGAS: creating OpenRouter-compatible async client")
 
             self.async_client = AsyncOpenAI(
                 api_key=self.openrouter_api_key,
@@ -137,9 +131,7 @@ class RagasEvaluator:
                 default_headers=self._build_headers(),
             )
 
-            logger.info(
-                "RAGAS: OpenRouter-compatible async client created"
-            )
+            logger.info("RAGAS: OpenRouter-compatible async client created")
 
             logger.info(
                 "RAGAS: creating evaluator LLM model=%s",
@@ -174,50 +166,36 @@ class RagasEvaluator:
                 embeddings_task,
             )
 
-            logger.info(
-                "RAGAS: evaluator LLM created"
-            )
+            logger.info("RAGAS: evaluator LLM created")
 
-            logger.info(
-                "RAGAS: embeddings created"
-            )
+            logger.info("RAGAS: embeddings created")
 
-            logger.info(
-                "RAGAS: creating Faithfulness metric"
-            )
+            logger.info("RAGAS: creating Faithfulness metric")
 
             self.faithfulness = Faithfulness(
                 llm=self.evaluator_llm,
             )
 
-            logger.info(
-                "RAGAS: creating AnswerRelevancy metric"
-            )
+            logger.info("RAGAS: creating AnswerRelevancy metric")
 
             self.answer_relevancy = AnswerRelevancy(
                 llm=self.evaluator_llm,
                 embeddings=self.evaluator_embeddings,
             )
 
-            logger.info(
-                "RAGAS: creating ContextPrecision metric"
-            )
+            logger.info("RAGAS: creating ContextPrecision metric")
 
             self.context_precision = ContextPrecision(
                 llm=self.evaluator_llm,
             )
 
-            logger.info(
-                "RAGAS: creating ContextRecall metric"
-            )
+            logger.info("RAGAS: creating ContextRecall metric")
 
             self.context_recall = ContextRecall(
                 llm=self.evaluator_llm,
             )
 
-            logger.info(
-                "RAGAS: all metrics created"
-            )
+            logger.info("RAGAS: all metrics created")
 
             self._initialized = True
 
@@ -232,13 +210,9 @@ class RagasEvaluator:
     def _build_headers() -> dict[str, str]:
         headers: dict[str, str] = {}
 
-        http_referer = os.getenv(
-            "OPENROUTER_HTTP_REFERER"
-        )
+        http_referer = os.getenv("OPENROUTER_HTTP_REFERER")
 
-        title = os.getenv(
-            "OPENROUTER_X_TITLE"
-        )
+        title = os.getenv("OPENROUTER_X_TITLE")
 
         if http_referer:
             headers["HTTP-Referer"] = http_referer
@@ -306,9 +280,7 @@ class RagasEvaluator:
                 "result",
             ):
                 if key in result:
-                    score = cls._safe_float(
-                        result[key]
-                    )
+                    score = cls._safe_float(result[key])
 
                     if score is not None:
                         return score
@@ -328,14 +300,12 @@ class RagasEvaluator:
                         attribute,
                     )
 
-                    score = cls._safe_float(
-                        value
-                    )
+                    score = cls._safe_float(value)
 
                     if score is not None:
                         return score
 
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     continue
 
         return cls._safe_float(result)
@@ -376,9 +346,7 @@ class RagasEvaluator:
             item,
             bytes,
         ):
-            value = item.decode(
-                errors="replace"
-            ).strip()
+            value = item.decode(errors="replace").strip()
 
             return value or None
 
@@ -400,13 +368,9 @@ class RagasEvaluator:
                 value = item.get(key)
 
                 if value:
-                    return str(
-                        value
-                    ).strip()
+                    return str(value).strip()
 
-            node = item.get(
-                "node"
-            )
+            node = item.get("node")
 
             if isinstance(
                 node,
@@ -422,9 +386,7 @@ class RagasEvaluator:
                     value = node.get(key)
 
                     if value:
-                        return str(
-                            value
-                        ).strip()
+                        return str(value).strip()
 
             return None
 
@@ -449,11 +411,9 @@ class RagasEvaluator:
                     )
 
                     if value:
-                        return str(
-                            value
-                        ).strip()
+                        return str(value).strip()
 
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     continue
 
         # ------------------------------------------------------------
@@ -468,11 +428,9 @@ class RagasEvaluator:
                 value = item.get_content()
 
                 if value:
-                    return str(
-                        value
-                    ).strip()
+                    return str(value).strip()
 
-            except Exception:
+            except (AttributeError, TypeError, ValueError):
                 pass
 
         return None
@@ -508,9 +466,7 @@ class RagasEvaluator:
                 "documents",
             ):
                 if key in retrieval_results:
-                    retrieval_results = (
-                        retrieval_results[key]
-                    )
+                    retrieval_results = retrieval_results[key]
                     break
 
         # ------------------------------------------------------------
@@ -521,15 +477,9 @@ class RagasEvaluator:
             retrieval_results,
             str,
         ):
-            context = cls._extract_context_from_item(
-                retrieval_results
-            )
+            context = cls._extract_context_from_item(retrieval_results)
 
-            return (
-                [context]
-                if context
-                else []
-            )
+            return [context] if context else []
 
         # ------------------------------------------------------------
         # Single bytes
@@ -539,15 +489,9 @@ class RagasEvaluator:
             retrieval_results,
             bytes,
         ):
-            context = cls._extract_context_from_item(
-                retrieval_results
-            )
+            context = cls._extract_context_from_item(retrieval_results)
 
-            return (
-                [context]
-                if context
-                else []
-            )
+            return [context] if context else []
 
         # ------------------------------------------------------------
         # Normalize single object
@@ -557,9 +501,7 @@ class RagasEvaluator:
             retrieval_results,
             (list, tuple),
         ):
-            retrieval_results = [
-                retrieval_results
-            ]
+            retrieval_results = [retrieval_results]
 
         # ------------------------------------------------------------
         # Extract contexts
@@ -568,14 +510,10 @@ class RagasEvaluator:
         contexts: list[str] = []
 
         for item in retrieval_results:
-            context = cls._extract_context_from_item(
-                item
-            )
+            context = cls._extract_context_from_item(item)
 
             if context:
-                contexts.append(
-                    context
-                )
+                contexts.append(context)
 
         return contexts
 
@@ -612,8 +550,7 @@ class RagasEvaluator:
                 task.cancel()
 
             logger.error(
-                "RAGAS metric timeout "
-                "request_id=%s metric=%s timeout=%ss",
+                "RAGAS metric timeout request_id=%s metric=%s timeout=%ss",
                 request_id,
                 metric_name,
                 self.metric_timeout_seconds,
@@ -621,13 +558,11 @@ class RagasEvaluator:
 
             return None
 
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, AttributeError):
             logger.exception(
-                "RAGAS metric wrapper failed "
-                "request_id=%s metric=%s error=%s",
+                "RAGAS metric wrapper failed request_id=%s metric=%s",
                 request_id,
                 metric_name,
-                exc,
             )
 
             return None
@@ -702,8 +637,7 @@ class RagasEvaluator:
         retrieved_contexts: list[str],
     ) -> float | None:
         logger.info(
-            "RAGAS metric starting "
-            "request_id=%s metric=faithfulness contexts=%d",
+            "RAGAS metric starting request_id=%s metric=faithfulness contexts=%d",
             request_id,
             len(retrieved_contexts),
         )
@@ -715,25 +649,20 @@ class RagasEvaluator:
                 retrieved_contexts=retrieved_contexts,
             )
 
-            score = self._extract_score(
-                result
-            )
+            score = self._extract_score(result)
 
             logger.info(
-                "RAGAS metric completed "
-                "request_id=%s metric=faithfulness score=%s",
+                "RAGAS metric completed request_id=%s metric=faithfulness score=%s",
                 request_id,
                 score,
             )
 
             return score
 
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, AttributeError):
             logger.exception(
-                "RAGAS metric failed "
-                "request_id=%s metric=faithfulness error=%s",
+                "RAGAS metric failed request_id=%s metric=faithfulness",
                 request_id,
-                exc,
             )
 
             return None
@@ -750,8 +679,7 @@ class RagasEvaluator:
         answer: str,
     ) -> float | None:
         logger.info(
-            "RAGAS metric starting "
-            "request_id=%s metric=answer_relevance",
+            "RAGAS metric starting request_id=%s metric=answer_relevance",
             request_id,
         )
 
@@ -761,25 +689,20 @@ class RagasEvaluator:
                 response=answer,
             )
 
-            score = self._extract_score(
-                result
-            )
+            score = self._extract_score(result)
 
             logger.info(
-                "RAGAS metric completed "
-                "request_id=%s metric=answer_relevance score=%s",
+                "RAGAS metric completed request_id=%s metric=answer_relevance score=%s",
                 request_id,
                 score,
             )
 
             return score
 
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, AttributeError):
             logger.exception(
-                "RAGAS metric failed "
-                "request_id=%s metric=answer_relevance error=%s",
+                "RAGAS metric failed request_id=%s metric=answer_relevance",
                 request_id,
-                exc,
             )
 
             return None
@@ -808,8 +731,7 @@ class RagasEvaluator:
             return None
 
         logger.info(
-            "RAGAS metric starting "
-            "request_id=%s metric=context_precision contexts=%d",
+            "RAGAS metric starting request_id=%s metric=context_precision contexts=%d",
             request_id,
             len(retrieved_contexts),
         )
@@ -821,9 +743,7 @@ class RagasEvaluator:
                 reference=reference,
             )
 
-            score = self._extract_score(
-                result
-            )
+            score = self._extract_score(result)
 
             logger.info(
                 "RAGAS metric completed "
@@ -834,12 +754,10 @@ class RagasEvaluator:
 
             return score
 
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, AttributeError):
             logger.exception(
-                "RAGAS metric failed "
-                "request_id=%s metric=context_precision error=%s",
+                "RAGAS metric failed request_id=%s metric=context_precision",
                 request_id,
-                exc,
             )
 
             return None
@@ -868,8 +786,7 @@ class RagasEvaluator:
             return None
 
         logger.info(
-            "RAGAS metric starting "
-            "request_id=%s metric=context_recall contexts=%d",
+            "RAGAS metric starting request_id=%s metric=context_recall contexts=%d",
             request_id,
             len(retrieved_contexts),
         )
@@ -881,25 +798,20 @@ class RagasEvaluator:
                 reference=reference,
             )
 
-            score = self._extract_score(
-                result
-            )
+            score = self._extract_score(result)
 
             logger.info(
-                "RAGAS metric completed "
-                "request_id=%s metric=context_recall score=%s",
+                "RAGAS metric completed request_id=%s metric=context_recall score=%s",
                 request_id,
                 score,
             )
 
             return score
 
-        except Exception as exc:
+        except (RuntimeError, TypeError, ValueError, AttributeError):
             logger.exception(
-                "RAGAS metric failed "
-                "request_id=%s metric=context_recall error=%s",
+                "RAGAS metric failed request_id=%s metric=context_recall",
                 request_id,
-                exc,
             )
 
             return None
@@ -935,19 +847,14 @@ class RagasEvaluator:
 
         errors: list[str] = []
 
-        question = (
-            question or ""
-        ).strip()
+        question = (question or "").strip()
 
-        answer = (
-            answer or ""
-        ).strip()
+        answer = (answer or "").strip()
 
         retrieved_contexts = [
             str(context).strip()
             for context in retrieved_contexts
-            if context
-            and str(context).strip()
+            if context and str(context).strip()
         ]
 
         # ------------------------------------------------------------
@@ -955,24 +862,17 @@ class RagasEvaluator:
         # ------------------------------------------------------------
 
         if not question:
-            errors.append(
-                "question is empty"
-            )
+            errors.append("question is empty")
 
         if not answer:
-            errors.append(
-                "answer is empty"
-            )
+            errors.append("answer is empty")
 
         if not retrieved_contexts:
-            errors.append(
-                "retrieved_contexts is empty"
-            )
+            errors.append("retrieved_contexts is empty")
 
         if errors:
             logger.warning(
-                "RAGAS case evaluation skipped "
-                "request_id=%s errors=%s",
+                "RAGAS case evaluation skipped request_id=%s errors=%s",
                 request_id,
                 errors,
             )
@@ -991,8 +891,7 @@ class RagasEvaluator:
         # ------------------------------------------------------------
 
         logger.info(
-            "RAGAS concurrent evaluation starting "
-            "request_id=%s",
+            "RAGAS concurrent evaluation starting request_id=%s",
             request_id,
         )
 
@@ -1072,25 +971,17 @@ class RagasEvaluator:
         # ------------------------------------------------------------
 
         if faithfulness is None:
-            errors.append(
-                "faithfulness evaluation returned no score"
-            )
+            errors.append("faithfulness evaluation returned no score")
 
         if answer_relevance is None:
-            errors.append(
-                "answer_relevance evaluation returned no score"
-            )
+            errors.append("answer_relevance evaluation returned no score")
 
         if reference:
             if context_precision is None:
-                errors.append(
-                    "context_precision evaluation returned no score"
-                )
+                errors.append("context_precision evaluation returned no score")
 
             if context_recall is None:
-                errors.append(
-                    "context_recall evaluation returned no score"
-                )
+                errors.append("context_recall evaluation returned no score")
 
         fallback_scores = self._fallback_scores(
             question=question,
@@ -1109,7 +1000,10 @@ class RagasEvaluator:
             answer_relevance = fallback_scores["answer_relevance"]
             fallback_used.append("answer_relevance")
 
-        if context_precision is None and fallback_scores["context_precision"] is not None:
+        if (
+            context_precision is None
+            and fallback_scores["context_precision"] is not None
+        ):
             context_precision = fallback_scores["context_precision"]
             fallback_used.append("context_precision")
 
@@ -1118,9 +1012,7 @@ class RagasEvaluator:
             fallback_used.append("context_recall")
 
         if fallback_used:
-            errors.append(
-                "fallback scores used for: " + ", ".join(fallback_used)
-            )
+            errors.append("fallback scores used for: " + ", ".join(fallback_used))
 
         # ------------------------------------------------------------
         # EVALUATION STATUS
@@ -1141,10 +1033,7 @@ class RagasEvaluator:
             and answer_relevance is not None
             and (
                 not reference
-                or (
-                    context_precision is not None
-                    and context_recall is not None
-                )
+                or (context_precision is not None and context_recall is not None)
             )
         ):
             evaluation_status = "completed"
@@ -1204,11 +1093,7 @@ class RagasEvaluator:
         Evaluate one production ERIS RAG request.
         """
 
-        retrieved_contexts = (
-            self._extract_retrieved_contexts(
-                retrieval_results
-            )
-        )
+        retrieved_contexts = self._extract_retrieved_contexts(retrieval_results)
 
         result_count = 0
 
@@ -1216,9 +1101,7 @@ class RagasEvaluator:
             retrieval_results,
             (list, tuple),
         ):
-            result_count = len(
-                retrieval_results
-            )
+            result_count = len(retrieval_results)
 
         logger.info(
             "RAGAS evaluate_rag_request "

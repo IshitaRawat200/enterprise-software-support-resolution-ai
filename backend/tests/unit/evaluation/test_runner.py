@@ -44,7 +44,9 @@ def test_load_benchmark_cases(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cases[0].expected_route == "rag"
     assert cases[0].expected_escalation is True
     assert cases[0].expected_guardrail_action == "allow"
-    assert cases[0].metadata["source_pdf"] == "API Error Codes & Troubleshooting Handbook"
+    assert (
+        cases[0].metadata["source_pdf"] == "API Error Codes & Troubleshooting Handbook"
+    )
 
 
 def test_evaluate_case() -> None:
@@ -145,7 +147,9 @@ def test_build_slo_inputs_include_new_metric_fields() -> None:
         expected_escalation=False,
         expected_resolution=True,
         expected_relevant_chunks=["password reset"],
-        expected_claims=["You can reset your password using the account settings page."],
+        expected_claims=[
+            "You can reset your password using the account settings page."
+        ],
         expected_answer_relevance=0.9,
         expected_guardrail_action="allow",
         expected_authorization_result=True,

@@ -48,7 +48,7 @@ def _patch_app_for_tests(monkeypatch):
     # Ensure the app state has a checkpointer so /health reports connected
     try:
         main.app.state.langgraph_checkpointer = object()
-    except Exception:
+    except AttributeError:
         # If app state isn't available yet, ignore — lifespan will set it.
         pass
 
