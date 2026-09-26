@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-
 from app.orchestrator.actions import incident_action
 
 

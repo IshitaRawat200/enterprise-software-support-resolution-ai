@@ -33,8 +33,8 @@ from app.database.connection import check_database_connection, get_db_session
 # are known to SQLAlchemy.
 #
 from app.database.models import registry  # noqa: F401
-from app.evaluation.runtime import get_production_evaluator
 from app.evaluation.report_api import router as evaluation_router
+from app.evaluation.runtime import get_production_evaluator
 from app.observability.logging import logger
 from app.orchestrator.graph import build_support_graph
 from app.rag.embeddings import get_embedding_model

@@ -128,7 +128,7 @@ class RagasEvaluator:
                 return
 
             logger.info(
-                "RAGAS: creating AsyncOpenAI client"
+                "RAGAS: creating OpenRouter-compatible async client"
             )
 
             self.async_client = AsyncOpenAI(
@@ -138,7 +138,7 @@ class RagasEvaluator:
             )
 
             logger.info(
-                "RAGAS: AsyncOpenAI client created"
+                "RAGAS: OpenRouter-compatible async client created"
             )
 
             logger.info(

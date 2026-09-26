@@ -1,10 +1,9 @@
 import io
 from types import SimpleNamespace
 
+import app.api.knowledge_base as kb
 import pytest
 from fastapi import HTTPException
-
-import app.api.knowledge_base as kb
 
 
 class DummySession:

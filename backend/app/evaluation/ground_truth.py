@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import csv
 import re
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from langfuse import get_client
 
-
 DATASET_NAME = "ERIS-Golden-50"
+LOCAL_GOLDEN_SET_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "ERIS-Golden-50-with-SLO-Targets (1).csv"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,14 +103,80 @@ def _load_dataset_items(dataset_name: str = DATASET_NAME) -> list[Any]:
     return list(dataset.items)
 
 
-@lru_cache(maxsize=1)
-def _load_evaluation_cases() -> tuple[EvaluationCase, ...]:
-    try:
-        items = _load_dataset_items()
-    except Exception:
+def _build_case(
+    *,
+    question: Any,
+    reference_answer: Any,
+    expected_route: Any,
+    test_id: Any = None,
+    expected_escalation: Any = None,
+    expected_guardrail: Any = None,
+) -> EvaluationCase | None:
+    if not question or not reference_answer or not expected_route:
+        return None
+
+    normalized_test_id: str | None = None
+    if test_id not in (None, ""):
+        candidate = str(test_id).strip()
+        if candidate and candidate.lower() not in {"none", "null"}:
+            normalized_test_id = candidate
+
+    return EvaluationCase(
+        question=str(question).strip(),
+        reference_answer=str(reference_answer).strip(),
+        expected_route=str(expected_route).strip().lower(),
+        test_id=normalized_test_id,
+        expected_escalation=_parse_bool(expected_escalation),
+        expected_guardrail=(
+            str(expected_guardrail).strip().lower()
+            if expected_guardrail not in (None, "")
+            else None
+        ),
+    )
+
+
+def _load_csv_evaluation_cases() -> tuple[EvaluationCase, ...]:
+    if not LOCAL_GOLDEN_SET_PATH.exists():
         return tuple()
 
     cases: list[EvaluationCase] = []
+
+    with LOCAL_GOLDEN_SET_PATH.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+
+        for row in reader:
+            case = _build_case(
+                question=_row_get(row, "Input / Query", "Input", "Query"),
+                reference_answer=_row_get(row, "Expected Output", "Reference Answer", "Answer"),
+                expected_route=_row_get(row, "Expected Route", "Route"),
+                test_id=_row_get(row, "Test ID", "Case ID", "ID"),
+                expected_escalation=_row_get(
+                    row,
+                    "Expected Escalation",
+                    "Escalation",
+                ),
+                expected_guardrail=_row_get(
+                    row,
+                    "Expected Guardrail",
+                    "Expected Guardrail Action",
+                ),
+            )
+
+            if case is not None:
+                cases.append(case)
+
+    return tuple(cases)
+
+
+@lru_cache(maxsize=1)
+def _load_evaluation_cases() -> tuple[EvaluationCase, ...]:
+    cases_by_question: dict[str, EvaluationCase] = {}
+    cases_by_test_id: dict[str, EvaluationCase] = {}
+
+    try:
+        items = _load_dataset_items()
+    except Exception:
+        items = []
 
     for item in items:
         metadata = _item_metadata(item)
@@ -158,22 +229,36 @@ def _load_evaluation_cases() -> tuple[EvaluationCase, ...]:
                 "expected_guardrail_action",
             )
 
-        cases.append(
-            EvaluationCase(
-                question=str(question).strip(),
-                reference_answer=str(reference_answer).strip(),
-                expected_route=str(expected_route).strip().lower(),
-                test_id=(
-                    str(test_id).strip()
-                    if test_id not in (None, "") and str(test_id).strip().lower() not in {"none", "null"}
-                    else None
-                ),
-                expected_escalation=expected_escalation,
-                expected_guardrail=(str(expected_guardrail).strip().lower() if expected_guardrail else None),
-            )
+        case = _build_case(
+            question=question,
+            reference_answer=reference_answer,
+            expected_route=expected_route,
+            test_id=test_id,
+            expected_escalation=expected_escalation,
+            expected_guardrail=expected_guardrail,
         )
 
-    return tuple(cases)
+        if case is None:
+            continue
+
+        cases_by_question[_normalize_question(case.question)] = case
+        if case.test_id:
+            cases_by_test_id[str(case.test_id).strip().lower()] = case
+
+    for case in _load_csv_evaluation_cases():
+        normalized_question = _normalize_question(case.question)
+        cases_by_question.setdefault(normalized_question, case)
+
+        if case.test_id:
+            cases_by_test_id.setdefault(str(case.test_id).strip().lower(), case)
+
+    ordered_cases = list(cases_by_question.values())
+
+    for case in cases_by_test_id.values():
+        if case not in ordered_cases:
+            ordered_cases.append(case)
+
+    return tuple(ordered_cases)
 
 
 # ============================================================
@@ -187,17 +272,21 @@ def _normalize_question(question: str) -> str:
     )
 
 
-# Exact-match lookup.
+@lru_cache(maxsize=1)
+def _cases_by_question() -> dict[str, EvaluationCase]:
+    return {
+        _normalize_question(case.question): case
+        for case in _load_evaluation_cases()
+    }
 
-_CASES_BY_QUESTION: dict[str, EvaluationCase] = {
-    _normalize_question(case.question): case for case in _load_evaluation_cases()
-}
 
-_CASES_BY_TEST_ID: dict[str, EvaluationCase] = {
-    str(case.test_id).strip().lower(): case
-    for case in _load_evaluation_cases()
-    if case.test_id
-}
+@lru_cache(maxsize=1)
+def _cases_by_test_id() -> dict[str, EvaluationCase]:
+    return {
+        str(case.test_id).strip().lower(): case
+        for case in _load_evaluation_cases()
+        if case.test_id
+    }
 
 
 # ============================================================
@@ -219,7 +308,7 @@ def get_evaluation_case(
     if not question:
         return None
 
-    return _CASES_BY_QUESTION.get(
+    return _cases_by_question().get(
         _normalize_question(question)
     )
 
@@ -250,4 +339,4 @@ def get_evaluation_case_by_test_id(test_id: str) -> EvaluationCase | None:
     if not test_id:
         return None
 
-    return _CASES_BY_TEST_ID.get(str(test_id).strip().lower())
+    return _cases_by_test_id().get(str(test_id).strip().lower())

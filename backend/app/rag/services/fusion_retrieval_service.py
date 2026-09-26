@@ -5,14 +5,13 @@ from time import perf_counter
 from typing import Any
 
 from llama_index.core import (
-    Settings,
     VectorStoreIndex,
 )
-from llama_index.core.schema import TextNode
 from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.retrievers import (
     QueryFusionRetriever,
 )
+from llama_index.core.schema import TextNode
 from llama_index.llms.groq import Groq
 from llama_index.retrievers.bm25 import BM25Retriever
 from pydantic import PrivateAttr

@@ -45,6 +45,18 @@ router = APIRouter(
 _ragas_tasks: set[asyncio.Task[Any]] = set()
 
 
+def _should_schedule_async_evaluation(
+    *,
+    route: str | None,
+    retrieval_results: list[dict[str, Any]] | None,
+) -> bool:
+    normalized_route = str(route or "").strip().lower()
+    if normalized_route not in {"rag", "hybrid"}:
+        return False
+
+    return bool(retrieval_results)
+
+
 # ============================================================
 # REQUEST
 # ============================================================
@@ -1552,6 +1564,15 @@ async def chat(
                 sanitized_message
             )
 
+            async_evaluation_enabled = _should_schedule_async_evaluation(
+                route=result.get("route"),
+                retrieval_results=(
+                    result.get("retrieval_results")
+                    or result.get("hybrid_results")
+                    or []
+                ),
+            )
+
             route_accuracy_initial: float | None = None
 
             if (
@@ -1577,7 +1598,11 @@ async def chat(
                     "escalation_required",
                     False,
                 ),
-                "evaluation_status": "pending",
+                "evaluation_status": (
+                    "pending"
+                    if async_evaluation_enabled
+                    else "completed"
+                ),
                 "accuracy": None,
                 "faithfulness": None,
                 "answer_relevance": None,
@@ -1588,7 +1613,11 @@ async def chat(
                 "cost_usd": request_metrics.get("cost_usd"),
                 "latency_ms": request_metrics.get("latency_ms"),
                 "evaluation": {
-                    "status": "pending",
+                    "status": (
+                        "pending"
+                        if async_evaluation_enabled
+                        else "completed"
+                    ),
                     "accuracy": None,
                     "faithfulness": None,
                     "answer_relevance": None,
@@ -1611,7 +1640,7 @@ async def chat(
 
             await db_session.commit()
 
-            if result.get("route") == "rag":
+            if async_evaluation_enabled:
                 logger.info(
                     "Scheduling asynchronous RAGAS evaluation "
                     "request_id=%s route=%s retrieval_results=%s",
@@ -1627,6 +1656,7 @@ async def chat(
                         answer=response_message,
                         retrieval_results=(
                             result.get("retrieval_results")
+                            or result.get("hybrid_results")
                             or []
                         ),
                         reference=(
@@ -1679,7 +1709,7 @@ async def chat(
                 request_id=request_id,
                 evaluation_status=(
                     "pending"
-                    if result.get("route") == "rag"
+                    if async_evaluation_enabled
                     else "completed"
                 ),
                 # Intent

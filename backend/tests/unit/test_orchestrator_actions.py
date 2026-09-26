@@ -79,6 +79,42 @@ def test_run_sql_success(monkeypatch):
     assert out["sql_row_count"] == 1
 
 
+def test_run_sql_ticket_status_shortcut(monkeypatch):
+    class FakeSQLService:
+        def __init__(self, session):
+            pass
+
+        async def query(self, question, customer_id=None):
+            assert question == "What is the status of ticket TCK-2227ADAA?"
+            return {
+                "success": True,
+                "sql": "SELECT ticket_number, status FROM support_tickets WHERE ticket_number = $1 AND customer_id = $2 LIMIT 1",
+                "rows": [{"ticket_number": "TCK-2227ADAA", "status": "open"}],
+                "row_count": 1,
+                "sql_confidence": 1.0,
+            }
+
+    async def fake_get_db_session():
+        async for s in _agen_single(SimpleNamespace()):
+            yield s
+
+    monkeypatch.setattr(sql_action, "get_db_session", fake_get_db_session)
+    monkeypatch.setattr(sql_action, "SQLService", FakeSQLService)
+
+    out = asyncio.run(
+        sql_action.run_sql(
+            {
+                "message": "What is the status of ticket TCK-2227ADAA?",
+                "customer_id": "cid",
+            }
+        )
+    )
+
+    assert out["sql_success"] is True
+    assert out["sql_rows"][0]["status"] == "open"
+    assert out["sql_confidence"] == 1.0
+
+
 def test_run_sql_failure(monkeypatch):
     class FakeSQLService:
         def __init__(self, session):

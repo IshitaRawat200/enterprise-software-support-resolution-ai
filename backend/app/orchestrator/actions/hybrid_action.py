@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.database.connection import get_db_session
 from app.hybrid.hybrid_retrieval_service import HybridRetrievalService
 from app.observability.logging import logger
+from app.orchestrator.hybrid_policy import can_resolve_hybrid_from_documentation
 from app.orchestrator.state import SupportState
 from app.sql.sql_service import SQLService
 
@@ -183,7 +184,18 @@ async def run_hybrid(state: SupportState) -> dict[str, Any]:
                 )
             )
 
-            errors = existing_errors + hybrid_errors
+            recoverable_sql_gap = (
+                can_resolve_hybrid_from_documentation(state)
+                and sufficient_evidence
+                and bool(rag_results)
+                and not sql_success
+                and bool(sql_error)
+                and bool(hybrid_errors)
+                and all(str(error).strip() == str(sql_error).strip() for error in hybrid_errors)
+            )
+
+            fatal_hybrid_errors = [] if recoverable_sql_gap else hybrid_errors
+            errors = existing_errors + fatal_hybrid_errors
 
             logger.info(
                 "ACT/HYBRID: rag_confidence=%.4f "
@@ -213,7 +225,9 @@ async def run_hybrid(state: SupportState) -> dict[str, Any]:
                 "hybrid_results": (rag_results),
                 "hybrid_confidence": (hybrid_confidence),
                 "hybrid_success": (
-                    sufficient_evidence and sql_success and not hybrid_errors
+                    sufficient_evidence
+                    and (sql_success or recoverable_sql_gap)
+                    and not fatal_hybrid_errors
                 ),
                 "hybrid_reason": (
                     data.get(

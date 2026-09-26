@@ -5,12 +5,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from app.database.connection import get_db_session
 from app.evaluation import report_api
 from app.guardrails.auth import get_current_user
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 class FakeEvaluationRunRepository:

@@ -331,18 +331,16 @@ const ChatMetrics = ({
   }
 
   const ragasPending =
-    metadata.route === "rag" &&
-    (metadata.evaluation_status ==
+    metadata.evaluation_status ==
       null ||
-      metadata.evaluation_status ===
-        "pending");
+    metadata.evaluation_status ===
+      "pending";
 
   const ragasTimedOut =
-    metadata.route === "rag" &&
-    (metadata.evaluation_status ===
+    metadata.evaluation_status ===
       "partial" ||
-      metadata.evaluation_status ===
-        "failed");
+    metadata.evaluation_status ===
+      "failed";
 
   const evaluationStatus =
     metadata.evaluation_status ??

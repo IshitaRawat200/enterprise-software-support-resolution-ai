@@ -2,7 +2,6 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-
 from app.rag.services.db_rag_ingestion_service import DBRAGIngestionService
 from app.rag.services.fusion_retrieval_service import FusionRetrievalService
 

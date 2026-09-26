@@ -70,6 +70,14 @@ class SQLService:
         the database executor is never called.
         """
 
+        deterministic_result = await self._run_deterministic_query(
+            question=question,
+            customer_id=customer_id,
+        )
+
+        if deterministic_result is not None:
+            return deterministic_result
+
         # =====================================================
         # 1. GENERATE SQL
         # =====================================================
@@ -134,6 +142,88 @@ class SQLService:
             "guardrail": (guardrail_result.guardrail_name),
             "guardrail_code": (guardrail_result.code),
         }
+
+    async def _run_deterministic_query(
+        self,
+        *,
+        question: str,
+        customer_id: str | None,
+    ) -> dict[str, Any] | None:
+        ticket_number = self._extract_ticket_number(question)
+        if not ticket_number or not self._is_ticket_status_lookup(question):
+            return None
+
+        if not customer_id:
+            raise ValueError(
+                "Authenticated customer_id is required for customer-scoped SQL query."
+            )
+
+        sql = (
+            "SELECT ticket_number, status "
+            "FROM support_tickets "
+            "WHERE ticket_number = $1 AND customer_id = $2 "
+            "LIMIT 1"
+        )
+
+        execution = await self.executor.execute(
+            sql,
+            parameters=[ticket_number, customer_id],
+        )
+
+        return {
+            "success": execution["success"],
+            "sql": execution["sql"],
+            "rows": execution["rows"],
+            "row_count": execution["row_count"],
+            "sql_confidence": 1.0,
+            "explanation": "Deterministic ticket status lookup executed.",
+            "tables_used": ["support_tickets"],
+            "error": execution["error"],
+            "guardrail_blocked": False,
+            "guardrail": "deterministic_sql_shortcut",
+            "guardrail_code": None,
+        }
+
+    @staticmethod
+    def _extract_ticket_number(question: str) -> str | None:
+        match = re.search(
+            r"\b(TCK[-\u2010-\u2015]?[A-Z0-9]{6,})\b",
+            str(question or ""),
+            re.IGNORECASE,
+        )
+        if not match:
+            return None
+
+        return (
+            match.group(1)
+            .upper()
+            .replace("‐", "-")
+            .replace("‑", "-")
+            .replace("‒", "-")
+            .replace("–", "-")
+            .replace("—", "-")
+            .replace("―", "-")
+        )
+
+    @classmethod
+    def _is_ticket_status_lookup(cls, question: str) -> bool:
+        normalized = str(question or "").strip().lower()
+        if not normalized:
+            return False
+
+        if cls._extract_ticket_number(question) is None:
+            return False
+
+        return any(
+            phrase in normalized
+            for phrase in {
+                "status of ticket",
+                "ticket status",
+                "status for ticket",
+                "what is the status",
+                "is ticket",
+            }
+        )
 
     @staticmethod
     def _build_execution_parameters(

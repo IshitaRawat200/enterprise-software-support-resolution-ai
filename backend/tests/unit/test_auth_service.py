@@ -2,8 +2,6 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
-
 from app.services import auth_service
 from app.services.auth_service import (
     authenticate_user,
@@ -11,6 +9,7 @@ from app.services.auth_service import (
     normalize_email,
     verify_password,
 )
+from fastapi import HTTPException
 
 
 def test_normalize_email():

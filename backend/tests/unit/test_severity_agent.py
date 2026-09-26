@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from app.agents.severity import severity_assessment_agent as sa_mod
 
 

@@ -6,9 +6,8 @@ from typing import Literal
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.config import get_settings
-from app.llm.providers import create_groq_llm
+from app.llm.providers import create_groq_llm, create_openrouter_llm
 from app.observability.logging import logger
-
 
 Complexity = Literal[
     "simple",
@@ -228,35 +227,44 @@ class LLMGateway:
         # SIMPLE / MEDIUM FALLBACK
         # --------------------------------------------------------
         #
-        # If GPT-OSS-20B hits a rate limit or another provider
-        # error, automatically retry the same request against
-        # GPT-OSS-120B.
+        # Groq is rate-limited on the shared on-demand plan. If the
+        # primary Groq model exhausts its quota, automatically retry
+        # using a cross-provider fallback rather than failing the whole
+        # request.
         #
 
-        fallback_route = LLMRoute(
-            provider="groq",
-            model=self.settings.groq_complex_model,
-            complexity="complex",
-            reason=(
-                "Fallback from Groq GPT-OSS-20B "
-                "to GPT-OSS-120B."
-            ),
-        )
+        fallback_models: list[BaseChatModel] = []
 
-        fallback_llm = self._create_primary_llm(
-            route=fallback_route,
-        )
+        if self.settings.openrouter_api_key:
+            fallback_models.append(create_openrouter_llm())
+
+        if (
+            self.settings.groq_complex_model
+            and self.settings.groq_complex_model != route.model
+        ):
+            fallback_route = LLMRoute(
+                provider="groq",
+                model=self.settings.groq_complex_model,
+                complexity="complex",
+                reason=(
+                    "Fallback from Groq GPT-OSS-20B "
+                    "to GPT-OSS-120B."
+                ),
+            )
+            fallback_models.append(
+                self._create_primary_llm(route=fallback_route),
+            )
 
         logger.info(
-            "LLM Gateway fallback configured: "
-            "primary=%s fallback=%s",
+            "LLM Gateway fallback configured: primary=%s fallback_count=%s",
             route.model,
-            fallback_route.model,
+            len(fallback_models),
         )
 
-        return primary_llm.with_fallbacks(
-            [fallback_llm],
-        )
+        if not fallback_models:
+            return primary_llm
+
+        return primary_llm.with_fallbacks(fallback_models)
 
 
 # ================================================================

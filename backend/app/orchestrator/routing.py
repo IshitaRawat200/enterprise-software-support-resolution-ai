@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from app.observability.logging import logger
+from app.orchestrator.hybrid_policy import (
+    can_resolve_hybrid_from_documentation,
+    is_low_risk_informational_request,
+)
 from app.orchestrator.state import SupportState
 
 # ============================================================
@@ -95,7 +99,50 @@ def _is_low_risk_rag_request(state: SupportState) -> bool:
     if (state.get("route") or "").lower() != "rag":
         return False
 
+    if not is_low_risk_informational_request(state):
+        return False
+
+    if not bool(state.get("sufficient_evidence", False)):
+        return False
+
+    severity = (state.get("severity") or "").lower()
+    return severity in {"", "low", "medium"}
+
+
+def _is_low_risk_hybrid_request(state: SupportState) -> bool:
+    """
+    Hybrid requests that combine documentation with customer-scoped evidence
+    can also bypass severity when they remain purely informational and show no
+    incident, security, or escalation signals.
+    """
+
+    if (state.get("route") or "").lower() != "hybrid":
+        return False
+
+    if not is_low_risk_informational_request(state):
+        return False
+
+    if not bool(state.get("sufficient_evidence", False)):
+        return False
+
+    if not bool(state.get("sql_success", False)) and not can_resolve_hybrid_from_documentation(state):
+        return False
+
+    severity = (state.get("severity") or "").lower()
+    return severity in {"", "low", "medium"}
+
+
+def _is_low_risk_sql_request(state: SupportState) -> bool:
+    if (state.get("route") or "").lower() != "sql":
+        return False
+
+    if (state.get("intent") or "").lower() != "billing_account":
+        return False
+
     if state.get("human_handoff_required") or state.get("escalation_required"):
+        return False
+
+    if not bool(state.get("sql_success", False)):
         return False
 
     if bool(state.get("incident_active", False)):
@@ -111,13 +158,6 @@ def _is_low_risk_rag_request(state: SupportState) -> bool:
         return False
 
     if bool(state.get("incident_unresolved_critical_alert", False)):
-        return False
-
-    if not bool(state.get("sufficient_evidence", False)):
-        return False
-
-    intent = (state.get("intent") or "").lower()
-    if intent not in {"usage_configuration", "integration_api", "performance_latency"}:
         return False
 
     severity = (state.get("severity") or "").lower()
@@ -146,6 +186,18 @@ def route_after_check(state: SupportState) -> str:
     if _is_low_risk_rag_request(state):
         logger.info(
             "ROUTER: CHECK | low-risk documentation request, routing directly to RESOLVE"
+        )
+        return "resolve"
+
+    if _is_low_risk_hybrid_request(state):
+        logger.info(
+            "ROUTER: CHECK | low-risk hybrid guidance request, routing directly to RESOLVE"
+        )
+        return "resolve"
+
+    if _is_low_risk_sql_request(state):
+        logger.info(
+            "ROUTER: CHECK | low-risk SQL lookup request, routing directly to RESOLVE"
         )
         return "resolve"
 
@@ -325,6 +377,18 @@ def route_after_resolve(state: SupportState) -> str:
     if _is_low_risk_rag_request(state):
         logger.info(
             "ROUTER: RESOLVE | low-risk documentation answer, skipping severity escalation"
+        )
+        return "complete"
+
+    if _is_low_risk_hybrid_request(state):
+        logger.info(
+            "ROUTER: RESOLVE | low-risk hybrid answer, skipping severity escalation"
+        )
+        return "complete"
+
+    if _is_low_risk_sql_request(state):
+        logger.info(
+            "ROUTER: RESOLVE | low-risk SQL answer, skipping severity escalation"
         )
         return "complete"
 

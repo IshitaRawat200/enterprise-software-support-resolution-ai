@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
 from app.services.ticket_service import TicketService
 
 

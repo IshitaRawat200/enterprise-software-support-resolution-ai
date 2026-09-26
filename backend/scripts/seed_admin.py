@@ -5,11 +5,10 @@ import os
 from pathlib import Path
 
 import bcrypt
-from dotenv import load_dotenv
-from sqlalchemy import select
-
 from app.database.connection import get_db_session
 from app.database.models.user import User
+from dotenv import load_dotenv
+from sqlalchemy import select
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 

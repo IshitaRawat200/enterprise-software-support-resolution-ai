@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.agents.account.account_validation_schema import (
     AccountValidationResult,
 )
 from app.database.repositories.customers import CustomerRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AccountValidationAgent:

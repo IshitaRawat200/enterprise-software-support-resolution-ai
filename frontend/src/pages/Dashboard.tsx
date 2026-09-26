@@ -191,8 +191,7 @@ function Dashboard() {
             <h3>Welcome back 👋</h3>
 
             <p>
-              Monitor your support requests, tickets,
-              SLA, and account activity from one place.
+              Monitor your support requests, tickets and account activity from one place.
             </p>
           </div>
         </div>
@@ -236,25 +235,7 @@ function Dashboard() {
             </small>
           </div>
 
-          <div className="customer-stat-card">
-            <div className="customer-stat-icon purple">
-              ◷
-            </div>
-
-            <div className="customer-stat-info">
-              <span>SLA Status</span>
-
-              <strong>
-                {loading
-                  ? "—"
-                  : customer?.sla_level || "—"}
-              </strong>
-            </div>
-
-            <small>
-              Current support agreement
-            </small>
-          </div>
+          
 
           <div className="customer-stat-card">
             <div className="customer-stat-icon orange">

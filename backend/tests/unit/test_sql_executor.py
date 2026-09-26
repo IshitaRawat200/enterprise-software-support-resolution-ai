@@ -1,8 +1,7 @@
 from types import SimpleNamespace
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from app.sql.sql_executor import SQLExecutor
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class FakeResult:

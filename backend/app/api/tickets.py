@@ -19,7 +19,6 @@ from app.guardrails.rbac import (
 from app.schemas.ticket import TicketResponse
 from app.services.ticket_service import TicketService
 
-
 router = APIRouter(
     prefix="/tickets",
     tags=["Tickets"],

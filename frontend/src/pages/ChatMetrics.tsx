@@ -69,6 +69,20 @@ export default function ChatMetrics({
     return null;
   }
 
+  const evaluationPending =
+    metadata.evaluation_status == null ||
+    metadata.evaluation_status === "pending";
+
+  const formatEvaluationPercent = (
+    value: number | null | undefined,
+  ): string => {
+    if (evaluationPending && value == null) {
+      return "Pending";
+    }
+
+    return formatPercent(value);
+  };
+
   return (
     <div
       style={{
@@ -99,37 +113,27 @@ export default function ChatMetrics({
       >
         <MetricCard
           label="Accuracy"
-          value={formatPercent(
-            metadata.accuracy,
-          )}
+          value={formatEvaluationPercent(metadata.accuracy)}
         />
 
         <MetricCard
           label="Faithfulness"
-          value={formatPercent(
-            metadata.faithfulness,
-          )}
+          value={formatEvaluationPercent(metadata.faithfulness)}
         />
 
         <MetricCard
           label="Answer Relevancy"
-          value={formatPercent(
-            metadata.answer_relevance,
-          )}
+          value={formatEvaluationPercent(metadata.answer_relevance)}
         />
 
         <MetricCard
           label="Context Precision"
-          value={formatPercent(
-            metadata.context_precision,
-          )}
+          value={formatEvaluationPercent(metadata.context_precision)}
         />
 
         <MetricCard
           label="Context Recall"
-          value={formatPercent(
-            metadata.context_recall,
-          )}
+          value={formatEvaluationPercent(metadata.context_recall)}
         />
 
         <MetricCard
@@ -161,8 +165,7 @@ export default function ChatMetrics({
         />
       </div>
 
-      {metadata.evaluation_status ===
-        "pending" && (
+      {evaluationPending && (
         <div
           style={{
             marginTop: "6px",

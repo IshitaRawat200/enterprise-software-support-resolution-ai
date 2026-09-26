@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from app.database.connection import get_db_session
+from app.observability.logging import logger
 from app.rag.services.fusion_retrieval_service import (
     FusionRetrievalService,
 )
-from app.observability.logging import logger
+from sqlalchemy.exc import SQLAlchemyError
+
 
 class RetrievalAgent:
     """

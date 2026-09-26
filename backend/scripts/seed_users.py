@@ -4,12 +4,11 @@ import asyncio
 import os
 
 import bcrypt
+from app.config import get_settings
+from app.database.models.user import User
 from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from app.config import get_settings
-from app.database.models.user import User
 
 load_dotenv()
 

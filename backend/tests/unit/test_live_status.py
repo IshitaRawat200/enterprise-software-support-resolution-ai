@@ -4,7 +4,6 @@ import asyncio
 
 import httpx
 import pytest
-
 from app.services.live_status_service import (
     LiveStatusService,
 )

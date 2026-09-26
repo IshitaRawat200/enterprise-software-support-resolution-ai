@@ -23,12 +23,38 @@ def test_route_valid_and_invalid(monkeypatch):
 
 def test_get_llm_uses_provider(monkeypatch):
     class FakeLLM:
-        pass
+        def with_fallbacks(self, fallbacks):
+            self.fallbacks = fallbacks
+            return self
 
     # gateway imported create_groq_llm at module import time, patch there
     import app.llm.gateway as gateway_mod
 
     monkeypatch.setattr(gateway_mod, "create_groq_llm", lambda complexity: FakeLLM())
+    monkeypatch.setattr(gateway_mod, "create_openrouter_llm", lambda: FakeLLM())
 
     llm = get_llm(complexity="simple")
     assert isinstance(llm, FakeLLM)
+
+
+def test_get_llm_uses_openrouter_fallback_when_groq_is_exhausted(monkeypatch):
+    import app.llm.gateway as gateway_mod
+
+    class FakeGroq:
+        def __init__(self):
+            self.fallbacks = []
+
+        def with_fallbacks(self, fallbacks):
+            self.fallbacks = fallbacks
+            return self
+
+    class FakeOpenRouter:
+        pass
+
+    monkeypatch.setattr(gateway_mod, "create_groq_llm", lambda complexity: FakeGroq())
+    monkeypatch.setattr(gateway_mod, "create_openrouter_llm", lambda: FakeOpenRouter())
+
+    llm = gateway_mod.LLMGateway().get_llm(complexity="simple")
+
+    assert isinstance(llm, FakeGroq)
+    assert any(isinstance(item, FakeOpenRouter) for item in llm.fallbacks)

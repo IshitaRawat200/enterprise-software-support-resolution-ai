@@ -1,5 +1,4 @@
 import pytest
-
 from app.agents.escalation import escalation_manager_agent as em_mod
 
 

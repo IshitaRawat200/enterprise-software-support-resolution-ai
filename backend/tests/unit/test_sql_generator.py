@@ -3,7 +3,6 @@ import json
 from types import SimpleNamespace
 
 import pytest
-
 from app.sql import sql_generator as sg
 
 

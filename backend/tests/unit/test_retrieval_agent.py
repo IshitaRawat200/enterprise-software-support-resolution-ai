@@ -1,9 +1,8 @@
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy.exc import SQLAlchemyError
-
 from app.agents.retrieval import retrieval_agent as ra_mod
+from sqlalchemy.exc import SQLAlchemyError
 
 
 @pytest.mark.asyncio

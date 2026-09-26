@@ -4,9 +4,6 @@ import json
 import re
 from typing import Any
 
-from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
-
 from app.agents.severity.severity_assessment_schema import (
     SeverityAssessmentResult,
 )
@@ -15,6 +12,8 @@ from app.llm.static_prompts.severity_prompt import (
     SEVERITY_SYSTEM_PROMPT,
     build_severity_prompt,
 )
+from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
 
 load_dotenv()
 

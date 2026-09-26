@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-
 from app.hybrid.hybrid_retrieval_service import HybridRetrievalService
 
 

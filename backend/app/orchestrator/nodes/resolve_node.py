@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from app.llm.complexity import assess_complexity
@@ -8,8 +9,8 @@ from app.llm.gateway import get_llm
 from app.llm.static_prompts.resolution_prompt import (
     build_resolution_prompt,
 )
+from app.orchestrator.hybrid_policy import can_resolve_hybrid_from_documentation
 from app.orchestrator.state import SupportState
-
 
 # Groq on-demand TPM is currently 8,000 tokens for the configured
 # organization/model. Keep the resolve request comfortably below that
@@ -24,11 +25,121 @@ MAX_HYBRID_RESULTS = 3
 MAX_HYBRID_CONTENT_CHARS = 1200
 
 
+def _extract_ticket_number_from_text(text: Any) -> str | None:
+    match = re.search(
+        r"\b(TCK[-\u2010-\u2015]?[A-Z0-9]{6,})\b",
+        str(text or ""),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    return (
+        match.group(1)
+        .upper()
+        .replace("‐", "-")
+        .replace("‑", "-")
+        .replace("‒", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace("―", "-")
+    )
+
+
+def _direct_sql_response(state: SupportState) -> str | None:
+    if (state.get("route") or "").lower() != "sql":
+        return None
+
+    if (state.get("intent") or "").lower() != "billing_account":
+        return None
+
+    message = str(state.get("message") or "")
+    normalized = message.strip().lower()
+    if not normalized:
+        return None
+
+    ticket_number = _extract_ticket_number_from_text(message)
+    if ticket_number is None:
+        return None
+
+    if not any(
+        phrase in normalized
+        for phrase in {
+            "status of ticket",
+            "ticket status",
+            "status for ticket",
+            "what is the status",
+            "is ticket",
+        }
+    ):
+        return None
+
+    rows = state.get("sql_rows") or []
+    if rows:
+        first_row = rows[0] if isinstance(rows[0], dict) else {}
+        status = first_row.get("status")
+        row_ticket_number = first_row.get("ticket_number") or ticket_number
+        if status not in (None, ""):
+            return f"Ticket {row_ticket_number} is currently **{str(status).strip()}**."
+
+    if bool(state.get("sql_success", False)):
+        return (
+            f"I couldn't find ticket {ticket_number} in your current support records, "
+            "so I can't confirm its status."
+        )
+
+    return None
+
+
 def _truncate_text(value: Any, max_chars: int) -> str:
     text = str(value or "").strip()
     if len(text) <= max_chars:
         return text
     return text[:max_chars].rstrip() + "…"
+
+
+def _normalize_for_question_compare(value: str) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().lower().rstrip("?")
+
+
+def _fallback_answer_from_evidence(state: SupportState, message: str) -> str | None:
+    evidence_candidates: list[str] = []
+
+    retrieval_results = state.get("retrieval_results") or []
+    for result in retrieval_results:
+        if isinstance(result, dict):
+            content = str(result.get("content") or result.get("text") or "").strip()
+            if content:
+                evidence_candidates.append(content)
+
+    hybrid_results = state.get("hybrid_results") or []
+    for result in hybrid_results:
+        if isinstance(result, dict):
+            content = str(result.get("content") or result.get("text") or "").strip()
+            if content:
+                evidence_candidates.append(content)
+        elif str(result).strip():
+            evidence_candidates.append(str(result).strip())
+
+    sql_rows = state.get("sql_rows") or []
+    for row in sql_rows:
+        if isinstance(row, dict):
+            for value in row.values():
+                text = str(value).strip()
+                if text and text.lower() not in {"none", "null"}:
+                    evidence_candidates.append(text)
+
+    for candidate in evidence_candidates:
+        normalized_candidate = _normalize_for_question_compare(candidate)
+        normalized_message = _normalize_for_question_compare(message)
+        if normalized_candidate and normalized_candidate != normalized_message:
+            return candidate
+
+    for candidate in evidence_candidates:
+        if candidate and "?" not in candidate:
+            return candidate
+
+    return None
 
 
 def _compact_history(history: list[Any]) -> list[dict[str, Any]]:
@@ -171,6 +282,21 @@ async def resolve_node(
                 "errors": ["Cannot resolve an empty customer message."],
             }
 
+        direct_sql_answer = _direct_sql_response(state)
+        if direct_sql_answer:
+            return {
+                "current_node": "resolve",
+                "response": direct_sql_answer,
+                "recommended_action": "Continue automated resolution.",
+                "severity": "low",
+                "severity_confidence": 0.0,
+                "severity_reason": "Low-risk informational SQL lookup.",
+                "escalation_required": False,
+                "escalation_reason": None,
+                "human_handoff_required": False,
+                "errors": [],
+            }
+
         # ========================================================
         # CONVERSATION CONTEXT
         # ========================================================
@@ -284,43 +410,58 @@ async def resolve_node(
             ),
         }
 
+        documentation_only_hybrid = (
+            can_resolve_hybrid_from_documentation(state)
+            and not bool(state.get("sql_success", False))
+        )
+
         # ========================================================
         # VERIFIED WORKFLOW EVIDENCE
         # ========================================================
 
-        evidence = {
-            "current_customer_question": message,
-            "conversation_context": conversation_context,
-            "conversation_history": conversation_history,
-            "intent": state.get("intent"),
-            "route": state.get("route"),
-            "rag_evidence": rag_evidence,
-            "sql_evidence": sql_evidence,
-            "hybrid_evidence": (hybrid_results[:5]),
-            "account_evidence": (account_evidence),
-            "incident_evidence": (incident_evidence),
-            "severity": state.get("severity"),
-            "severity_confidence": state.get(
-                "severity_confidence",
-                0.0,
-            ),
-            "escalation_required": (
-                state.get(
-                    "escalation_required",
-                    False,
-                )
-            ),
-            "escalation_reason": (state.get("escalation_reason")),
-            "escalation_priority": (state.get("escalation_priority")),
-            "escalation_type": (state.get("escalation_type")),
-            "human_handoff_required": (
-                state.get(
-                    "human_handoff_required",
-                    False,
-                )
-            ),
-            "recommended_action": (state.get("recommended_action")),
-        }
+        if documentation_only_hybrid:
+            evidence = {
+                "intent": state.get("intent"),
+                "route": state.get("route"),
+                "rag_evidence": rag_evidence,
+                "hybrid_evidence": (hybrid_results[:3]),
+                "retrieval_reason": state.get("retrieval_reason"),
+                "sql_note": state.get("sql_error"),
+            }
+        else:
+            evidence = {
+                "current_customer_question": message,
+                "conversation_context": conversation_context,
+                "conversation_history": conversation_history,
+                "intent": state.get("intent"),
+                "route": state.get("route"),
+                "rag_evidence": rag_evidence,
+                "sql_evidence": sql_evidence,
+                "hybrid_evidence": (hybrid_results[:5]),
+                "account_evidence": (account_evidence),
+                "incident_evidence": (incident_evidence),
+                "severity": state.get("severity"),
+                "severity_confidence": state.get(
+                    "severity_confidence",
+                    0.0,
+                ),
+                "escalation_required": (
+                    state.get(
+                        "escalation_required",
+                        False,
+                    )
+                ),
+                "escalation_reason": (state.get("escalation_reason")),
+                "escalation_priority": (state.get("escalation_priority")),
+                "escalation_type": (state.get("escalation_type")),
+                "human_handoff_required": (
+                    state.get(
+                        "human_handoff_required",
+                        False,
+                    )
+                ),
+                "recommended_action": (state.get("recommended_action")),
+            }
 
         # ========================================================
         # SERIALIZE DYNAMIC EVIDENCE
@@ -335,22 +476,34 @@ async def resolve_node(
             default=str,
         )
 
-        account_context = json.dumps(
-            account_evidence,
-            separators=(",", ":"),
-            default=str,
+        account_context = (
+            ""
+            if documentation_only_hybrid
+            else json.dumps(
+                account_evidence,
+                separators=(",", ":"),
+                default=str,
+            )
         )
 
-        sql_result = json.dumps(
-            sql_evidence,
-            separators=(",", ":"),
-            default=str,
+        sql_result = (
+            ""
+            if documentation_only_hybrid
+            else json.dumps(
+                sql_evidence,
+                separators=(",", ":"),
+                default=str,
+            )
         )
 
-        incident_result = json.dumps(
-            incident_evidence,
-            separators=(",", ":"),
-            default=str,
+        incident_result = (
+            ""
+            if documentation_only_hybrid
+            else json.dumps(
+                incident_evidence,
+                separators=(",", ":"),
+                default=str,
+            )
         )
 
         # ========================================================
@@ -400,9 +553,10 @@ async def resolve_node(
         # get_llm() currently creates the model with max_tokens=900.
         # Reserve more headroom for the prompt by overriding the resolve
         # call to 600 output tokens. The answer format does not require 900.
-        llm = llm.bind(
-            max_tokens=RESOLVE_MAX_OUTPUT_TOKENS,
-        )
+        if hasattr(llm, "bind"):
+            llm = llm.bind(
+                max_tokens=RESOLVE_MAX_OUTPUT_TOKENS,
+            )
 
         # ========================================================
         # LLM CALL
@@ -448,12 +602,24 @@ async def resolve_node(
                 "errors": [("Resolution model returned an empty response.")],
             }
 
+        normalized_answer = _normalize_for_question_compare(answer)
+        normalized_message = _normalize_for_question_compare(message)
+        if (
+            not normalized_answer
+            or normalized_answer == normalized_message
+            or answer.strip().endswith("?")
+            and normalized_answer == normalized_message
+        ):
+            fallback_answer = _fallback_answer_from_evidence(state, message)
+            if fallback_answer:
+                answer = fallback_answer
+
         # ========================================================
         # RECOMMENDED ACTION
         # ========================================================
 
-        low_risk_rag_response = (
-            (state.get("route") or "").lower() == "rag"
+        low_risk_support_response = (
+            (state.get("route") or "").lower() in {"rag", "hybrid"}
             and (state.get("intent") or "").lower()
             in {"usage_configuration", "integration_api", "performance_latency"}
             and bool(state.get("sufficient_evidence", False))
@@ -464,6 +630,11 @@ async def resolve_node(
             and not bool(state.get("incident_unresolved_critical_alert", False))
             and not bool(state.get("escalation_required", False))
             and not bool(state.get("human_handoff_required", False))
+            and (
+                (state.get("route") or "").lower() != "hybrid"
+                or bool(state.get("sql_success", False))
+                or can_resolve_hybrid_from_documentation(state)
+            )
         )
 
         recommended_action = (
@@ -483,16 +654,16 @@ async def resolve_node(
             "current_node": "resolve",
             "response": answer,
             "recommended_action": (recommended_action),
-            "severity": "low" if low_risk_rag_response else state.get("severity"),
-            "severity_confidence": 0.0 if low_risk_rag_response else state.get("severity_confidence", 0.0),
+            "severity": "low" if low_risk_support_response else state.get("severity"),
+            "severity_confidence": 0.0 if low_risk_support_response else state.get("severity_confidence", 0.0),
             "severity_reason": (
-                "Low-risk informational documentation request; default severity is low."
-                if low_risk_rag_response
+                "Low-risk informational support request; default severity is low."
+                if low_risk_support_response
                 else state.get("severity_reason")
             ),
-            "escalation_required": False if low_risk_rag_response else state.get("escalation_required", False),
-            "escalation_reason": None if low_risk_rag_response else state.get("escalation_reason"),
-            "human_handoff_required": False if low_risk_rag_response else state.get("human_handoff_required", False),
+            "escalation_required": False if low_risk_support_response else state.get("escalation_required", False),
+            "escalation_reason": None if low_risk_support_response else state.get("escalation_reason"),
+            "human_handoff_required": False if low_risk_support_response else state.get("human_handoff_required", False),
             "errors": [],
         }
 

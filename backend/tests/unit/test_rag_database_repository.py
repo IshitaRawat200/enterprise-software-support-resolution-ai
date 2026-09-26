@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
-
 from app.rag.database.rag_database_repository import RAGDatabaseRepository
 
 

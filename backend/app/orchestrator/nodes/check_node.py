@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.agents.retrieval.retrieval_agent import RetrievalAgent
+from app.hybrid.hybrid_retrieval_service import HybridRetrievalService
+from app.orchestrator.hybrid_policy import can_resolve_hybrid_from_documentation
 from app.orchestrator.state import SupportState
 
 
@@ -188,6 +190,14 @@ async def check_node(
             )
         )
 
+        retrieval_confidence = float(
+            state.get(
+                "retrieval_confidence",
+                0.0,
+            )
+            or 0.0
+        )
+
         sql_success = bool(
             state.get(
                 "sql_success",
@@ -195,16 +205,32 @@ async def check_node(
             )
         )
 
-        evidence_sufficient = rag_evidence_sufficient and sql_success
+        documentation_only_hybrid = can_resolve_hybrid_from_documentation(state)
 
-        confidence_sufficient = hybrid_confidence >= 0.70
+        evidence_sufficient = rag_evidence_sufficient and (
+            sql_success or documentation_only_hybrid
+        )
+
+        confidence_sufficient = (
+            hybrid_confidence >= 0.70
+            if sql_success
+            else (
+                documentation_only_hybrid
+                and hybrid_confidence >= HybridRetrievalService.SUFFICIENT_EVIDENCE_THRESHOLD
+                and retrieval_confidence >= RetrievalAgent.SUFFICIENT_EVIDENCE_THRESHOLD
+            )
+        )
 
         check_passed = evidence_sufficient and confidence_sufficient
 
         check_reason = (
-            "Hybrid RAG and SQL evidence passed validation."
-            if check_passed
-            else ("Hybrid evidence did not meet the validation requirements.")
+            "Hybrid evidence passed validation."
+            if check_passed and sql_success
+            else (
+                "Documentation evidence is sufficient for a guidance-only hybrid response."
+                if check_passed
+                else "Hybrid evidence did not meet the validation requirements."
+            )
         )
 
         return {

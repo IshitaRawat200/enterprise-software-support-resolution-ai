@@ -5,7 +5,6 @@ from typing import Any
 
 from app.guardrails.guardrail_result import GuardrailResult
 
-
 GUARDRAIL_NAME = "output_guardrail"
 
 
@@ -50,10 +49,6 @@ SAFE_PLACEHOLDERS: set[str] = {
 # ============================================================
 
 SECRET_PATTERNS: tuple[tuple[str, str], ...] = (
-    (
-        "openai_api_key",
-        r"\bsk-[A-Za-z0-9_-]{20,}\b",
-    ),
     (
         "github_token",
         r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b",

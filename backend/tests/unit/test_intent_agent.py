@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from app.agents.intent import intent_agent as ia_mod
 from app.agents.intent.intent_schema import IntentClassificationResult
 

@@ -1,10 +1,9 @@
 from types import SimpleNamespace
 from uuid import UUID
 
+import app.api.customers as customers_api
 import pytest
 from fastapi import HTTPException
-
-import app.api.customers as customers_api
 
 
 class DummySession:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.guardrails.handoff_guardrail import detect_explicit_human_request
@@ -32,6 +33,9 @@ from app.services.intent_service import IntentService
 def _normalize_route(
     intent: str | None,
     suggested_route: str | None,
+    *,
+    message: str | None = None,
+    conversation_context: str | None = None,
 ) -> str:
     """
     Convert the Intent Agent's proposed route into a safe
@@ -45,6 +49,14 @@ def _normalize_route(
 
     normalized_route = (suggested_route or "").strip().lower()
 
+    current_message = (message or "").strip()
+    if _is_ticket_status_lookup(current_message):
+        return "sql"
+
+    requires_structured_evidence = bool(current_message) and _requires_hybrid_evidence(
+        current_message,
+    )
+
     # --------------------------------------------------------
     # Deterministic routes
     # --------------------------------------------------------
@@ -53,12 +65,17 @@ def _normalize_route(
         return "out_of_scope"
 
     if normalized_intent == "usage_configuration":
+        if requires_structured_evidence:
+            return "hybrid"
+
         return "rag"
 
     if normalized_intent == "production_incident":
         return "incident"
 
     if normalized_intent == "billing_account":
+        if _is_support_policy_question(message or ""):
+            return "rag"
         return "sql"
 
     # --------------------------------------------------------
@@ -86,6 +103,9 @@ def _normalize_route(
     # --------------------------------------------------------
 
     if normalized_intent == "integration_api":
+        if requires_structured_evidence:
+            return "hybrid"
+
         if normalized_route in {
             "rag",
             "hybrid",
@@ -102,6 +122,9 @@ def _normalize_route(
     # --------------------------------------------------------
 
     if normalized_intent == "performance_latency":
+        if requires_structured_evidence:
+            return "hybrid"
+
         if normalized_route in {
             "rag",
             "hybrid",
@@ -152,6 +175,112 @@ def _normalize_route(
         return normalized_route
 
     return "clarification"
+
+
+def _is_support_policy_question(text: str) -> bool:
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return False
+
+    policy_markers = (
+        "support response time",
+        "support response times",
+        "response times for",
+        "support tier",
+        "support tiers",
+        "support policy",
+        "sla",
+        "service level agreement",
+        "response/resolution",
+    )
+    if any(marker in normalized for marker in policy_markers):
+        return True
+
+    tier_names = ("basic", "enhanced", "priority", "enterprise")
+    if any(tier in normalized for tier in tier_names):
+        return any(
+            marker in normalized
+            for marker in (
+                "response time",
+                "response times",
+                "support tier",
+                "support tiers",
+                "tier",
+                "sla",
+            )
+        )
+
+    return False
+
+
+def _requires_hybrid_evidence(text: str) -> bool:
+    structured_evidence_patterns = (
+        r"\bcurrent ticket\b",
+        r"\bticket information\b",
+        r"\bticket info\b",
+        r"\bsupport ticket\b",
+        r"\brequest id\b",
+        r"\brequest limit\b",
+        r"\brate limit\b",
+        r"\bquota remaining\b",
+        r"\bquota reset\b",
+        r"\bquota exhausted\b",
+        r"\bretry-after\b",
+        r"\bx-ratelimit(?:-[a-z]+)?\b",
+        r"\bx-quota(?:-[a-z]+)?\b",
+        r"\baccount status\b",
+        r"\bsubscription status\b",
+    )
+
+    structured_verbs = (
+        r"\breview\b",
+        r"\bcheck\b",
+        r"\bvalidate\b",
+        r"\bverify\b",
+        r"\binspect\b",
+        r"\blook at\b",
+    )
+
+    structured_targets = (
+        r"\bmy account\b",
+        r"\bour account\b",
+        r"\bmy ticket\b",
+        r"\bour ticket\b",
+        r"\bmy current ticket\b",
+        r"\bour current ticket\b",
+    )
+
+    if any(re.search(pattern, text) for pattern in structured_evidence_patterns):
+        return True
+
+    has_structured_verb = any(re.search(pattern, text) for pattern in structured_verbs)
+    has_structured_target = any(re.search(pattern, text) for pattern in structured_targets)
+
+    return has_structured_verb and has_structured_target
+
+
+def _is_ticket_status_lookup(text: str) -> bool:
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return False
+
+    has_ticket_number = bool(
+        re.search(r"\btck[-\u2010-\u2015]?[a-z0-9]{6,}\b", normalized, re.IGNORECASE)
+    )
+
+    if not has_ticket_number:
+        return False
+
+    return any(
+        phrase in normalized
+        for phrase in {
+            "status of ticket",
+            "ticket status",
+            "status for ticket",
+            "what is the status",
+            "is ticket",
+        }
+    )
 
 
 async def intent_node(
@@ -266,7 +395,13 @@ async def intent_node(
         route = _normalize_route(
             intent=result.intent,
             suggested_route=suggested_route,
+            message=message,
+            conversation_context=conversation_context,
         )
+
+        requires_clarification = result.requires_clarification
+        if route != "clarification":
+            requires_clarification = False
 
         # ====================================================
         # ROUTE CORRECTION INFORMATION
@@ -277,10 +412,16 @@ async def intent_node(
         route_reason = "Route accepted from Intent Agent."
 
         if route_was_corrected:
-            route_reason = (
-                "Intent Agent route was normalized "
-                "according to deterministic routing policy."
-            )
+            if route == "hybrid":
+                route_reason = (
+                    "Intent Agent route was normalized to hybrid because the "
+                    "request combines guidance with ticket or account evidence needs."
+                )
+            else:
+                route_reason = (
+                    "Intent Agent route was normalized "
+                    "according to deterministic routing policy."
+                )
 
         # ====================================================
         # RETURN CLASSIFICATION
@@ -290,7 +431,7 @@ async def intent_node(
             "intent": result.intent,
             "intent_confidence": (result.confidence),
             "intent_reason": (result.reason),
-            "requires_clarification": (result.requires_clarification),
+            "requires_clarification": (requires_clarification),
             # Keep the original LLM proposal for auditability.
             "suggested_route": (suggested_route),
             # Store the final route actually used by the graph.

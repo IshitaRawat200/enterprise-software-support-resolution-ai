@@ -1,12 +1,11 @@
 import asyncio
 from types import SimpleNamespace
 
-import pytest
-from langchain_core.documents import Document
-
 import app.rag.chunking as chunking_mod
 import app.rag.embeddings as emb_mod
+import pytest
 from app.sql.sql_service import SQLService
+from langchain_core.documents import Document
 
 
 def test_chunker_validation_and_split():

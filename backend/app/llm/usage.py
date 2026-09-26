@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 MODEL_PRICING_PER_MILLION: dict[str, dict[str, float]] = {
     # Prices in USD per 1M tokens.
     "openai/gpt-oss-20b": {

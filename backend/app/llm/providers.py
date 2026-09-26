@@ -2,9 +2,41 @@ from __future__ import annotations
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 
 from app.config import get_settings
 from app.observability.logging import logger
+
+
+def create_openrouter_llm() -> BaseChatModel:
+    """
+    Create an OpenRouter-backed LLM as the backup provider when Groq is
+    exhausted or unavailable.
+    """
+    settings = get_settings()
+
+    if not settings.openrouter_api_key:
+        raise RuntimeError("OPENROUTER_API_KEY is not configured.")
+
+    model = settings.openrouter_model or "openai/gpt-oss-20b"
+
+    logger.info(
+        "Creating OpenRouter LLM: model=%s max_tokens=%s max_retries=%s timeout=%ss",
+        model,
+        900,
+        2,
+        30,
+    )
+
+    return ChatOpenAI(
+        model=model,
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+        temperature=0.0,
+        max_tokens=900,
+        max_retries=2,
+        timeout=30,
+    )
 
 
 def create_groq_llm(

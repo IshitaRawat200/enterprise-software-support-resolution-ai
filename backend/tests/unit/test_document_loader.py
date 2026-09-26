@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from app.rag.loaders.document_loader import KnowledgeBaseDocumentLoader
 
 

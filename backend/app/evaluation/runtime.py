@@ -5,7 +5,6 @@ import asyncio
 from app.evaluation.production_evaluator import ProductionEvaluator
 from app.evaluation.ragas_evaluator import RagasEvaluator
 
-
 _evaluator: ProductionEvaluator | None = None
 _evaluator_lock = asyncio.Lock()
 

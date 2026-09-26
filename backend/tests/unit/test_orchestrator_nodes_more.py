@@ -199,6 +199,72 @@ def test_safe_rag_query_skips_reflect_and_severity_path():
     assert route_after_resolve({**state, "severity": "low"}) == "complete"
 
 
+def test_safe_hybrid_query_skips_severity_path():
+    state = {
+        "route": "hybrid",
+        "intent": "usage_configuration",
+        "sufficient_evidence": True,
+        "sql_success": True,
+        "retrieval_confidence": 0.78,
+        "sql_confidence": 0.95,
+        "escalation_required": False,
+        "human_handoff_required": False,
+        "incident_active": False,
+        "incident_security_related": False,
+        "incident_data_loss_reported": False,
+        "incident_affects_production": False,
+        "incident_unresolved_critical_alert": False,
+    }
+
+    assert route_after_resolve({**state, "severity": "low"}) == "complete"
+
+
+def test_safe_sql_lookup_skips_severity_path():
+    state = {
+        "route": "sql",
+        "intent": "billing_account",
+        "sql_success": True,
+        "sql_confidence": 1.0,
+        "sql_rows": [{"ticket_number": "TCK-2227ADAA", "status": "open"}],
+        "escalation_required": False,
+        "human_handoff_required": False,
+        "incident_active": False,
+        "incident_security_related": False,
+        "incident_data_loss_reported": False,
+        "incident_affects_production": False,
+        "incident_unresolved_critical_alert": False,
+    }
+
+    assert route_after_check(state) == "resolve"
+    assert route_after_resolve({**state, "severity": "low"}) == "complete"
+
+
+def test_guidance_only_hybrid_query_skips_reflect_and_severity_without_sql_success():
+    state = {
+        "route": "hybrid",
+        "intent": "usage_configuration",
+        "message": (
+            "My current ticket reports repeated HTTP 429 responses. "
+            "What does the policy say I should do, and what ticket information should I review?"
+        ),
+        "sufficient_evidence": True,
+        "retrieval_confidence": 0.64,
+        "hybrid_confidence": 0.64,
+        "sql_success": False,
+        "sql_error": "No ticket-scoped SQL evidence was available.",
+        "escalation_required": False,
+        "human_handoff_required": False,
+        "incident_active": False,
+        "incident_security_related": False,
+        "incident_data_loss_reported": False,
+        "incident_affects_production": False,
+        "incident_unresolved_critical_alert": False,
+    }
+
+    assert route_after_check(state) == "resolve"
+    assert route_after_resolve({**state, "severity": "low"}) == "complete"
+
+
 def test_resolution_node_safe_rag_answer_stays_grounded_and_low_severity(monkeypatch):
     class FakeLLM:
         async def ainvoke(self, prompt):
@@ -236,6 +302,123 @@ def test_resolution_node_safe_rag_answer_stays_grounded_and_low_severity(monkeyp
     assert out["severity"] == "low"
     assert out["escalation_required"] is False
     assert out["human_handoff_required"] is False
+
+
+def test_resolution_node_safe_hybrid_answer_stays_low_severity(monkeypatch):
+    class FakeLLM:
+        async def ainvoke(self, prompt):
+            return type(
+                "Resp",
+                (),
+                {"content": "Wait for Retry-After, apply backoff, and review request IDs on the ticket."},
+            )()
+
+    monkeypatch.setattr(
+        "app.orchestrator.nodes.resolve_node.get_llm",
+        lambda complexity: FakeLLM(),
+    )
+    monkeypatch.setattr(
+        "app.orchestrator.nodes.resolve_node.assess_complexity",
+        lambda *args, **kwargs: "medium",
+    )
+
+    state = {
+        "message": (
+            "My current ticket reports repeated HTTP 429 responses. "
+            "What does the policy say I should do, and what ticket information should I review?"
+        ),
+        "route": "hybrid",
+        "intent": "usage_configuration",
+        "sufficient_evidence": True,
+        "sql_success": True,
+        "retrieval_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+        "hybrid_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+        "sql_rows": [{"ticket_number": "TCK-1", "status": "open"}],
+        "retrieval_confidence": 0.9,
+        "sql_confidence": 0.95,
+        "incident_active": False,
+        "incident_security_related": False,
+        "incident_data_loss_reported": False,
+        "incident_affects_production": False,
+        "incident_unresolved_critical_alert": False,
+        "escalation_required": False,
+        "human_handoff_required": False,
+        "severity": None,
+    }
+
+    out = asyncio.run(resolve_node(state))
+
+    assert "retry-after" in out["response"].lower()
+    assert out["severity"] == "low"
+    assert out["escalation_required"] is False
+    assert out["human_handoff_required"] is False
+
+
+def test_resolution_node_guidance_only_hybrid_answer_stays_low_severity_without_sql(monkeypatch):
+    class FakeLLM:
+        async def ainvoke(self, prompt):
+            return type(
+                "Resp",
+                (),
+                {"content": "Wait for Retry-After, apply backoff, and review request IDs on the ticket."},
+            )()
+
+    monkeypatch.setattr(
+        "app.orchestrator.nodes.resolve_node.get_llm",
+        lambda complexity: FakeLLM(),
+    )
+    monkeypatch.setattr(
+        "app.orchestrator.nodes.resolve_node.assess_complexity",
+        lambda *args, **kwargs: "medium",
+    )
+
+    state = {
+        "message": (
+            "My current ticket reports repeated HTTP 429 responses. "
+            "What does the policy say I should do, and what ticket information should I review?"
+        ),
+        "route": "hybrid",
+        "intent": "usage_configuration",
+        "sufficient_evidence": True,
+        "sql_success": False,
+        "sql_error": "No ticket-scoped SQL evidence was available.",
+        "retrieval_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+        "hybrid_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+        "sql_rows": [],
+        "retrieval_confidence": 0.64,
+        "hybrid_confidence": 0.64,
+        "incident_active": False,
+        "incident_security_related": False,
+        "incident_data_loss_reported": False,
+        "incident_affects_production": False,
+        "incident_unresolved_critical_alert": False,
+        "escalation_required": False,
+        "human_handoff_required": False,
+        "severity": None,
+    }
+
+    out = asyncio.run(resolve_node(state))
+
+    assert "retry-after" in out["response"].lower()
+    assert out["severity"] == "low"
+    assert out["escalation_required"] is False
+    assert out["human_handoff_required"] is False
+
+
+def test_resolution_node_ticket_status_sql_uses_direct_answer():
+    state = {
+        "message": "What is the status of ticket TCK-2227ADAA?",
+        "route": "sql",
+        "intent": "billing_account",
+        "sql_success": True,
+        "sql_rows": [{"ticket_number": "TCK-2227ADAA", "status": "open"}],
+    }
+
+    out = asyncio.run(resolve_node(state))
+
+    assert out["response"] == "Ticket TCK-2227ADAA is currently **open**."
+    assert out["severity"] == "low"
+    assert out["escalation_required"] is False
 
 
 def test_critical_rag_query_keeps_severity_path():

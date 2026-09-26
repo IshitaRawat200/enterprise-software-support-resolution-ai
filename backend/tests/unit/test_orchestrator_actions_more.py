@@ -2,7 +2,6 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-
 from app.orchestrator.actions import hybrid_action, rag_action, sql_action
 
 
@@ -160,3 +159,58 @@ def test_run_hybrid_success_and_no_db(monkeypatch):
     monkeypatch.setattr(hybrid_action, "get_db_session", _make_db_session_gen(None))
     out2 = asyncio.run(hybrid_action.run_hybrid({"message": "q"}))
     assert "Unable to obtain a database session" in out2["errors"][0]
+
+
+def test_run_hybrid_guidance_only_request_treats_sql_gap_as_recoverable(monkeypatch):
+    class FakeRA:
+        def __init__(self, similarity_top_k=5):
+            pass
+
+    class FakeSQLService:
+        def __init__(self, session):
+            pass
+
+    class FakeHybrid:
+        def __init__(self, rag_service, sql_service):
+            pass
+
+        async def run(self, query, customer_id=None, session=None):
+            return {
+                "rag_results": [{"title": "429 Policy", "content": "Use Retry-After and backoff."}],
+                "rag_confidence": 0.64,
+                "sufficient_evidence": True,
+                "sql_result": {
+                    "success": False,
+                    "rows": [],
+                    "confidence": 0.0,
+                    "validation_message": "No ticket-scoped SQL evidence was available.",
+                },
+                "hybrid_confidence": 0.64,
+                "evidence_summary": "Documentation evidence was found.",
+                "errors": ["No ticket-scoped SQL evidence was available."],
+            }
+
+    monkeypatch.setattr(hybrid_action, "RetrievalAgent", FakeRA)
+    monkeypatch.setattr(hybrid_action, "SQLService", FakeSQLService)
+    monkeypatch.setattr(hybrid_action, "HybridRetrievalService", FakeHybrid)
+    monkeypatch.setattr(
+        hybrid_action, "get_db_session", _make_db_session_gen(SimpleNamespace())
+    )
+
+    out = asyncio.run(
+        hybrid_action.run_hybrid(
+            {
+                "route": "hybrid",
+                "intent": "usage_configuration",
+                "message": (
+                    "My current ticket reports repeated HTTP 429 responses. "
+                    "What does the policy say I should do, and what ticket information should I review?"
+                ),
+                "customer_id": "cid",
+            }
+        )
+    )
+
+    assert out["sql_success"] is False
+    assert out["hybrid_success"] is True
+    assert out["errors"] == []

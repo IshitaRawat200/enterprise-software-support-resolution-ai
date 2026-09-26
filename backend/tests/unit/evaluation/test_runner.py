@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.evaluation.runner import (
     BenchmarkCase,
     build_slo_inputs,

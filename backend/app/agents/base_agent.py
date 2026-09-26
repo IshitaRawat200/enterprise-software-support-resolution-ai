@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from langchain_core.prompts import ChatPromptTemplate
-
 from app.llm.gateway import get_llm
 from app.llm.usage import extract_llm_usage
 from app.observability.logging import logger
+from langchain_core.prompts import ChatPromptTemplate
 
 
 class BaseAgent:

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
-
 from app.api.chat import (
     ChatRequest,
     ChatResponse,
+    _should_schedule_async_evaluation,
 )
+from pydantic import ValidationError
 
 # ============================================================
 # CHAT REQUEST TESTS
@@ -123,3 +123,29 @@ def test_chat_response_accepts_workflow_metadata() -> None:
 
     assert response.ticket_id == "11111111-1111-4111-8111-111111111111"
     assert response.escalation_id == "22222222-2222-4222-8222-222222222222"
+
+
+def test_async_evaluation_runs_for_rag_and_hybrid_with_retrieval_evidence() -> None:
+    retrieval_results = [{"title": "doc", "content": "evidence"}]
+
+    assert _should_schedule_async_evaluation(
+        route="rag",
+        retrieval_results=retrieval_results,
+    ) is True
+
+    assert _should_schedule_async_evaluation(
+        route="hybrid",
+        retrieval_results=retrieval_results,
+    ) is True
+
+
+def test_async_evaluation_skips_routes_without_retrieval_evidence() -> None:
+    assert _should_schedule_async_evaluation(
+        route="sql",
+        retrieval_results=[{"row": 1}],
+    ) is False
+
+    assert _should_schedule_async_evaluation(
+        route="hybrid",
+        retrieval_results=[],
+    ) is False

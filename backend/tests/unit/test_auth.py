@@ -3,9 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
-
 from app.guardrails.rbac import require_admin
+from fastapi import HTTPException
 
 
 @pytest.mark.asyncio

@@ -72,14 +72,14 @@ class Settings(BaseSettings):
     groq_base_url: str = Field(default="https://api.groq.com/openai/v1")
 
     # =========================================================
-    # OpenAI
+    # OpenRouter (OpenAI-compatible fallback provider)
     # =========================================================
 
-    openai_api_key: str | None = Field(default=None)
+    openrouter_api_key: str | None = Field(default=None)
 
-    openai_model: str | None = Field(default=None)
+    openrouter_model: str | None = Field(default=None)
 
-    openai_base_url: str = Field(default="https://api.openai.com/v1")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
 
     # =========================================================
     # Embeddings
