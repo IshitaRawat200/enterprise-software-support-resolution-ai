@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Annotated, Any
 from uuid import UUID, uuid4
@@ -17,8 +18,13 @@ from sqlalchemy import select
 
 from app.database.connection import get_db_session
 from app.database.models.customer import Customer
+from app.evaluation.ground_truth import get_evaluation_case
+from app.evaluation.runtime import (
+    get_production_evaluator,
+)
 from app.guardrails.auth import get_current_user
 from app.guardrails.guardrails_service import guardrails_service
+from app.llm.usage import aggregate_usage_cost_usd
 from app.observability.logging import logger
 from app.observability.slo_evaluator import SLOEvaluator
 from app.observability.tracing import support_trace
@@ -33,6 +39,10 @@ router = APIRouter(
     prefix="/chat",
     tags=["Support Chat"],
 )
+
+
+# Keep strong references to active asynchronous RAGAS tasks.
+_ragas_tasks: set[asyncio.Task[Any]] = set()
 
 
 # ============================================================
@@ -59,6 +69,8 @@ class ChatResponse(BaseModel):
 
     conversation_id: str | None = None
 
+    evaluation_status: str | None = None
+
     # --------------------------------------------------------
     # Intent
     # --------------------------------------------------------
@@ -72,7 +84,20 @@ class ChatResponse(BaseModel):
     # --------------------------------------------------------
 
     route: str | None = None
+    # --------------------------------------------------------
+    # Evaluation / Observability
+    # --------------------------------------------------------
 
+
+    accuracy: float | None = None
+    faithfulness: float | None = None
+    answer_relevance: float | None = None
+    context_precision: float | None = None
+    context_recall: float | None = None
+    route_accuracy: float | None = None
+    guardrail_effectiveness: float | None = None
+    cost_usd: float | None = None
+    latency_ms: float | None = None
     # --------------------------------------------------------
     # RAG
     # --------------------------------------------------------
@@ -176,6 +201,7 @@ class ConversationMessageResponse(BaseModel):
     content: str
     created_at: str | None = None
     ticket_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ConversationResponse(BaseModel):
@@ -271,6 +297,211 @@ def build_conversation_context(
 
     return "\n".join(lines)
 
+async def run_post_response_evaluation(
+    *,
+    request_id: str,
+    question: str,
+    answer: str,
+    retrieval_results: list[dict[str, Any]],
+    reference: str | None = None,
+    expected_route: str | None = None,
+    actual_route: str | None = None,
+) -> None:
+    """
+    Run asynchronous RAGAS evaluation and persist the result.
+
+    This function:
+      1. Logs immediately when the task starts.
+      2. Creates the production evaluator.
+      3. Runs RAGAS evaluation.
+      4. Opens a fresh database session.
+      5. Persists the evaluation metadata.
+    """
+
+    logger.info(
+        "RAGAS TASK STARTED request_id=%s",
+        request_id,
+    )
+
+    try:
+        logger.info(
+            "RAGAS evaluator initialization starting request_id=%s",
+            request_id,
+        )
+
+        evaluator = await get_production_evaluator()
+
+        logger.info(
+            "RAGAS evaluator initialized request_id=%s evaluator=%s",
+            request_id,
+            type(evaluator).__name__,
+        )
+
+        logger.info(
+            "Starting asynchronous RAGAS evaluation request_id=%s",
+            request_id,
+        )
+
+        result = await evaluator.evaluate_rag_request(
+            question=question,
+            answer=answer,
+            retrieval_results=retrieval_results,
+            reference=reference,
+            request_id=request_id,
+        )
+
+        # Route Accuracy requires a trusted expected route.
+        route_accuracy = None
+
+        if expected_route is not None and actual_route is not None:
+            route_accuracy = (
+                100.0
+                if expected_route.strip().lower() == actual_route.strip().lower()
+                else 0.0
+            )
+
+        result["expected_route"] = expected_route
+        result["actual_route"] = actual_route
+        result["route_accuracy"] = route_accuracy
+
+        logger.info(
+            "Completed asynchronous RAGAS evaluation "
+            "request_id=%s "
+            "faithfulness=%s "
+            "answer_relevance=%s "
+            "context_precision=%s "
+            "context_recall=%s "
+            "ragas_evaluated=%s "
+            "ragas_errors=%s",
+            request_id,
+            result.get("faithfulness"),
+            result.get("answer_relevance"),
+            result.get("context_precision"),
+            result.get("context_recall"),
+            result.get("ragas_evaluated"),
+            result.get("ragas_errors"),
+        )
+
+        logger.info(
+            "Opening fresh DB session for RAGAS persistence "
+            "request_id=%s",
+            request_id,
+        )
+
+        async for db_session in get_db_session():
+            try:
+                conversation_service = ConversationService(
+                    db_session
+                )
+
+                await conversation_service.update_ai_message_evaluation(
+                    request_id=request_id,
+                    evaluation=result,
+                )
+
+                await db_session.commit()
+
+                logger.info(
+                    "Persisted asynchronous RAGAS evaluation "
+                    "request_id=%s",
+                    request_id,
+                )
+
+            except Exception:
+                await db_session.rollback()
+
+                logger.exception(
+                    "Failed to persist RAGAS evaluation "
+                    "request_id=%s",
+                    request_id,
+                )
+
+                raise
+
+            break
+
+    except asyncio.CancelledError:
+        logger.warning(
+            "RAGAS asyncio task was cancelled "
+            "request_id=%s",
+            request_id,
+        )
+
+        try:
+            async for db_session in get_db_session():
+                conversation_service = ConversationService(
+                    db_session
+                )
+
+                await conversation_service.update_ai_message_evaluation(
+                    request_id=request_id,
+                    evaluation={
+                        "faithfulness": None,
+                        "answer_relevance": None,
+                        "context_precision": None,
+                        "context_recall": None,
+                        "route_accuracy": None,
+                        "ragas_evaluated": False,
+                        "evaluation_status": "failed",
+                        "ragas_errors": [
+                            "RAGAS evaluation task was cancelled"
+                        ],
+                    },
+                )
+
+                await db_session.commit()
+                break
+
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to persist cancelled RAGAS evaluation "
+                "request_id=%s",
+                request_id,
+            )
+
+        raise
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Asynchronous RAGAS evaluation failed "
+            "request_id=%s error=%s",
+            request_id,
+            str(exc),
+        )
+
+        try:
+            async for db_session in get_db_session():
+                conversation_service = ConversationService(
+                    db_session
+                )
+
+                await conversation_service.update_ai_message_evaluation(
+                    request_id=request_id,
+                    evaluation={
+                        "faithfulness": None,
+                        "answer_relevance": None,
+                        "context_precision": None,
+                        "context_recall": None,
+                        "route_accuracy": None,
+                        "ragas_evaluated": False,
+                        "evaluation_status": "failed",
+                        "ragas_errors": [
+                            f"{type(exc).__name__}: {exc}"
+                        ],
+                    },
+                )
+
+                await db_session.commit()
+                break
+
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to persist failed RAGAS evaluation "
+                "request_id=%s",
+                request_id,
+            )
+
+
 @router.get(
     "/conversations",
     response_model=list[ConversationResponse],
@@ -281,9 +512,17 @@ async def list_conversations(
         Depends(get_current_user),
     ],
 ) -> list[ConversationResponse]:
-    """Return all persisted conversations for the authenticated customer."""
+    """
+    Return the 10 most recent conversations for the authenticated user.
 
-    user_id_value = getattr(current_user, "id", None)
+    Each conversation contains ALL messages belonging to that session.
+    """
+
+    user_id_value = getattr(
+        current_user,
+        "id",
+        None,
+    )
 
     if user_id_value is None:
         raise HTTPException(
@@ -297,7 +536,8 @@ async def list_conversations(
             if isinstance(user_id_value, UUID)
             else UUID(str(user_id_value))
         )
-    except ValueError as exc:
+
+    except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authenticated user ID.",
@@ -305,47 +545,84 @@ async def list_conversations(
 
     async for db_session in get_db_session():
         try:
-            conversation_service = ConversationService(db_session)
+            conversation_service = ConversationService(
+                db_session
+            )
 
             sessions = await conversation_service.list_sessions(
                 user_id=user_id,
             )
 
-            conversations: list[ConversationResponse] = []
+            conversations: list[
+                ConversationResponse
+            ] = []
 
             for session in sessions:
-                session_id = session["session_id"]
-
-                history = await conversation_service.get_history(
-                    session_id=session_id,
-                    user_id=user_id,
+                session_id = session.get(
+                    "session_id"
                 )
 
-                messages = [
-                    ConversationMessageResponse(
-                        id=str(item.id),
-                        role=item.role,
-                        content=item.content,
-                        created_at=(
-                            item.created_at.isoformat()
-                            if item.created_at
-                            else None
-                        ),
-                        ticket_id=(
-                            str(item.ticket_id)
-                            if item.ticket_id
-                            else None
-                        ),
+                if session_id is None:
+                    continue
+
+                # Your repository may call this last_activity
+                # because the session query uses MAX(created_at).
+                conversation_timestamp = (
+                    session.get("created_at")
+                    or session.get("last_activity")
+                )
+
+                history = (
+                    await conversation_service.get_history(
+                        session_id=session_id,
+                        user_id=user_id,
                     )
-                    for item in history
-                ]
+                )
+
+                messages: list[
+                    ConversationMessageResponse
+                ] = []
+
+                for item in history:
+                    item_metadata = getattr(
+                        item,
+                        "metadata_",
+                        {},
+                    )
+
+                    if not isinstance(
+                        item_metadata,
+                        dict,
+                    ):
+                        item_metadata = {}
+
+                    messages.append(
+                        ConversationMessageResponse(
+                            id=str(item.id),
+                            role=str(item.role),
+                            content=item.content or "",
+                            created_at=(
+                                item.created_at.isoformat()
+                                if item.created_at
+                                else None
+                            ),
+                            ticket_id=(
+                                str(item.ticket_id)
+                                if item.ticket_id
+                                else None
+                            ),
+                            metadata=item_metadata,
+                        )
+                    )
 
                 conversations.append(
                     ConversationResponse(
-                        conversation_id=str(session_id),
+                        conversation_id=str(
+                            session_id
+                        ),
                         created_at=(
-                            session["created_at"].isoformat()
-                            if session["created_at"]
+                            conversation_timestamp.isoformat()
+                            if conversation_timestamp
                             else None
                         ),
                         messages=messages,
@@ -353,6 +630,9 @@ async def list_conversations(
                 )
 
             return conversations
+
+        except HTTPException:
+            raise
 
         except Exception as exc:
             logger.exception(
@@ -366,6 +646,8 @@ async def list_conversations(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Unable to load conversations.",
             ) from exc
+
+    return []
 
 # ============================================================
 # CHAT
@@ -805,23 +1087,34 @@ async def chat(
 
                 request_latency_ms = (time.perf_counter() - workflow_start) * 1000
 
+                llm_usage_entries = result.get("llm_usage")
+                if not isinstance(llm_usage_entries, list):
+                    llm_usage_entries = []
+
+                request_cost_usd = aggregate_usage_cost_usd(
+                    llm_usage_entries,
+                )
+
                 slo_evaluator = SLOEvaluator()
 
                 request_metrics = slo_evaluator.build_request_metrics(
                     result,
                     latency_ms=request_latency_ms,
+                    cost_usd=request_cost_usd,
                 )
 
                 logger.info(
                     "SLO request metrics "
                     "request_id=%s "
                     "latency_ms=%.2f "
+                    "cost_usd=%s "
                     "intent=%s "
                     "route=%s "
                     "severity=%s "
                     "escalation_required=%s",
                     request_id,
                     request_metrics["latency_ms"],
+                    request_metrics["cost_usd"],
                     request_metrics["intent"],
                     request_metrics["route"],
                     request_metrics["severity"],
@@ -874,6 +1167,7 @@ async def chat(
                         "slo_escalation_required": request_metrics[
                             "escalation_required"
                         ],
+                        "slo_cost_usd": request_metrics["cost_usd"],
                     },
                 )
 
@@ -1125,27 +1419,119 @@ async def chat(
                 except ValueError:
                     ticket_uuid = None
 
+            guardrail_effectiveness = calculate_guardrail_effectiveness(
+                input_allowed=guardrail_result.allowed,
+                output_allowed=response_guardrail_result.allowed,
+            )
+
+            evaluation_case = get_evaluation_case(
+                sanitized_message
+            )
+
+            route_accuracy_initial: float | None = None
+
+            if (
+                evaluation_case is not None
+                and evaluation_case.expected_route is not None
+                and result.get("route") is not None
+            ):
+                route_accuracy_initial = (
+                    100.0
+                    if evaluation_case.expected_route.strip().lower()
+                    == str(result.get("route")).strip().lower()
+                    else 0.0
+                )
+
+            # Initial AI metadata is persisted immediately.
+            # RAGAS and Route Accuracy are populated asynchronously.
+            ai_metadata = {
+                "request_id": request_id,
+                "intent": result.get("intent"),
+                "route": result.get("route"),
+                "severity": result.get("severity"),
+                "escalation_required": result.get(
+                    "escalation_required",
+                    False,
+                ),
+                "evaluation_status": "pending",
+                "accuracy": None,
+                "faithfulness": None,
+                "answer_relevance": None,
+                "context_precision": None,
+                "context_recall": None,
+                "route_accuracy": route_accuracy_initial,
+                "guardrail_effectiveness": guardrail_effectiveness,
+                "cost_usd": request_metrics.get("cost_usd"),
+                "latency_ms": request_metrics.get("latency_ms"),
+                "evaluation": {
+                    "status": "pending",
+                    "accuracy": None,
+                    "faithfulness": None,
+                    "answer_relevance": None,
+                    "context_precision": None,
+                    "context_recall": None,
+                    "route_accuracy": route_accuracy_initial,
+                    "guardrail_effectiveness": guardrail_effectiveness,
+                    "cost_usd": request_metrics.get("cost_usd"),
+                    "latency_ms": request_metrics.get("latency_ms"),
+                },
+            }
+
             await conversation_service.add_ai_message(
                 session_id=session_id,
                 user_id=user_id,
                 content=response_message,
                 ticket_id=ticket_uuid,
-                metadata={
-                    "request_id": request_id,
-                    "intent": result.get("intent"),
-                    "route": result.get("route"),
-                    "severity": result.get("severity"),
-                    "escalation_required": (
-                        result.get(
-                            "escalation_required",
-                            False,
-                        )
-                    ),
-                    "langgraph_thread_id": (thread_id),
-                },
+                metadata=ai_metadata,
             )
 
             await db_session.commit()
+
+            if result.get("route") == "rag":
+                logger.info(
+                    "Scheduling asynchronous RAGAS evaluation "
+                    "request_id=%s route=%s retrieval_results=%s",
+                    request_id,
+                    result.get("route"),
+                    len(result.get("retrieval_results") or []),
+                )
+
+                evaluation_task = asyncio.create_task(
+                    run_post_response_evaluation(
+                        request_id=request_id,
+                        question=sanitized_message,
+                        answer=response_message,
+                        retrieval_results=(
+                            result.get("retrieval_results")
+                            or []
+                        ),
+                        reference=(
+                            evaluation_case.reference_answer
+                            if evaluation_case is not None
+                            else None
+                        ),
+                        expected_route=(
+                            evaluation_case.expected_route
+                            if evaluation_case is not None
+                            else None
+                        ),
+                        actual_route=result.get("route"),
+                    )
+                )
+
+                _ragas_tasks.add(evaluation_task)
+
+                evaluation_task.add_done_callback(
+                    _ragas_tasks.discard
+                )
+
+                logger.info(
+                    "Asynchronous RAGAS asyncio task created "
+                    "request_id=%s task=%s active_ragas_tasks=%s",
+                    request_id,
+                    evaluation_task.get_name(),
+                    len(_ragas_tasks),
+                )
 
             logger.info(
                 "AI response saved request_id=%s conversation_id=%s ticket_id=%s",
@@ -1154,6 +1540,11 @@ async def chat(
                 ticket_id,
             )
 
+            result["guardrail_effectiveness"] = guardrail_effectiveness
+            result["cost_usd"] = request_metrics.get("cost_usd")
+            if route_accuracy_initial is not None:
+                result["route_accuracy"] = route_accuracy_initial
+
             # =================================================
             # RETURN
             # =================================================
@@ -1161,6 +1552,11 @@ async def chat(
             return ChatResponse(
                 message=response_message,
                 conversation_id=str(session_id),
+                evaluation_status=(
+                    "pending"
+                    if result.get("route") == "rag"
+                    else "completed"
+                ),
                 # Intent
                 intent=result.get("intent"),
                 intent_confidence=result.get(
@@ -1170,6 +1566,18 @@ async def chat(
                 intent_reason=result.get("intent_reason"),
                 # Routing
                 route=result.get("route"),
+
+                # Evaluation / Observability
+                accuracy=result.get("accuracy"),
+                faithfulness=result.get("faithfulness"),
+                answer_relevance=result.get("answer_relevance"),
+                context_precision=result.get("context_precision"),
+                context_recall=result.get("context_recall"),
+                route_accuracy=result.get("route_accuracy"),
+                guardrail_effectiveness=guardrail_effectiveness,
+                cost_usd=request_metrics.get("cost_usd"),
+                latency_ms=request_metrics.get("latency_ms"),
+
                 # RAG
                 retrieval_confidence=result.get(
                     "retrieval_confidence",
@@ -1308,4 +1716,23 @@ async def chat(
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=("Unable to initialize database session."),
+    )
+def calculate_guardrail_effectiveness(
+    *,
+    input_allowed: bool,
+    output_allowed: bool,
+) -> float:
+    """
+    Deterministic guardrail effectiveness indicator.
+
+    100% means both input and output guardrails completed
+    successfully for an allowed production response.
+
+    This is an operational metric, not one of the six approved SLOs.
+    """
+
+    return (
+        100.0
+        if input_allowed and output_allowed
+        else 0.0
     )

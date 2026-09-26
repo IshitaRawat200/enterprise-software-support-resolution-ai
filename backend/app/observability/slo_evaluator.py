@@ -1,216 +1,370 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 from app.observability.metrics import (
     SLOReport,
     calculate_slo_report,
-    score_trace,
 )
 
 
 class SLOEvaluator:
     """
-    Evaluate the enterprise support system against its SLOs.
+    Production SLO evaluator.
 
-    This class intentionally stays separate from the workflow; the workflow
-    produces evidence and this evaluator decides whether the collected evidence
-    meets the SLO thresholds.
+    The six approved SLOs are:
+
+        1. Faithfulness
+        2. Answer Relevancy
+        3. Context Precision
+        4. Context Recall
+        5. Route Accuracy
+        6. P95 Latency
     """
 
-    def __init__(
-        self,
-        *,
-        cost_target_usd: float = 0.05,
-    ) -> None:
-        self.cost_target_usd = cost_target_usd
+    def __init__(self) -> None:
+        pass
 
-    @staticmethod
+    # ========================================================
+    # REQUEST METRICS
+    # ========================================================
+
+    def build_request_metrics(
+        self,
+        result: Mapping[str, Any] | None = None,
+        *,
+        request_id: str | None = None,
+        latency_ms: float | None = None,
+        intent: str | None = None,
+        intent_confidence: float | None = None,
+        sql_confidence: float | None = None,
+        severity_confidence: float | None = None,
+        route: str | None = None,
+        severity: str | None = None,
+        escalation_required: bool | None = None,
+        retrieval_confidence: float | None = None,
+        accuracy: float | None = None,
+        faithfulness: float | None = None,
+        answer_relevance: float | None = None,
+        context_precision: float | None = None,
+        context_recall: float | None = None,
+        route_accuracy: float | None = None,
+        guardrail_effectiveness: float | None = None,
+        cost_usd: float | None = None,
+        sufficient_evidence: bool | None = None,
+        retrieval_result_count: int | None = None,
+        errors: list[str] | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+
+        result = result or {}
+
+        return {
+            "request_id": (
+                request_id
+                if request_id is not None
+                else result.get("request_id")
+            ),
+
+            "latency_ms": latency_ms,
+
+            "intent": (
+                intent
+                if intent is not None
+                else result.get("intent")
+            ),
+
+            "intent_confidence": (
+                intent_confidence
+                if intent_confidence is not None
+                else result.get("intent_confidence")
+            ),
+
+            "sql_confidence": (
+                sql_confidence
+                if sql_confidence is not None
+                else result.get("sql_confidence")
+            ),
+
+            "severity_confidence": (
+                severity_confidence
+                if severity_confidence is not None
+                else result.get("severity_confidence")
+            ),
+
+            "route": (
+                route
+                if route is not None
+                else result.get("route")
+            ),
+
+            "severity": (
+                severity
+                if severity is not None
+                else result.get("severity")
+            ),
+
+            "escalation_required": (
+                escalation_required
+                if escalation_required is not None
+                else result.get("escalation_required")
+            ),
+
+            "retrieval_confidence": (
+                retrieval_confidence
+                if retrieval_confidence is not None
+                else result.get("retrieval_confidence")
+            ),
+
+            "accuracy": accuracy,
+            "faithfulness": faithfulness,
+            "answer_relevance": answer_relevance,
+            "context_precision": context_precision,
+            "context_recall": context_recall,
+            "route_accuracy": route_accuracy,
+
+            "guardrail_effectiveness": (
+                guardrail_effectiveness
+            ),
+
+            "cost_usd": cost_usd,
+
+            "sufficient_evidence": (
+                sufficient_evidence
+                if sufficient_evidence is not None
+                else result.get("sufficient_evidence")
+            ),
+
+            "retrieval_result_count": (
+                retrieval_result_count
+                if retrieval_result_count is not None
+                else len(
+                    result.get(
+                        "retrieval_results"
+                    ) or []
+                )
+            ),
+
+            "errors": (
+                errors
+                if errors is not None
+                else result.get("errors") or []
+            ),
+
+            "status": (
+                status
+                if status is not None
+                else result.get("status")
+            ),
+        }    
+    
+    # ========================================================
+    # SUPPORT RESULT
+    # ========================================================
+
     def build_support_result(
-        result: dict[str, Any],
+        self,
+        result: Mapping[str, Any],
         *,
         status: str | None = None,
     ) -> dict[str, Any]:
+
         return {
-            "status": (status or result.get("status") or ("resolved" if not result.get("escalation_required", False) else "in_progress")),
-            "escalation_required": bool(result.get("escalation_required", False)),
+            "request_id": result.get("request_id"),
+            "latency_ms": result.get("latency_ms"),
             "intent": result.get("intent"),
-            "intent_confidence": float(result.get("intent_confidence", 0.0)),
+            "intent_confidence": result.get(
+                "intent_confidence"
+            ),
+            "sql_confidence": result.get(
+                "sql_confidence"
+            ),
+            "severity_confidence": result.get(
+                "severity_confidence"
+            ),
             "route": result.get("route"),
             "severity": result.get("severity"),
-            "severity_confidence": float(result.get("severity_confidence", 0.0)),
-            "retrieval_confidence": float(result.get("retrieval_confidence", 0.0)),
-            "sql_confidence": float(result.get("sql_confidence", 0.0)),
-            "resolution_reason": result.get("resolution_reason"),
-            "ticket_id": result.get("ticket_id"),
+            "escalation_required": result.get(
+                "escalation_required"
+            ),
+            "retrieval_confidence": result.get(
+                "retrieval_confidence"
+            ),
+            "sufficient_evidence": result.get(
+                "sufficient_evidence"
+            ),
+            "retrieval_result_count": len(
+                result.get("retrieval_results") or []
+            ),
+            "errors": result.get("errors") or [],
+            "status": status or result.get("status"),
         }
 
-    @staticmethod
-    def build_request_metrics(
-        result: dict[str, Any],
-        *,
-        latency_ms: float,
-        cost_usd: float | None = None,
-    ) -> dict[str, Any]:
-        support_result = SLOEvaluator.build_support_result(result)
-        return {
-            "latency_ms": max(0.0, float(latency_ms)),
-            "cost_usd": (None if cost_usd is None else max(0.0, float(cost_usd))),
-            "intent": support_result["intent"],
-            "intent_confidence": support_result["intent_confidence"],
-            "route": support_result["route"],
-            "retrieval_confidence": support_result["retrieval_confidence"],
-            "sql_confidence": support_result["sql_confidence"],
-            "severity": support_result["severity"],
-            "severity_confidence": support_result["severity_confidence"],
-            "escalation_required": support_result["escalation_required"],
-            "status": support_result["status"],
-            "ticket_id": support_result["ticket_id"],
-            "resolution_reason": support_result["resolution_reason"],
-        }
+    # ========================================================
+    # ROUTE RESULT
+    # ========================================================
 
-    @staticmethod
-    def build_sql_result(
-        *,
-        generated_sql: str | None,
-        expected_sql: str | None = None,
-        correct: bool | None = None,
-        execution_success: bool | None = None,
-    ) -> dict[str, Any]:
-        record: dict[str, Any] = {
-            "generated_sql": generated_sql,
-            "expected_sql": expected_sql,
-            "execution_success": execution_success,
-        }
-        if correct is not None:
-            record["correct"] = bool(correct)
-        return record
-
-    @staticmethod
-    def build_severity_result(
-        *,
-        expected_severity: str,
-        predicted_severity: str | None,
-    ) -> dict[str, Any]:
-        return {
-            "expected_severity": str(expected_severity).upper(),
-            "predicted_severity": str(predicted_severity or "").upper(),
-        }
-
-    @staticmethod
     def build_route_result(
+        self,
         *,
+        request_id: str,
         expected_route: str | None,
         actual_route: str | None,
     ) -> dict[str, Any]:
+
         return {
+            "request_id": request_id,
             "expected_route": expected_route,
             "actual_route": actual_route,
         }
 
-    @staticmethod
-    def build_escalation_result(
+    # ========================================================
+    # RAGAS RESULT
+    # ========================================================
+
+    def build_ragas_result(
+        self,
         *,
-        expected_escalation: bool | None,
-        actual_escalation: bool | None,
+        request_id: str,
+        faithfulness: float | None,
+        answer_relevance: float | None,
+        context_precision: float | None,
+        context_recall: float | None,
+        ragas_evaluated: bool = False,
+        errors: list[str] | None = None,
     ) -> dict[str, Any]:
+
         return {
-            "expected_escalation": bool(expected_escalation or False),
-            "actual_escalation": bool(actual_escalation or False),
+            "request_id": request_id,
+            "faithfulness": faithfulness,
+            "answer_relevance": answer_relevance,
+            "context_precision": context_precision,
+            "context_recall": context_recall,
+            "ragas_evaluated": ragas_evaluated,
+            "errors": errors or [],
         }
 
-    @staticmethod
-    def build_cost_result(
-        *,
-        cost_usd: float | None,
-    ) -> dict[str, Any]:
-        return {"cost_usd": max(0.0, float(cost_usd or 0.0))}
+    # ========================================================
+    # SCORE EXTRACTION
+    # ========================================================
 
     @staticmethod
-    def build_retrieval_result(
-        *,
-        message: str | None = None,
-        response: str | None = None,
-        retrieval_results: list[dict[str, Any]] | None = None,
-        expected_claims: list[str] | None = None,
-        expected_relevant_chunks: list[str] | None = None,
-        expected_answer_relevance: float | None = None,
-        actual_guardrail_action: str | None = None,
-        expected_guardrail_action: str | None = None,
-        actual_authorization_result: bool | None = None,
-        expected_authorization_result: bool | None = None,
-        judge_score: float | None = None,
-    ) -> dict[str, Any]:
-        return {
-            "message": message,
-            "response": response,
-            "retrieval_results": retrieval_results or [],
-            "expected_claims": expected_claims or [],
-            "expected_relevant_chunks": expected_relevant_chunks or [],
-            "expected_answer_relevance": expected_answer_relevance,
-            "actual_guardrail_action": actual_guardrail_action,
-            "expected_guardrail_action": expected_guardrail_action,
-            "actual_authorization_result": actual_authorization_result,
-            "expected_authorization_result": expected_authorization_result,
-            "judge_score": judge_score,
-        }
+    def _extract_score(
+        item: Mapping[str, Any],
+        field: str,
+    ) -> float | None:
+
+        value = item.get(field)
+
+        if value is None:
+            return None
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _extract_ragas_scores(
+        self,
+        results: Iterable[Mapping[str, Any]],
+        field: str,
+    ) -> list[float]:
+
+        scores: list[float] = []
+
+        for result in results:
+            score = self._extract_score(
+                result,
+                field,
+            )
+
+            if score is not None:
+                scores.append(score)
+
+        return scores
+
+    # ========================================================
+    # EVALUATE
+    # ========================================================
 
     def evaluate(
         self,
         *,
-        support_results: list[dict[str, Any]],
-        latencies_ms: list[float],
-        sql_results: list[dict[str, Any]],
-        severity_results: list[dict[str, Any]],
-        cost_results: list[dict[str, Any]],
-        route_results: list[dict[str, Any]] | None = None,
-        escalation_results: list[dict[str, Any]] | None = None,
-        retrieval_results: list[dict[str, Any]] | None = None,
-        guardrail_results: list[dict[str, Any]] | None = None,
-        authorization_results: list[dict[str, Any]] | None = None,
-        judge_results: list[dict[str, Any]] | None = None,
+        latencies_ms: Iterable[float],
+        route_results: Iterable[Mapping[str, Any]],
+        ragas_results: Iterable[Mapping[str, Any]],
     ) -> SLOReport:
-        return calculate_slo_report(
-            support_results=support_results,
-            latencies_ms=latencies_ms,
-            sql_results=sql_results,
-            severity_results=severity_results,
-            cost_results=cost_results,
-            route_results=route_results,
-            escalation_results=escalation_results,
-            retrieval_results=retrieval_results,
-            guardrail_results=guardrail_results,
-            authorization_results=authorization_results,
-            judge_results=judge_results,
-            cost_target_usd=self.cost_target_usd,
+
+        latency_values = [
+            float(value)
+            for value in latencies_ms
+            if value is not None
+        ]
+
+        route_cases = list(route_results)
+        ragas_cases = list(ragas_results)
+
+        faithfulness_scores = (
+            self._extract_ragas_scores(
+                ragas_cases,
+                "faithfulness",
+            )
         )
 
+        answer_relevance_scores = (
+            self._extract_ragas_scores(
+                ragas_cases,
+                "answer_relevance",
+            )
+        )
+
+        context_precision_scores = (
+            self._extract_ragas_scores(
+                ragas_cases,
+                "context_precision",
+            )
+        )
+
+        context_recall_scores = (
+            self._extract_ragas_scores(
+                ragas_cases,
+                "context_recall",
+            )
+        )
+
+        return calculate_slo_report(
+            faithfulness_scores=faithfulness_scores,
+            answer_relevance_scores=answer_relevance_scores,
+            context_precision_scores=context_precision_scores,
+            context_recall_scores=context_recall_scores,
+            route_cases=route_cases,
+            latency_ms_values=latency_values,
+        )
+
+    # ========================================================
+    # REPORT
+    # ========================================================
+
     @staticmethod
-    def score_langfuse_trace(
-        *,
-        trace_id: str,
+    def report_to_dict(
         report: SLOReport,
-    ) -> None:
-        score_trace(trace_id, name="slo_tsr", value=(report.tsr_percent / 100.0))
-        score_trace(trace_id, name="slo_p95_latency", value=(1.0 if report.latency_passed else 0.0))
-        score_trace(trace_id, name="slo_sql_correctness", value=(report.sql_correctness_percent / 100.0))
-        score_trace(trace_id, name="slo_critical_misclassification", value=(1.0 if report.critical_misclassification_passed else 0.0))
-        score_trace(trace_id, name="slo_cost", value=(1.0 if report.cost_passed else 0.0))
-        score_trace(trace_id, name="slo_overall", value=(1.0 if report.overall_passed else 0.0))
+    ) -> dict[str, Any]:
 
-        score_trace(trace_id, name="query_routing_accuracy", value=(report.query_routing_accuracy / 100.0))
-        score_trace(trace_id, name="risk_classification_accuracy", value=(report.risk_classification_accuracy / 100.0))
-        score_trace(trace_id, name="escalation_recall", value=(report.escalation_recall / 100.0))
-        score_trace(trace_id, name="source_attribution_rate", value=(report.source_attribution_rate / 100.0))
-        score_trace(trace_id, name="faithfulness_score", value=(report.faithfulness_score / 100.0))
-        score_trace(trace_id, name="answer_relevance", value=(report.answer_relevance / 100.0))
-        score_trace(trace_id, name="context_precision", value=(report.context_precision / 100.0))
-        score_trace(trace_id, name="context_recall", value=(report.context_recall / 100.0))
-        score_trace(trace_id, name="guardrail_effectiveness", value=(report.guardrail_effectiveness / 100.0))
-        score_trace(trace_id, name="unauthorized_access_violations", value=(1.0 if report.unauthorized_access_violations == 0 else 0.0))
-        score_trace(trace_id, name="llm_judge_score", value=(report.llm_judge_score / 100.0))
-
-    @staticmethod
-    def report_to_dict(report: SLOReport) -> dict[str, Any]:
         return asdict(report)
+
+    def evaluate_to_dict(
+        self,
+        *,
+        latencies_ms: Iterable[float],
+        route_results: Iterable[Mapping[str, Any]],
+        ragas_results: Iterable[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+
+        report = self.evaluate(
+            latencies_ms=latencies_ms,
+            route_results=route_results,
+            ragas_results=ragas_results,
+        )
+
+        return self.report_to_dict(report)

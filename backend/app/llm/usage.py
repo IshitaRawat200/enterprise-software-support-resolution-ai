@@ -3,6 +3,29 @@ from __future__ import annotations
 from typing import Any
 
 
+MODEL_PRICING_PER_MILLION: dict[str, dict[str, float]] = {
+    # Prices in USD per 1M tokens.
+    "openai/gpt-oss-20b": {
+        "input": 0.075,
+        "output": 0.300,
+        "cached_input": 0.037,
+    },
+    "openai/gpt-oss-120b": {
+        "input": 0.15,
+        "output": 0.60,
+        "cached_input": 0.075,
+    },
+}
+
+
+MODEL_ALIASES: dict[str, str] = {
+    "gpt-oss-20b": "openai/gpt-oss-20b",
+    "gpt-oss-120b": "openai/gpt-oss-120b",
+    "openai/gpt-oss:20b": "openai/gpt-oss-20b",
+    "openai/gpt-oss:120b": "openai/gpt-oss-120b",
+}
+
+
 def _safe_int(
     value: Any,
     default: int = 0,
@@ -171,7 +194,21 @@ def extract_llm_usage(
         )
     )
 
+    model = (
+        usage.get("model")
+        or response_metadata.get("model")
+        or response_metadata.get("model_name")
+        or response_metadata.get("model_id")
+        or ""
+    )
+
+    model = str(model).strip().lower()
+
+    if model:
+        model = MODEL_ALIASES.get(model, model)
+
     return {
+        "model": model or None,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "total_tokens": total_tokens,
@@ -186,3 +223,102 @@ def extract_llm_usage(
         "completion_time": completion_time,
         "total_time": total_time,
     }
+
+
+def estimate_usage_cost_usd(
+    usage: dict[str, Any],
+) -> float | None:
+    """
+    Estimate USD cost for one usage record.
+
+    Expected fields include:
+        model, prompt_tokens, completion_tokens, cached_tokens
+    """
+
+    if not isinstance(usage, dict):
+        return None
+
+    model = str(usage.get("model") or "").strip().lower()
+    model = MODEL_ALIASES.get(model, model)
+
+    if not model:
+        # Default to the common production model when provider metadata
+        # omits explicit model identity.
+        model = "openai/gpt-oss-20b"
+
+    pricing = MODEL_PRICING_PER_MILLION.get(model)
+
+    if pricing is None:
+        return None
+
+    prompt_tokens = max(
+        0,
+        _safe_int(
+            usage.get("prompt_tokens"),
+            default=0,
+        ),
+    )
+
+    completion_tokens = max(
+        0,
+        _safe_int(
+            usage.get("completion_tokens"),
+            default=0,
+        ),
+    )
+
+    cached_tokens = max(
+        0,
+        _safe_int(
+            usage.get("cached_tokens"),
+            default=0,
+        ),
+    )
+
+    cached_tokens = min(
+        cached_tokens,
+        prompt_tokens,
+    )
+
+    billable_prompt_tokens = max(
+        0,
+        prompt_tokens - cached_tokens,
+    )
+
+    total_cost = (
+        billable_prompt_tokens * pricing["input"]
+        + cached_tokens * pricing["cached_input"]
+        + completion_tokens * pricing["output"]
+    ) / 1_000_000.0
+
+    return round(total_cost, 8)
+
+
+def aggregate_usage_cost_usd(
+    usage_entries: list[dict[str, Any]] | None,
+) -> float | None:
+    """
+    Aggregate estimated USD costs over all known-priced usage entries.
+
+    Returns None only if no entry had known pricing.
+    """
+
+    if not usage_entries:
+        return None
+
+    total = 0.0
+    counted = 0
+
+    for usage in usage_entries:
+        cost = estimate_usage_cost_usd(usage)
+
+        if cost is None:
+            continue
+
+        total += cost
+        counted += 1
+
+    if counted == 0:
+        return None
+
+    return round(total, 8)

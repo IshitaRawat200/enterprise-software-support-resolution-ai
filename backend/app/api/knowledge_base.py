@@ -357,6 +357,8 @@ async def upload_knowledge_document(
 
             await ingestion_service.ingest_file(
                 file_path=str(temp_path),
+                document_id=document_id,
+                original_filename=original_filename,
             )
 
         await db.commit()

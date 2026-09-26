@@ -5,7 +5,44 @@ from typing import Any
 
 from app.guardrails.guardrail_result import GuardrailResult
 
+
 GUARDRAIL_NAME = "output_guardrail"
+
+
+# ============================================================
+# SAFE DOCUMENTATION PLACEHOLDERS
+# ============================================================
+
+SAFE_PLACEHOLDERS: set[str] = {
+    "changeme",
+    "example",
+    "example123",
+    "your_key",
+    "your-api-key",
+    "your_api_key",
+    "api_key",
+    "apikey",
+    "<your_key>",
+    "<your-key>",
+    "<your-api-key>",
+    "<your_api_key>",
+    "<api-key>",
+    "<api_key>",
+    "<token>",
+    "<access_token>",
+    "<access-token>",
+    "access_token",
+    "access-token",
+    "your_token",
+    "your-token",
+    "<your_token>",
+    "<your-token>",
+    "yourpassword",
+    "your_password",
+    "your-password",
+    "<password>",
+    "<your-password>",
+}
 
 
 # ============================================================
@@ -15,7 +52,7 @@ GUARDRAIL_NAME = "output_guardrail"
 SECRET_PATTERNS: tuple[tuple[str, str], ...] = (
     (
         "openai_api_key",
-        r"\bsk-[A-Za-z0-9_\-]{20,}\b",
+        r"\bsk-[A-Za-z0-9_-]{20,}\b",
     ),
     (
         "github_token",
@@ -31,7 +68,7 @@ SECRET_PATTERNS: tuple[tuple[str, str], ...] = (
     ),
     (
         "jwt",
-        r"\beyJ[A-Za-z0-9_\-]+?\.[A-Za-z0-9_\-]+?\.[A-Za-z0-9_\-]+\b",
+        r"\beyJ[A-Za-z0-9_-]+?\.[A-Za-z0-9_-]+?\.[A-Za-z0-9_-]+?\b",
     ),
     (
         "private_key",
@@ -43,7 +80,7 @@ SECRET_PATTERNS: tuple[tuple[str, str], ...] = (
     ),
     (
         "api_key_assignment",
-        r"\bapi[_\-]?key\s*[:=]\s*\S+",
+        r"\bapi[_-]?key\s*[:=]\s*\S+",
     ),
     (
         "secret_assignment",
@@ -65,58 +102,200 @@ INTERNAL_CONTENT_PATTERNS: tuple[str, ...] = (
 )
 
 
-SAFE_PASSWORD_PLACEHOLDERS: set[str] = {
-    "changeme",
-    "<your-password>",
-    "<password>",
-    "example",
-    "example123",
-}
+# ============================================================
+# NORMALIZATION
+# ============================================================
 
+def _normalize_value(value: str) -> str:
+    """
+    Normalize a candidate credential value.
 
-def _normalize_password_value(value: str) -> str:
-    normalized = value.strip().strip(",.;")
+    Handles:
+        <your_key>
+        `your_key`
+        "your_key"
+        'your_key'
+        your_key,
+        your_key.
+    """
 
-    # Support markdown/code-style wrappers like `changeme` and quoted examples.
-    for _ in range(2):
+    normalized = value.strip()
+
+    normalized = normalized.strip(",.;")
+
+    for _ in range(3):
         if (
             len(normalized) >= 2
             and normalized[0] == normalized[-1]
-            and normalized[0] in {"`", '"', "'"}
+            and normalized[0] in {
+                "`",
+                '"',
+                "'",
+            }
         ):
-            normalized = normalized[1:-1].strip().strip(",.;")
+            normalized = normalized[1:-1].strip()
+            normalized = normalized.strip(",.;")
 
-    return normalized
+    return normalized.lower()
 
 
-def _is_safe_password_placeholder(value: str) -> bool:
-    normalized_value = _normalize_password_value(value)
-    return normalized_value.lower() in SAFE_PASSWORD_PLACEHOLDERS
+def _is_safe_placeholder(value: str) -> bool:
+    normalized = _normalize_value(value)
 
+    if normalized in SAFE_PLACEHOLDERS:
+        return True
+
+    # Generic documentation placeholders.
+    if normalized.startswith("<") and normalized.endswith(">"):
+        inner = normalized[1:-1].strip()
+
+        safe_words = {
+            "key",
+            "api_key",
+            "api-key",
+            "token",
+            "access_token",
+            "access-token",
+            "your_key",
+            "your-key",
+            "your_api_key",
+            "your-api-key",
+            "your_token",
+            "your-token",
+            "password",
+            "your_password",
+            "your-password",
+        }
+
+        if inner in safe_words:
+            return True
+
+    # Common examples such as:
+    # your_key
+    # your_token
+    # your_api_key
+    # example_key
+    if normalized.startswith("your_"):
+        return True
+
+    if normalized.startswith("your-"):
+        return True
+
+    if normalized.startswith("example_"):
+        return True
+
+    if normalized.startswith("example-"):
+        return True
+
+    return False
+
+
+# ============================================================
+# EXTRACT ASSIGNMENT VALUE
+# ============================================================
+
+def _extract_assignment_value(
+    matched_text: str,
+) -> str:
+    """
+    Extract the value from:
+
+        password: something
+        password=something
+        X-API-Key: something
+        api_key=something
+    """
+
+    if "=" in matched_text:
+        return matched_text.split(
+            "=",
+            maxsplit=1,
+        )[1].strip()
+
+    if ":" in matched_text:
+        return matched_text.split(
+            ":",
+            maxsplit=1,
+        )[1].strip()
+
+    parts = matched_text.split(
+        maxsplit=1,
+    )
+
+    if len(parts) == 2:
+        return parts[1].strip()
+
+    return matched_text.strip()
+
+
+# ============================================================
+# SECRET FINDER
+# ============================================================
 
 def _find_secret(
     text: str,
 ) -> tuple[str, str] | None:
+    """
+    Find the first actual credential.
+
+    Documentation placeholders such as:
+
+        X-API-Key: <your_key>
+        api_key: your_key
+        password: <password>
+
+    are intentionally allowed.
+    """
+
     for name, pattern in SECRET_PATTERNS:
-        match = re.search(
+        matches = re.finditer(
             pattern,
             text,
             flags=re.IGNORECASE,
         )
 
-        if match:
-            if name == "password_assignment":
-                value = match.group(0).split(maxsplit=1)[-1]
-                value = value.split("=", maxsplit=1)[-1]
-                value = value.split(":", maxsplit=1)[-1]
+        for match in matches:
+            matched_text = match.group(0)
 
-                if _is_safe_password_placeholder(value):
+            # ------------------------------------------------
+            # Assignment-based secrets
+            # ------------------------------------------------
+
+            if name in {
+                "password_assignment",
+                "api_key_assignment",
+                "secret_assignment",
+            }:
+                value = _extract_assignment_value(
+                    matched_text,
+                )
+
+                if _is_safe_placeholder(value):
                     continue
 
-            return name, match.group(0)
+            # ------------------------------------------------
+            # Bearer tokens
+            # ------------------------------------------------
+
+            if name == "bearer_token":
+                parts = matched_text.split(
+                    maxsplit=1,
+                )
+
+                if len(parts) == 2:
+                    token_value = parts[1]
+
+                    if _is_safe_placeholder(token_value):
+                        continue
+
+            return name, matched_text
 
     return None
 
+
+# ============================================================
+# INTERNAL CONTENT
+# ============================================================
 
 def _contains_internal_content(
     text: str,
@@ -132,9 +311,17 @@ def _contains_internal_content(
     return False
 
 
+# ============================================================
+# SECRET REDACTION
+# ============================================================
+
 def _redact_secrets(
     text: str,
 ) -> tuple[str, list[str]]:
+    """
+    Redact actual secrets while preserving documentation examples.
+    """
+
     redacted = text
     categories: list[str] = []
 
@@ -150,44 +337,73 @@ def _redact_secrets(
         if not matches:
             continue
 
-        if name == "password_assignment":
-            unsafe_match_found = False
+        unsafe_matches: list[str] = []
 
-            for match in matches:
-                value = match.group(0).split(maxsplit=1)[-1]
-                value = value.split("=", maxsplit=1)[-1]
-                value = value.split(":", maxsplit=1)[-1]
+        for match in matches:
+            matched_text = match.group(0)
 
-                if not _is_safe_password_placeholder(value):
-                    unsafe_match_found = True
-                    break
+            if name in {
+                "password_assignment",
+                "api_key_assignment",
+                "secret_assignment",
+            }:
+                value = _extract_assignment_value(
+                    matched_text,
+                )
 
-            if not unsafe_match_found:
-                continue
+                if _is_safe_placeholder(value):
+                    continue
+
+            if name == "bearer_token":
+                parts = matched_text.split(
+                    maxsplit=1,
+                )
+
+                if len(parts) == 2:
+                    token_value = parts[1]
+
+                    if _is_safe_placeholder(token_value):
+                        continue
+
+            unsafe_matches.append(
+                matched_text,
+            )
+
+        if not unsafe_matches:
+            continue
 
         categories.append(name)
-        redacted = re.sub(
-            pattern,
-            "[REDACTED]",
-            redacted,
-            flags=re.IGNORECASE,
-        )
 
-    return redacted, sorted(set(categories))
+        for unsafe_match in unsafe_matches:
+            redacted = redacted.replace(
+                unsafe_match,
+                "[REDACTED]",
+            )
 
+    return (
+        redacted,
+        sorted(set(categories)),
+    )
+
+
+# ============================================================
+# OUTPUT TEXT VALIDATION
+# ============================================================
 
 def validate_output_text(
     text: str,
 ) -> GuardrailResult:
     """
-    Validate customer-facing text.
+    Validate customer-facing output.
 
-    This function does not evaluate whether the answer is
-    factually correct. CHECK / evaluation remains responsible
-    for evidence quality.
+    This validates security-related output concerns.
+    It does not evaluate factual correctness.
     """
 
-    if not isinstance(text, str):
+    if not isinstance(
+        text,
+        str,
+    ):
         return GuardrailResult.block(
             GUARDRAIL_NAME,
             reason="Output must be a string.",
@@ -230,17 +446,24 @@ def validate_output_text(
     )
 
 
+# ============================================================
+# OUTPUT SANITIZATION
+# ============================================================
+
 def sanitize_output_text(
     text: str,
 ) -> tuple[str, GuardrailResult]:
     """
-    Redact accidental secrets from text.
+    Defensive final sanitization layer.
 
-    Prefer validate_output_text() for strict API behavior.
-    Sanitization exists as a defensive final layer.
+    Actual credentials are replaced with [REDACTED].
+    Documentation placeholders are preserved.
     """
 
-    if not isinstance(text, str):
+    if not isinstance(
+        text,
+        str,
+    ):
         result = GuardrailResult.block(
             GUARDRAIL_NAME,
             reason="Output must be a string.",
@@ -250,9 +473,13 @@ def sanitize_output_text(
 
         return "", result
 
-    sanitized, categories = _redact_secrets(text)
+    sanitized, categories = _redact_secrets(
+        text,
+    )
 
-    if _contains_internal_content(sanitized):
+    if _contains_internal_content(
+        sanitized,
+    ):
         result = GuardrailResult.block(
             GUARDRAIL_NAME,
             reason="Internal system content detected in output.",
@@ -283,6 +510,10 @@ def sanitize_output_text(
     return sanitized, result
 
 
+# ============================================================
+# STRUCTURED RESPONSE VALIDATION
+# ============================================================
+
 def validate_response_payload(
     payload: dict[str, Any],
 ) -> GuardrailResult:
@@ -290,7 +521,10 @@ def validate_response_payload(
     Validate the structured response contract.
     """
 
-    if not isinstance(payload, dict):
+    if not isinstance(
+        payload,
+        dict,
+    ):
         return GuardrailResult.block(
             GUARDRAIL_NAME,
             reason="Response payload must be an object.",
@@ -307,7 +541,11 @@ def validate_response_payload(
         "escalation_required",
     }
 
-    missing_fields = sorted(field for field in required_fields if field not in payload)
+    missing_fields = sorted(
+        field
+        for field in required_fields
+        if field not in payload
+    )
 
     if missing_fields:
         return GuardrailResult.block(
@@ -320,14 +558,20 @@ def validate_response_payload(
             },
         )
 
-    answer = payload.get("answer")
+    answer = payload.get(
+        "answer",
+    )
 
-    answer_result = validate_output_text(answer)
+    answer_result = validate_output_text(
+        answer,
+    )
 
     if not answer_result.allowed:
         return answer_result
 
-    confidence = payload.get("confidence")
+    confidence = payload.get(
+        "confidence",
+    )
 
     if not isinstance(
         confidence,
@@ -348,7 +592,9 @@ def validate_response_payload(
             code="INVALID_CONFIDENCE",
         )
 
-    escalation_required = payload.get("escalation_required")
+    escalation_required = payload.get(
+        "escalation_required",
+    )
 
     if not isinstance(
         escalation_required,

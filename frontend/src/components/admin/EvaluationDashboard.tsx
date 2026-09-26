@@ -1,385 +1,481 @@
-import { useEffect, useState } from "react";
-import {
-  getEvaluationReport,
-  type EvaluationReport,
-  type SLOMetric,
-} from "../../services/adminApi";
+import { useCallback, useEffect, useState } from "react";
 import "./EvaluationDashboard.css";
 
-function formatMetricName(
-  name: string
+type SLOMetric = {
+  name: string;
+  target: number;
+  actual: number;
+  passed: boolean;
+};
+
+type EvaluationRun = {
+  run_id: string;
+  created_at: string;
+  status: string;
+  total_cases: number;
+  overall_passed: boolean;
+  metrics: SLOMetric[];
+};
+
+type EvaluationReport = {
+  latest_run: EvaluationRun;
+  historical_runs: EvaluationRun[];
+  slo_metrics: SLOMetric[];
+  case_count: number;
+  cases: Record<string, unknown>[];
+  generated_at: string;
+};
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:8000";
+
+const SLO_ORDER = [
+  "Faithfulness",
+  "Answer Relevancy",
+  "Context Precision",
+  "Context Recall",
+  "Route Accuracy",
+  "P95 Latency",
+];
+
+function formatMetric(
+  metric: SLOMetric,
 ): string {
-  return name
-    .replace(/_percent$/i, "")
-    .replace(/_ms$/i, "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) =>
-      char.toUpperCase()
-    );
-}
-
-function formatMetricValue(
-  metric: SLOMetric
-): string {
-  if (metric.name.includes("latency")) {
-    return `${Number(metric.value).toFixed(0)} ms`;
+  if (metric.name === "P95 Latency") {
+    return `${Number(metric.actual).toFixed(0)} ms`;
   }
 
-  if (metric.name.includes("cost")) {
-    return `$${Number(metric.value).toFixed(4)}`;
-  }
-
-  if (metric.name.includes("violations")) {
-    return String(metric.value);
-  }
-
-  return `${Number(metric.value).toFixed(2)}%`;
+  return `${Number(metric.actual).toFixed(1)}%`;
 }
 
 function formatTarget(
-  metric: SLOMetric
+  metric: SLOMetric,
 ): string {
-  if (metric.name.includes("latency")) {
+  if (metric.name === "P95 Latency") {
     return `≤ ${Number(metric.target).toFixed(0)} ms`;
   }
 
-  if (metric.name.includes("cost")) {
-    return `≤ $${Number(metric.target).toFixed(4)}`;
-  }
-
-  if (metric.name.includes("violations")) {
-    return `≤ ${Number(metric.target)}`;
-  }
-
-  return `≥ ${Number(metric.target).toFixed(2)}%`;
+  return `≥ ${Number(metric.target).toFixed(1)}%`;
 }
 
 export default function EvaluationDashboard() {
   const [report, setReport] =
-    useState<EvaluationReport | null>(
-      null
-    );
+    useState<EvaluationReport | null>(null);
 
   const [loading, setLoading] =
     useState(true);
 
   const [error, setError] =
-    useState("");
+    useState<string | null>(null);
 
-  async function loadReport() {
-    try {
-      setLoading(true);
-      setError("");
+  const loadReport = useCallback(
+    async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const data =
-        await getEvaluationReport();
+        const token =
+          localStorage.getItem("access_token") ||
+          localStorage.getItem("token");
 
-      setReport(data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load evaluation report."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+        const headers: HeadersInit = {
+          Accept: "application/json",
+        };
+
+        if (token) {
+          headers.Authorization =
+            `Bearer ${token}`;
+        }
+
+        const response = await fetch(
+          `${API_BASE_URL}/evaluation/report`,
+          {
+            method: "GET",
+            headers,
+          },
+        );
+
+        if (!response.ok) {
+          const body =
+            await response.text();
+
+          throw new Error(
+            body ||
+              `Evaluation report failed: ${response.status}`,
+          );
+        }
+
+        const data =
+          (await response.json()) as EvaluationReport;
+
+        setReport(data);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load evaluation report.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadReport();
-  }, []);
+  }, [loadReport]);
 
   if (loading) {
     return (
-      <section className="evaluation-dashboard">
-        <div className="evaluation-empty">
-          Loading evaluation results...
+      <div className="evaluation-page">
+        <div className="evaluation-loading">
+          Loading SLO dashboard...
         </div>
-      </section>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <section className="evaluation-dashboard">
-        <div className="evaluation-message error">
-          {error}
+      <div className="evaluation-page">
+        <div className="evaluation-header">
+          <div>
+            <h1>Evaluation & SLOs</h1>
+            <p>
+              ERIS production evaluation
+            </p>
+          </div>
+
+          <button
+            className="evaluation-refresh"
+            onClick={() => void loadReport()}
+          >
+            Retry
+          </button>
         </div>
-      </section>
+
+        <div className="evaluation-error">
+          <strong>
+            Unable to load SLO report
+          </strong>
+
+          <p>{error}</p>
+        </div>
+      </div>
     );
   }
 
   if (!report) {
-    return (
-      <section className="evaluation-dashboard">
-        <div className="evaluation-empty">
-          No evaluation results available.
-        </div>
-      </section>
-    );
+    return null;
   }
 
-  const sloMetrics =
-    report.slo_metrics ?? [];
+  const metricsByName =
+    new Map(
+      report.slo_metrics.map(
+        (metric) => [
+          metric.name,
+          metric,
+        ],
+      ),
+    );
 
-  const cases =
-    report.cases ?? [];
-
-  const overallPassed =
-    report.overall_slo_passed ??
-    report.overall_passed ??
-    false;
+  const orderedMetrics =
+    SLO_ORDER
+      .map(
+        (name) =>
+          metricsByName.get(name),
+      )
+      .filter(
+        (
+          metric,
+        ): metric is SLOMetric =>
+          Boolean(metric),
+      );
 
   return (
-    <section className="evaluation-dashboard">
+    <div className="evaluation-page">
       <div className="evaluation-header">
         <div>
-          <h2>Evaluation Dashboard</h2>
+          <h1>
+            Evaluation & SLOs
+          </h1>
 
           <p>
-            ERIS Golden Dataset evaluation
-            and SLO performance.
+            Six production SLOs for ERIS
           </p>
         </div>
 
         <button
-          type="button"
-          className="evaluation-refresh-button"
-          onClick={() =>
-            void loadReport()
-          }
+          className="evaluation-refresh"
+          onClick={() => void loadReport()}
         >
           Refresh
         </button>
       </div>
 
       <div className="evaluation-summary">
-        <div className="evaluation-summary-card">
-          <span>Run Status</span>
-
-          <strong>
-            {report.status}
-          </strong>
-        </div>
-
-        <div className="evaluation-summary-card">
-          <span>Total Cases</span>
-
-          <strong>
-            {report.total_cases}
-          </strong>
-        </div>
-
-        <div className="evaluation-summary-card">
-          <span>Overall SLO</span>
+        <div className="summary-card">
+          <span className="summary-label">
+            Evaluation Status
+          </span>
 
           <strong
             className={
-              overallPassed
-                ? "evaluation-pass"
-                : "evaluation-fail"
+              report.latest_run
+                .overall_passed
+                ? "status-pass"
+                : "status-fail"
             }
           >
-            {overallPassed
-              ? "PASSED"
-              : "FAILED"}
+            {report.latest_run
+              .overall_passed
+              ? "All SLOs Passed"
+              : "SLOs Need Attention"}
           </strong>
         </div>
 
-        <div className="evaluation-summary-card">
-          <span>Run Date</span>
+        <div className="summary-card">
+          <span className="summary-label">
+            Cases
+          </span>
+
+          <strong>
+            {report.case_count}
+          </strong>
+        </div>
+
+        <div className="summary-card">
+          <span className="summary-label">
+            Run Status
+          </span>
+
+          <strong>
+            {report.latest_run.status}
+          </strong>
+        </div>
+
+        <div className="summary-card">
+          <span className="summary-label">
+            Last Updated
+          </span>
 
           <strong>
             {new Date(
-              report.created_at
+              report.generated_at,
             ).toLocaleString()}
           </strong>
         </div>
       </div>
 
-      <div className="evaluation-card">
-        <div className="evaluation-card-header">
-          <h3>SLO Results</h3>
+      <section className="slo-section">
+        <div className="section-title">
+          <h2>
+            Six SLOs
+          </h2>
+
+          <span>
+            Latest evaluation run
+          </span>
         </div>
 
-        {sloMetrics.length === 0 ? (
-          <div className="evaluation-empty">
-            No SLO metrics available for
-            this evaluation run.
+        <div className="slo-grid">
+          {orderedMetrics.map(
+            (metric) => (
+              <div
+                key={metric.name}
+                className={
+                  metric.passed
+                    ? "slo-card passed"
+                    : "slo-card failed"
+                }
+              >
+                <div className="slo-card-top">
+                  <h3>
+                    {metric.name}
+                  </h3>
+
+                  <span
+                    className={
+                      metric.passed
+                        ? "slo-badge passed"
+                        : "slo-badge failed"
+                    }
+                  >
+                    {metric.passed
+                      ? "PASS"
+                      : "FAIL"}
+                  </span>
+                </div>
+
+                <div className="slo-value">
+                  {formatMetric(metric)}
+                </div>
+
+                <div className="slo-target">
+                  Target{" "}
+                  {formatTarget(metric)}
+                </div>
+
+                <div className="slo-progress">
+                  <div
+                    className="slo-progress-track"
+                  >
+                    <div
+                      className="slo-progress-value"
+                      style={{
+                        width:
+                          metric.name ===
+                          "P95 Latency"
+                            ? `${Math.min(
+                                100,
+                                (Number(
+                                  metric.actual,
+                                ) /
+                                  Number(
+                                    metric.target,
+                                  )) *
+                                  100,
+                              )}%`
+                            : `${Math.min(
+                                100,
+                                Number(
+                                  metric.actual,
+                                ),
+                              )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      </section>
+
+      <section className="evaluation-table-section">
+        <div className="section-title">
+          <h2>
+            SLO Details
+          </h2>
+        </div>
+
+        <div className="evaluation-table-wrapper">
+          <table className="evaluation-table">
+            <thead>
+              <tr>
+                <th>SLO</th>
+                <th>Actual</th>
+                <th>Target</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {orderedMetrics.map(
+                (metric) => (
+                  <tr
+                    key={metric.name}
+                  >
+                    <td>
+                      {metric.name}
+                    </td>
+
+                    <td>
+                      {formatMetric(metric)}
+                    </td>
+
+                    <td>
+                      {formatTarget(metric)}
+                    </td>
+
+                    <td>
+                      <span
+                        className={
+                          metric.passed
+                            ? "table-status pass"
+                            : "table-status fail"
+                        }
+                      >
+                        {metric.passed
+                          ? "PASS"
+                          : "FAIL"}
+                      </span>
+                    </td>
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="historical-section">
+        <div className="section-title">
+          <h2>
+            Historical Runs
+          </h2>
+        </div>
+
+        {report.historical_runs.length ===
+        0 ? (
+          <div className="empty-history">
+            No previous evaluation runs.
           </div>
         ) : (
           <div className="evaluation-table-wrapper">
             <table className="evaluation-table">
               <thead>
                 <tr>
-                  <th>Metric</th>
-                  <th>Actual</th>
-                  <th>Target</th>
+                  <th>Date</th>
+                  <th>Cases</th>
                   <th>Status</th>
+                  <th>Overall</th>
                 </tr>
               </thead>
 
               <tbody>
-                {sloMetrics.map(
-                  (metric) => (
+                {report.historical_runs.map(
+                  (run) => (
                     <tr
-                      key={metric.name}
+                      key={run.run_id}
                     >
                       <td>
-                        {formatMetricName(
-                          metric.name
-                        )}
+                        {new Date(
+                          run.created_at,
+                        ).toLocaleString()}
                       </td>
 
                       <td>
-                        {formatMetricValue(
-                          metric
-                        )}
+                        {run.total_cases}
                       </td>
 
                       <td>
-                        {formatTarget(
-                          metric
-                        )}
+                        {run.status}
                       </td>
 
                       <td>
                         <span
-                          className={`evaluation-status ${
-                            metric.passed
-                              ? "pass"
-                              : "fail"
-                          }`}
+                          className={
+                            run.overall_passed
+                              ? "table-status pass"
+                              : "table-status fail"
+                          }
                         >
-                          {metric.passed
+                          {run.overall_passed
                             ? "PASS"
                             : "FAIL"}
                         </span>
                       </td>
                     </tr>
-                  )
+                  ),
                 )}
               </tbody>
             </table>
           </div>
         )}
-      </div>
-
-      <div className="evaluation-card evaluation-cases-card">
-        <div className="evaluation-card-header">
-          <h3>Evaluation Cases</h3>
-
-          <span>
-            {report.total_cases} cases
-          </span>
-        </div>
-
-        {cases.length === 0 ? (
-          <div className="evaluation-empty">
-            No evaluation cases available.
-          </div>
-        ) : (
-          <div className="evaluation-table-wrapper">
-            <table className="evaluation-table">
-              <thead>
-                <tr>
-                  <th>Test ID</th>
-                  <th>Query</th>
-                  <th>Expected Route</th>
-                  <th>Actual Route</th>
-                  <th>Result</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {cases.map(
-                  (testCase, index) => {
-                    const item =
-                      testCase as Record<
-                        string,
-                        unknown
-                      >;
-
-                    const testId =
-                      item.test_id ??
-                      item.case_id ??
-                      item.id ??
-                      `Case ${index + 1}`;
-
-                    const query =
-                      item.query ??
-                      item.question ??
-                      "";
-
-                    const expectedRoute =
-                      item.expected_route ??
-                      "";
-
-                    const actualRoute =
-                      item.actual_route ??
-                      "";
-
-                    const passed =
-                      item.passed ??
-                      item.success ??
-                      item.evaluation_passed;
-
-                    return (
-                      <tr
-                        key={`${String(
-                          testId
-                        )}-${index}`}
-                      >
-                        <td>
-                          {String(
-                            testId
-                          )}
-                        </td>
-
-                        <td className="evaluation-query">
-                          {String(query)}
-                        </td>
-
-                        <td>
-                          {String(
-                            expectedRoute
-                          )}
-                        </td>
-
-                        <td>
-                          {String(
-                            actualRoute
-                          )}
-                        </td>
-
-                        <td>
-                          {typeof passed ===
-                          "boolean" ? (
-                            <span
-                              className={`evaluation-status ${
-                                passed
-                                  ? "pass"
-                                  : "fail"
-                              }`}
-                            >
-                              {passed
-                                ? "PASS"
-                                : "FAIL"}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  }
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

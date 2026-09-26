@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,8 @@ class DBRAGIngestionService:
     """
     Database-backed RAG ingestion pipeline.
 
+    The caller owns the documents row.
+
     Pipeline:
 
         File
@@ -28,15 +30,11 @@ class DBRAGIngestionService:
           ↓
         Chunking
           ↓
-        LlamaIndex Documents
-          ↓
         Embedding
-          ↓
-        documents
           ↓
         document_chunks
           ↓
-        Supabase pgvector
+        Retrieval cache invalidation
     """
 
     def __init__(
@@ -45,7 +43,6 @@ class DBRAGIngestionService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
     ) -> None:
-
         self.session = session
 
         self.ingestion_service = RAGDocumentIngestionService(
@@ -60,27 +57,24 @@ class DBRAGIngestionService:
     async def ingest_file(
         self,
         file_path: str | Path,
+        document_id: UUID,
         metadata: dict[str, Any] | None = None,
         original_filename: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Load, chunk, embed, and persist chunks for an
+        already-created documents row.
+
+        The caller is responsible for creating the documents
+        row and storing file_data.
+        """
 
         path = Path(file_path)
 
         if not path.exists():
-            raise FileNotFoundError(f"Document not found: {path}")
-
-        # -------------------------------------------------
-        # Determine the canonical document name.
-        #
-        # Swagger uploads are stored temporarily, so
-        # path.name may be something like:
-        #
-        #     tmpuiiusnvc.pdf
-        #
-        # We want to preserve the actual uploaded filename:
-        #
-        #     production_incident_response.pdf
-        # -------------------------------------------------
+            raise FileNotFoundError(
+                f"Document not found: {path}"
+            )
 
         document_name = (
             original_filename.strip()
@@ -89,35 +83,7 @@ class DBRAGIngestionService:
         )
 
         # -------------------------------------------------
-        # Create deterministic content hash.
-        # -------------------------------------------------
-
-        file_bytes = path.read_bytes()
-
-        content_hash = hashlib.sha256(file_bytes).hexdigest()
-
-        # -------------------------------------------------
-        # Avoid ingesting the same document twice.
-        # -------------------------------------------------
-
-        existing_document_id = await self.repository.find_document_by_hash(content_hash)
-
-        if existing_document_id is not None:
-            existing_chunk_count = await self.repository.count_chunks(
-                existing_document_id
-            )
-
-            return {
-                "status": "already_exists",
-                "document_id": str(existing_document_id),
-                "document_name": document_name,
-                "document_type": path.suffix.lower(),
-                "chunks_created": (existing_chunk_count),
-                "embedding_dimension": (self.embedding_service.EMBEDDING_DIMENSION),
-            }
-
-        # -------------------------------------------------
-        # Load + process + chunk.
+        # Load + process + chunk
         # -------------------------------------------------
 
         documents = self.ingestion_service.load_file(
@@ -126,64 +92,37 @@ class DBRAGIngestionService:
         )
 
         if not documents:
-            raise ValueError(f"No chunks generated from {path}.")
+            raise ValueError(
+                f"No chunks generated from {path}."
+            )
 
         # -------------------------------------------------
-        # Replace temporary loader filename metadata with
-        # the original uploaded filename.
+        # Preserve the actual uploaded filename
         # -------------------------------------------------
 
         for document in documents:
             document.metadata["document_name"] = document_name
-
             document.metadata["original_filename"] = document_name
 
         # -------------------------------------------------
-        # Extract metadata from the first chunk.
-        # -------------------------------------------------
-
-        first_metadata = dict(documents[0].metadata)
-
-        # -------------------------------------------------
-        # Build document-level metadata.
+        # Remove any old chunks for this document.
         #
-        # Remove temporary/internal fields and make the
-        # original uploaded filename canonical.
+        # This makes re-ingestion safe and prevents duplicate
+        # chunks if an existing document is reprocessed.
         # -------------------------------------------------
 
-        document_metadata = {
-            key: value
-            for key, value in first_metadata.items()
-            if key
-            not in {
-                "chunk_index",
-                "file_path",
-                "document_name",
-                "original_filename",
-            }
-        }
+        from sqlalchemy import delete
 
-        document_metadata["document_name"] = document_name
+        from app.database.models.knowledge import DocumentChunk
 
-        document_metadata["original_filename"] = document_name
-
-        # -------------------------------------------------
-        # Create documents row.
-        # -------------------------------------------------
-
-        document_id = await self.repository.create_document(
-            document_name=document_name,
-            document_type=path.suffix.lower(),
-            source_url=first_metadata.get("source_url"),
-            product_name=first_metadata.get("product_name"),
-            product_version=first_metadata.get("product_version"),
-            version=first_metadata.get("version"),
-            content_hash=content_hash,
-            metadata=document_metadata,
+        await self.session.execute(
+            delete(DocumentChunk).where(
+                DocumentChunk.document_id == document_id
+            )
         )
 
         # -------------------------------------------------
-        # Create document_chunks rows.
+        # Create document_chunks rows
         # -------------------------------------------------
 
         chunks_created = 0
@@ -195,15 +134,10 @@ class DBRAGIngestionService:
                 if not content:
                     continue
 
-                # -------------------------------------------------
-                # Generate 1536-dimensional embedding.
-                # -------------------------------------------------
-
-                embedding = self.embedding_service.embed_document(content)
-
-                # -------------------------------------------------
-                # Store chunk metadata.
-                # -------------------------------------------------
+                # Generate embedding
+                embedding = self.embedding_service.embed_document(
+                    content
+                )
 
                 chunk_metadata = {
                     **document.metadata,
@@ -214,10 +148,6 @@ class DBRAGIngestionService:
                 }
 
                 token_count = len(content.split())
-
-                # -------------------------------------------------
-                # Insert chunk into document_chunks.
-                # -------------------------------------------------
 
                 await self.repository.create_chunk(
                     document_id=document_id,
@@ -230,30 +160,33 @@ class DBRAGIngestionService:
 
                 chunks_created += 1
 
+            if chunks_created == 0:
+                raise ValueError(
+                    f"No non-empty chunks generated from {path}."
+                )
+
             # -------------------------------------------------
-            # Commit document + chunks.
+            # Commit document chunks
             # -------------------------------------------------
 
             await self.session.commit()
 
-            # -------------------------------------------------
-            # Knowledge-base content changed.
-            # Invalidate retrieval cache so the next query
-            # rebuilds vector/BM25/RRF artifacts once.
-            # -------------------------------------------------
-
-            await FusionRetrievalService.invalidate_cache(
-                reason="document_upload_or_ingestion",
-            )
-
         except Exception:
             await self.session.rollback()
-
             raise
 
         # -------------------------------------------------
-        # Return ingestion result.
+        # Invalidate retrieval cache
         # -------------------------------------------------
+
+        try:
+            await FusionRetrievalService.invalidate_cache(
+                reason="document_upload_or_ingestion"
+            )
+        except Exception:
+            # Cache invalidation failure should not make an
+            # otherwise successful ingestion fail.
+            pass
 
         return {
             "status": "indexed",
@@ -261,5 +194,7 @@ class DBRAGIngestionService:
             "document_name": document_name,
             "document_type": path.suffix.lower(),
             "chunks_created": chunks_created,
-            "embedding_dimension": (self.embedding_service.EMBEDDING_DIMENSION),
+            "embedding_dimension": (
+                self.embedding_service.EMBEDDING_DIMENSION
+            ),
         }

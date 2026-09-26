@@ -11,6 +11,108 @@ from app.llm.static_prompts.resolution_prompt import (
 from app.orchestrator.state import SupportState
 
 
+# Groq on-demand TPM is currently 8,000 tokens for the configured
+# organization/model. Keep the resolve request comfortably below that
+# limit instead of relying on the model gateway to reject oversized calls.
+RESOLVE_MAX_OUTPUT_TOKENS = 600
+MAX_CONVERSATION_CONTEXT_CHARS = 2400
+MAX_HISTORY_MESSAGES = 4
+MAX_HISTORY_MESSAGE_CHARS = 1000
+MAX_RAG_RESULTS = 3
+MAX_RAG_CONTENT_CHARS = 2200
+MAX_HYBRID_RESULTS = 3
+MAX_HYBRID_CONTENT_CHARS = 1200
+
+
+def _truncate_text(value: Any, max_chars: int) -> str:
+    text = str(value or "").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rstrip() + "…"
+
+
+def _compact_history(history: list[Any]) -> list[dict[str, Any]]:
+    compact: list[dict[str, Any]] = []
+
+    for item in history[-MAX_HISTORY_MESSAGES:]:
+        if isinstance(item, dict):
+            compact.append(
+                {
+                    "role": item.get("role"),
+                    "content": _truncate_text(
+                        item.get("content"),
+                        MAX_HISTORY_MESSAGE_CHARS,
+                    ),
+                }
+            )
+        else:
+            compact.append(
+                {
+                    "role": getattr(item, "role", None),
+                    "content": _truncate_text(
+                        getattr(item, "content", ""),
+                        MAX_HISTORY_MESSAGE_CHARS,
+                    ),
+                }
+            )
+
+    return compact
+
+
+def _compact_retrieval_results(
+    retrieval_results: list[Any],
+) -> list[dict[str, Any]]:
+    compact: list[dict[str, Any]] = []
+
+    for result in retrieval_results[:MAX_RAG_RESULTS]:
+        if not isinstance(result, dict):
+            continue
+
+        compact.append(
+            {
+                "title": result.get("title"),
+                "content": _truncate_text(
+                    result.get("content"),
+                    MAX_RAG_CONTENT_CHARS,
+                ),
+                "source": (
+                    result.get("source")
+                    or result.get("document_name")
+                ),
+                "source_url": result.get("source_url"),
+                "relevance_score": result.get("relevance_score"),
+            }
+        )
+
+    return compact
+
+
+def _compact_generic_results(
+    results: list[Any],
+) -> list[Any]:
+    compact: list[Any] = []
+
+    for result in results[:MAX_HYBRID_RESULTS]:
+        if isinstance(result, dict):
+            item = dict(result)
+            for key in ("content", "text", "answer", "result"):
+                if key in item:
+                    item[key] = _truncate_text(
+                        item[key],
+                        MAX_HYBRID_CONTENT_CHARS,
+                    )
+            compact.append(item)
+        else:
+            compact.append(
+                _truncate_text(
+                    result,
+                    MAX_HYBRID_CONTENT_CHARS,
+                )
+            )
+
+    return compact
+
+
 async def resolve_node(
     state: SupportState,
 ) -> dict[str, Any]:
@@ -53,20 +155,13 @@ async def resolve_node(
         # CONVERSATION CONTEXT
         # ========================================================
 
-        conversation_context = (
-            state.get(
-                "conversation_context",
-                "",
-            )
-            or ""
-        ).strip()
+        conversation_context = _truncate_text(
+            state.get("conversation_context", ""),
+            MAX_CONVERSATION_CONTEXT_CHARS,
+        )
 
-        conversation_history = (
-            state.get(
-                "conversation_history",
-                [],
-            )
-            or []
+        conversation_history = _compact_history(
+            state.get("conversation_history") or []
         )
 
         # ========================================================
@@ -75,24 +170,19 @@ async def resolve_node(
 
         retrieval_results = state.get("retrieval_results") or []
 
-        rag_evidence: list[dict[str, Any]] = []
-
-        for result in retrieval_results[:5]:
-            rag_evidence.append(
-                {
-                    "title": result.get("title"),
-                    "content": result.get("content"),
-                    "source": (result.get("source") or result.get("document_name")),
-                    "source_url": result.get("source_url"),
-                    "relevance_score": result.get("relevance_score"),
-                }
-            )
+        rag_evidence = _compact_retrieval_results(
+            retrieval_results
+        )
 
         # ========================================================
         # SQL EVIDENCE
         # ========================================================
 
         sql_rows = state.get("sql_rows") or []
+
+        compact_sql_rows = _compact_generic_results(
+            sql_rows
+        )
 
         sql_evidence = {
             "success": state.get(
@@ -103,14 +193,16 @@ async def resolve_node(
                 "sql_confidence",
                 0.0,
             ),
-            "rows": sql_rows,
+            "rows": compact_sql_rows,
         }
 
         # ========================================================
         # HYBRID EVIDENCE
         # ========================================================
 
-        hybrid_results = state.get("hybrid_results") or []
+        hybrid_results = _compact_generic_results(
+            state.get("hybrid_results") or []
+        )
 
         # ========================================================
         # ACCOUNT VALIDATION
@@ -164,13 +256,11 @@ async def resolve_node(
                 "incident_confidence",
                 0.0,
             ),
-            "mcp_tool_calls": state.get(
-                "mcp_tool_calls",
-                [],
+            "mcp_tool_calls": _compact_generic_results(
+                state.get("mcp_tool_calls") or []
             ),
-            "results": state.get(
-                "incident_results",
-                [],
+            "results": _compact_generic_results(
+                state.get("incident_results") or []
             ),
         }
 
@@ -180,8 +270,8 @@ async def resolve_node(
 
         evidence = {
             "current_customer_question": message,
-            "conversation_context": (conversation_context),
-            "conversation_history": (conversation_history[-10:]),
+            "conversation_context": conversation_context,
+            "conversation_history": conversation_history,
             "intent": state.get("intent"),
             "route": state.get("route"),
             "rag_evidence": rag_evidence,
@@ -216,27 +306,30 @@ async def resolve_node(
         # SERIALIZE DYNAMIC EVIDENCE
         # ========================================================
 
+        # Compact JSON avoids spending tokens on indentation/whitespace.
+        # These objects are already structured evidence, so pretty-printing
+        # them adds no information for the model.
         evidence_text = json.dumps(
             evidence,
-            indent=2,
+            separators=(",", ":"),
             default=str,
         )
 
         account_context = json.dumps(
             account_evidence,
-            indent=2,
+            separators=(",", ":"),
             default=str,
         )
 
         sql_result = json.dumps(
             sql_evidence,
-            indent=2,
+            separators=(",", ":"),
             default=str,
         )
 
         incident_result = json.dumps(
             incident_evidence,
-            indent=2,
+            separators=(",", ":"),
             default=str,
         )
 
@@ -281,6 +374,14 @@ async def resolve_node(
 
         llm = get_llm(
             complexity=complexity,
+        )
+
+        # The configured Groq on-demand TPM limit is 8,000 tokens.
+        # get_llm() currently creates the model with max_tokens=900.
+        # Reserve more headroom for the prompt by overriding the resolve
+        # call to 600 output tokens. The answer format does not require 900.
+        llm = llm.bind(
+            max_tokens=RESOLVE_MAX_OUTPUT_TOKENS,
         )
 
         # ========================================================

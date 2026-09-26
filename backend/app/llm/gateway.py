@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.llm.providers import create_groq_llm
 from app.observability.logging import logger
 
+
 Complexity = Literal[
     "simple",
     "medium",
@@ -37,13 +38,33 @@ class LLMGateway:
     - Select the appropriate model.
     - Control simple/medium/complex routing.
     - Upgrade high-risk requests.
+    - Provide automatic model fallback.
     - Keep agents independent from providers.
-    - Provide one central location for future
-      retry, timeout, budget and fallback logic.
+    - Centralize future retry, timeout and budget logic.
+
+    Routing:
+
+        simple
+            -> Groq GPT-OSS-20B
+            -> fallback: Groq GPT-OSS-120B
+
+        medium
+            -> Groq GPT-OSS-20B
+            -> fallback: Groq GPT-OSS-120B
+
+        complex
+            -> Groq GPT-OSS-120B
+
+        high-risk
+            -> Groq GPT-OSS-120B
     """
 
     def __init__(self) -> None:
         self.settings = get_settings()
+
+    # ============================================================
+    # ROUTING
+    # ============================================================
 
     def route(
         self,
@@ -54,38 +75,34 @@ class LLMGateway:
         """
         Determine which provider/model should handle
         the workload.
-
-        Routing policy:
-
-        simple
-            -> Groq GPT-OSS-20B
-
-        medium
-            -> Groq GPT-OSS-20B
-
-        complex
-            -> Groq GPT-OSS-120B
-
-        high_risk
-            -> minimum complex model
         """
 
-        normalized_complexity = complexity.strip().lower()
+        normalized_complexity = (
+            complexity.strip().lower()
+        )
 
         if normalized_complexity not in {
             "simple",
             "medium",
             "complex",
         }:
-            raise ValueError(f"Unsupported LLM complexity: {complexity}")
+            raise ValueError(
+                f"Unsupported LLM complexity: {complexity}"
+            )
 
-        # High-risk requests must use the
-        # complex model.
+        # --------------------------------------------------------
+        # HIGH-RISK REQUESTS
+        # --------------------------------------------------------
+
         if high_risk and normalized_complexity in {
             "simple",
             "medium",
         }:
             normalized_complexity = "complex"
+
+        # --------------------------------------------------------
+        # SIMPLE
+        # --------------------------------------------------------
 
         if normalized_complexity == "simple":
             return LLMRoute(
@@ -94,10 +111,14 @@ class LLMGateway:
                 complexity="simple",
                 reason=(
                     "Simple workload routed to "
-                    "Groq GPT-OSS-20B for "
-                    "cost-efficient processing."
+                    "Groq GPT-OSS-20B with "
+                    "GPT-OSS-120B fallback."
                 ),
             )
+
+        # --------------------------------------------------------
+        # MEDIUM
+        # --------------------------------------------------------
 
         if normalized_complexity == "medium":
             return LLMRoute(
@@ -106,17 +127,50 @@ class LLMGateway:
                 complexity="medium",
                 reason=(
                     "Medium workload routed to "
-                    "Groq GPT-OSS-20B for "
-                    "cost-efficient processing."
+                    "Groq GPT-OSS-20B with "
+                    "GPT-OSS-120B fallback."
                 ),
             )
+
+        # --------------------------------------------------------
+        # COMPLEX
+        # --------------------------------------------------------
 
         return LLMRoute(
             provider="groq",
             model=self.settings.groq_complex_model,
             complexity="complex",
-            reason=("Complex or high-risk workload routed to Groq GPT-OSS-120B."),
+            reason=(
+                "Complex or high-risk workload routed "
+                "to Groq GPT-OSS-120B."
+            ),
         )
+
+    # ============================================================
+    # CREATE PRIMARY LLM
+    # ============================================================
+
+    def _create_primary_llm(
+        self,
+        *,
+        route: LLMRoute,
+    ) -> BaseChatModel:
+        """
+        Create the primary LLM for the selected route.
+        """
+
+        if route.provider != "groq":
+            raise RuntimeError(
+                f"Unsupported LLM provider: {route.provider}"
+            )
+
+        return create_groq_llm(
+            complexity=route.complexity,
+        )
+
+    # ============================================================
+    # GET LLM
+    # ============================================================
 
     def get_llm(
         self,
@@ -126,6 +180,17 @@ class LLMGateway:
     ) -> BaseChatModel:
         """
         Create the LLM selected by the gateway.
+
+        For simple/medium requests:
+
+            GPT-OSS-20B
+                    |
+                    | failure / rate limit
+                    v
+            GPT-OSS-120B
+
+        Complex/high-risk requests directly use
+        GPT-OSS-120B.
         """
 
         route = self.route(
@@ -144,14 +209,66 @@ class LLMGateway:
             route.reason,
         )
 
-        if route.provider == "groq":
-            return create_groq_llm(complexity=route.complexity)
+        primary_llm = self._create_primary_llm(
+            route=route,
+        )
 
-        raise RuntimeError(f"Unsupported LLM provider: {route.provider}")
+        # --------------------------------------------------------
+        # COMPLEX ROUTES
+        # --------------------------------------------------------
+        #
+        # Complex/high-risk already uses the large model.
+        # There is no second Groq model configured here.
+        #
 
+        if route.complexity == "complex":
+            return primary_llm
+
+        # --------------------------------------------------------
+        # SIMPLE / MEDIUM FALLBACK
+        # --------------------------------------------------------
+        #
+        # If GPT-OSS-20B hits a rate limit or another provider
+        # error, automatically retry the same request against
+        # GPT-OSS-120B.
+        #
+
+        fallback_route = LLMRoute(
+            provider="groq",
+            model=self.settings.groq_complex_model,
+            complexity="complex",
+            reason=(
+                "Fallback from Groq GPT-OSS-20B "
+                "to GPT-OSS-120B."
+            ),
+        )
+
+        fallback_llm = self._create_primary_llm(
+            route=fallback_route,
+        )
+
+        logger.info(
+            "LLM Gateway fallback configured: "
+            "primary=%s fallback=%s",
+            route.model,
+            fallback_route.model,
+        )
+
+        return primary_llm.with_fallbacks(
+            [fallback_llm],
+        )
+
+
+# ================================================================
+# SINGLETON
+# ================================================================
 
 llm_gateway = LLMGateway()
 
+
+# ================================================================
+# CONVENIENCE FUNCTION
+# ================================================================
 
 def get_llm(
     complexity: Complexity = "simple",

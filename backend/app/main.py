@@ -33,6 +33,7 @@ from app.database.connection import check_database_connection, get_db_session
 # are known to SQLAlchemy.
 #
 from app.database.models import registry  # noqa: F401
+from app.evaluation.runtime import get_production_evaluator
 from app.evaluation.report_api import router as evaluation_router
 from app.observability.logging import logger
 from app.orchestrator.graph import build_support_graph
@@ -81,6 +82,30 @@ async def _prewarm_retrieval_cache() -> None:
         logger.info(
             "RAG: background retrieval prewarm completed top_k=%s",
             similarity_top_k,
+        )
+
+
+async def _prewarm_ragas_evaluator() -> None:
+    """
+    Warm the production evaluator in the background.
+
+    This avoids first asynchronous RAGAS evaluation paying
+    initialization overhead during a live chat flow.
+    """
+
+    logger.info("RAGAS: background evaluator prewarm started")
+
+    try:
+        evaluator = await get_production_evaluator()
+        await evaluator.ragas_evaluator.prewarm()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "RAGAS: background evaluator prewarm failed: %s",
+            exc,
+        )
+    else:
+        logger.info(
+            "RAGAS: background evaluator prewarm completed"
         )
 
 
@@ -185,7 +210,12 @@ async def lifespan(app: FastAPI):
             _prewarm_retrieval_cache()
         )
 
+        ragas_prewarm_task = asyncio.create_task(
+            _prewarm_ragas_evaluator()
+        )
+
         app.state.rag_prewarm_task = prewarm_task
+        app.state.ragas_prewarm_task = ragas_prewarm_task
 
         # ----------------------------------------------------
         # Application is ready
@@ -200,6 +230,14 @@ async def lifespan(app: FastAPI):
 
                 try:
                     await prewarm_task
+                except asyncio.CancelledError:
+                    pass
+
+            if not ragas_prewarm_task.done():
+                ragas_prewarm_task.cancel()
+
+                try:
+                    await ragas_prewarm_task
                 except asyncio.CancelledError:
                     pass
 
