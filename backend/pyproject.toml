@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "enterprise-software-support-resolution-ai"
 version = "0.1.0"
 description = "Enterprise Software Support and Resolution Intelligence System"
-requires-python = ">=3.13"
+requires-python = "==3.13.*"
 
 dependencies = [
     "fastapi",                              # Web API framework for ERIS REST endpoints.
