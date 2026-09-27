@@ -6,9 +6,9 @@ An enterprise SaaS support application in which customers interact primarily wit
 
 ## Project Status
 
-> **Current stage:** Backend foundation and Supabase database setup.
+> **Current stage:** Backend foundation, Supabase database, authentication, RBAC, and support-agent provisioning completed.
 >
-> FastAPI is running locally, the Supabase PostgreSQL schema has been created, and synthetic seed data is being prepared. The remaining AI, authentication, RAG, NL2SQL, hybrid routing, escalation, evaluation, and frontend modules are implemented incrementally.
+> FastAPI is running locally, the Supabase PostgreSQL schema has been created, customer registration/login is implemented, JWT authentication and bcrypt password hashing are in place, RBAC distinguishes customers from support agents, and development support-agent accounts can be provisioned through the seed script. Customer profile and ticket APIs are the next implementation milestone.
 
 ## Objectives
 
@@ -159,7 +159,8 @@ enterprise-software-support-resolution-ai/
 |   |   |-- sql/
 |   |   |-- database/
 |   |   |   |-- connection.py
-|   |   |   |-- models.py
+|   |   |   |-- model_registry.py
+|   |   |   |-- models/
 |   |   |   `-- repositories/
 |   |   |-- guardrails/
 |   |   |-- services/
@@ -172,6 +173,8 @@ enterprise-software-support-resolution-ai/
 |   |   |-- evaluation/
 |   |   `-- schemas/
 |   |
+|   |-- scripts/
+|   |   `-- seed_users.py
 |   |-- tests/
 |   |-- requirements.txt
 |   |-- .env.example
@@ -360,8 +363,30 @@ From `backend/`:
 
 ```bash
 source .venv/bin/activate
+pip install --force-reinstall PyJWT
+pip install "mcp[cli]"
 uvicorn app.main:app --reload
 ```
+python -m scripts.generate_graph_diagram
+ pytest -q tests --cov=app --cov-report=term-missing
+
+ python -m app.evaluation.run_benchmark
+
+ python -m pytest tests/unit --cov=app --cov-report=term-missing
+
+ruff check . --fix && ruff format .
+
+
+Step 1: React/Vite project + base UI
+Step 2: Login/Register
+Step 3: Dashboard layout
+Step 4: AI Chat
+Step 5: Tickets
+Step 6: Knowledge Base upload
+Step 7: Agent escalation view
+Step 8: Admin SLO dashboard
+Step 9: Connect everything to Cloud Run
+Step 10: Final testing/deployment
 
 Open:
 
@@ -406,6 +431,8 @@ GET  /support/escalations/{ticket_id}
 POST /support/tickets/{ticket_id}/reply
 POST /support/tickets/{ticket_id}/resolve
 ```
+
+
 
 ### Infrastructure
 
@@ -610,6 +637,7 @@ The security model separates two application roles:
 - Can access their own tickets
 - Can use the AI support chat
 - Cannot access internal support evidence or other customers' data
+- Can self-register through the public registration endpoint
 
 ### Support Agent
 
@@ -617,8 +645,43 @@ The security model separates two application roles:
 - Can review investigation evidence
 - Can reply to customers
 - Can resolve tickets
+- Is provisioned internally rather than through public self-registration
 
 Authentication and authorization are enforced at the application boundary with role and resource checks.
+
+### Current Authentication Implementation
+
+The backend currently provides:
+
+```text
+POST /auth/register
+POST /auth/login
+GET  /auth/me
+GET  /auth/customer-test
+GET  /auth/support-test
+```
+
+Customer registration collects:
+
+- Full name
+- Company name
+- Email
+- Password
+- Password confirmation
+
+The backend assigns the `customer` role and creates the linked `users` and `customers` records.
+
+Passwords are stored only as bcrypt hashes. Plaintext passwords are never persisted.
+
+Support-agent development accounts are provisioned with:
+
+```text
+backend/scripts/seed_users.py
+```
+
+The seed script reads development credentials from the local environment, generates bcrypt hashes, and creates or updates support-agent accounts. Development credentials must not be committed to source control.
+
+Public registration must never allow a caller to choose `support_agent` as their role.
 
 ## Escalation Rules
 
@@ -751,14 +814,53 @@ Expected behavior:
 - Reject the unsafe request
 - Do not execute unrestricted SQL
 
+## Current Implementation Milestone
+
+The backend foundation is now functional through authentication and authorization:
+
+```text
+Customer Registration
+        |
+        v
+users + customers
+        |
+        v
+JWT Login
+        |
+        v
+Authenticated Request
+        |
+        +----> Customer RBAC
+        |
+        +----> Support Agent RBAC
+```
+
+Completed backend security capabilities:
+
+- Customer self-registration
+- Email normalization
+- Password confirmation validation
+- bcrypt password hashing and verification
+- JWT access tokens
+- Authenticated `/auth/me`
+- Customer-only route protection
+- Support-agent-only route protection
+- Development support-agent provisioning
+- Active/inactive account checks
+- Duplicate-email protection
+
+The next milestone is to expose customer account/profile information through an authenticated Customer API and then implement ticket management.
+
 ## Development Order
 
-1. FastAPI foundation and configuration
-2. Supabase PostgreSQL + pgvector
-3. SQLAlchemy models and repositories
-4. Authentication and RBAC
-5. Customer APIs
-6. LangGraph workflow foundation
+1. FastAPI foundation and configuration — **Completed**
+2. Supabase PostgreSQL + pgvector — **Completed**
+3. SQLAlchemy models and repositories — **Completed**
+4. Authentication and RBAC — **Completed**
+5. Support-agent development provisioning — **Completed**
+6. Customer Profile APIs — **Next**
+7. Ticket Management APIs
+8. LangGraph workflow foundation
 7. LLM Gateway
 8. RAG ingestion and retrieval
 9. BM25 + vector search + RRF + re-ranking
